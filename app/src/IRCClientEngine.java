@@ -3,9 +3,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class IRCClientEngine {
 
@@ -14,7 +18,8 @@ public class IRCClientEngine {
     private final REPL terminal;
 
     private volatile boolean running = false;
-    private volatile IRCClientState state = IRCClientState.CONNECTING;
+    private volatile IRCClientState state = IRCClientState.DISCONNECTED;
+    private volatile String channel = null;
 
     private Thread workerThread; // handles outgoing commands
     private Thread readerThread; // handles incoming server messages
@@ -42,8 +47,7 @@ public class IRCClientEngine {
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         out = new PrintWriter(socket.getOutputStream(), true);
 
-        terminal.println("Connected to IRC server %s/%d".formatted(properties.getHost(), properties.getPort()));
-        state = IRCClientState.SENDING_NICKNAME;
+        state = IRCClientState.CONNECTING;
         running = true;
 
         // Outgoing command processing thread
@@ -76,14 +80,16 @@ public class IRCClientEngine {
         while (running) {
             try {
                 switch (state) {
-                    case CONNECTING: break; // do nothing
-                    case SENDING_NICKNAME:
+                    case DISCONNECTED: break; // do nothing
+                    case CONNECTING:
                         sendNicknameCommand();
-                        break;
-                    case SENDING_USER:
                         sendUserCommand();
+                        this.state = IRCClientState.REGISTERING;
                         break;
-                    case CHATTING:
+                    case REGISTERING:
+                        Thread.sleep(100);
+                        break;
+                    case REGISTERED:
                         IRCClientCommand command = commands.poll(100, TimeUnit.MILLISECONDS);
                         if (command != null) {
                             handleCommand(command);
@@ -101,7 +107,6 @@ public class IRCClientEngine {
         try {
             String line;
             while (running && (line = in.readLine()) != null) {
-                terminal.println("[SERVER] " + line);
                 IRCMessage message = IRCMessageParser.parse(line);
                 handleServerMessage(message);
             }
@@ -116,28 +121,70 @@ public class IRCClientEngine {
 
     private void handleServerMessage(IRCMessage message) {
         switch (message.getCommand()) {
+            case "001" -> {
+                terminal.setPrompt("[%s%s%s@%s%s%s]: ".formatted(
+                        Colorizer.colorize(properties.getNickname()), properties.getNickname(), Colorizer.SUFFIX,
+                        Colorizer.colorize(properties.getHost().getHostName()), properties.getHost().getHostName(), Colorizer.SUFFIX
+                ));
+                terminal.println(message.getParams().getLast());
+                this.state = IRCClientState.REGISTERED;
+            }
             case "PING" -> sendPong(message.getParams().getFirst());
+            case "PRIVMSG" -> printPrivateMessage(message);
+            default -> terminal.println("[SERVER] %s %s %s".formatted(message.getPrefix(), message.getCommand(), message.getParams()));
         }
     }
 
-    private void handleCommand(IRCClientCommand msg) {
-        // TODO: serialize msg into IRC protocol format and send via `out.println(...)`
-        terminal.println("[ENGINE] Received command: " + msg);
+    private void handleCommand(IRCClientCommand message) {
+        switch (message.getCommand()) {
+            case "JOIN" -> sendJoin(message.getParams().getFirst());
+            case "PRIVMSG" -> sendPrivateMessage(message.getParams().getFirst(), message.getParams().getLast());
+            default -> {}
+        }
     }
 
     private void sendNicknameCommand() {
         out.printf("NICK %s\r\n", properties.getNickname());
         terminal.println("[ENGINE] Sending nickname command");
-        state = IRCClientState.SENDING_USER;
     }
 
     private void sendUserCommand() {
         out.printf("USER %s 0 * :%s\r\n", properties.getNickname(), properties.getRealName());
         terminal.println("[ENGINE] Sending user command");
-        state = IRCClientState.CHATTING;
     }
 
     private void sendPong(String value) {
         out.printf("PONG :%s\r\n", value);
+    }
+
+    private void sendJoin(String channel) {
+        out.printf("JOIN :%s\r\n", channel);
+    }
+
+    private void sendPrivateMessage(String channel, String message) {
+        out.printf("PRIVMSG %s :%s\r\n", channel, message);
+        printMessage(properties.getNickname(), channel, message);
+    }
+
+    private void printPrivateMessage(IRCMessage message) {
+        Pattern prefixPattern = Pattern.compile("^(?<nick>[a-zA-Z0-9]+)!(?<user>[a-zA-Z0-9~]+)@(?<host>[a-zA-Z0-9._-]+)$");
+        Matcher matcher = prefixPattern.matcher(message.getPrefix());
+        if (!matcher.matches()) {
+            terminal.println("Error receiving private message");
+        }
+        String nick = matcher.group("nick");
+        String user = matcher.group("user");
+        String host = matcher.group("host");
+        String channel = message.getParams().getFirst();
+        printMessage(nick, channel, message.getParams().getLast());
+    }
+
+    private void printMessage(String nick, String channel, String text) {
+        String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        terminal.println("%8s %s%10s%s -> %s%-10s%s \033[0;36m|\033[0m %s".formatted(
+                time,
+                Colorizer.colorize(nick), nick, Colorizer.SUFFIX,
+                Colorizer.colorize(channel), channel, Colorizer.SUFFIX,
+                text));
     }
 }

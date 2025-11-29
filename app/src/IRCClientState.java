@@ -1,6 +1,6 @@
 public enum IRCClientState {
+    DISCONNECTED,
     CONNECTING,
-    SENDING_NICKNAME,
-    SENDING_USER,
-    CHATTING
+    REGISTERING,
+    REGISTERED
 }

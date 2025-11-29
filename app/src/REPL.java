@@ -44,6 +44,7 @@ public abstract class REPL {
         }
     }
 
+    public abstract void setPrompt(String prompt);
     public abstract void println(String text);
     public abstract void start();
     public abstract void stop();
@@ -59,6 +60,11 @@ public abstract class REPL {
         public SimpleREPL(InputStream in, PrintStream out) {
             super(in, out);
             this.inReader = new BufferedReader(new InputStreamReader(in));
+        }
+
+        @Override
+        public void setPrompt(String prompt) {
+            // noop
         }
 
         @Override
