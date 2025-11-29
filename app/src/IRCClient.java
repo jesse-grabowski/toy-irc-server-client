@@ -1,33 +1,15 @@
+import java.io.IOException;
+
 public class IRCClient {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         IRCClientProperties properties = parseArgs(args);
 
         REPL.InteractiveREPL repl = new REPL.InteractiveREPL(System.in, System.out);
-        repl.addInputHandler(repl::println);
-        new Thread(() -> {
-            int i = 0;
-            while (true) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                repl.println("Hello from server %d".formatted(i++));
-            }
-        }).start();
-        new Thread(() -> {
-            int i = 0;
-            while (true) {
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                repl.setPrompt("[%d]: ".formatted(i++));
-            }
-        }).start();
-
+        IRCClientEngine engine = new IRCClientEngine(properties, repl);
+        IRCClientCommandParser parser = new IRCClientCommandParser(repl, engine);
+        repl.addInputHandler(parser::accept);
+        engine.start();
         repl.start();
     }
 
@@ -35,7 +17,9 @@ public class IRCClient {
         ArgsParser<IRCClientProperties> argsParser = new ArgsParser<>(IRCClient.class, IRCClientProperties::new)
                 .addInetAddressPositional(0, IRCClientProperties::setHost, "hostname of the IRC server", true)
                 .addIntegerFlag('p', "port", IRCClientProperties::setPort, "port of the IRC server (default 6667)", false)
-                .addBooleanFlag('s', "simple-ui", IRCClientProperties::setUseSimpleTerminal, "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)", false);
+                .addBooleanFlag('s', "simple-ui", IRCClientProperties::setUseSimpleTerminal, "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)", false)
+                .addStringFlag('n', "nickname", IRCClientProperties::setNickname, "nickname of the IRC user", false)
+                .addStringFlag('r', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false);
 
         try {
             return argsParser.parse(args);

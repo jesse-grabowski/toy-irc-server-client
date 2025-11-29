@@ -6,6 +6,8 @@ public class IRCClientProperties implements ArgsProperties {
     private InetAddress host;
     private int port = 6667;
     private boolean useSimpleTerminal = false;
+    private String nickname = "auto";
+    private String realName = "Unknown";
 
     @Override
     public void validate() {
@@ -36,5 +38,21 @@ public class IRCClientProperties implements ArgsProperties {
 
     public void setUseSimpleTerminal(boolean useSimpleTerminal) {
         this.useSimpleTerminal = useSimpleTerminal;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public String getRealName() {
+        return realName;
+    }
+
+    public void setRealName(String realName) {
+        this.realName = realName;
     }
 }
