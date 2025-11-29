@@ -1,3 +1,5 @@
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -54,11 +56,24 @@ public class ArgsParser<T extends ArgsProperties> {
         return this;
     }
 
+    public ArgsParser<T> addInetAddressPositional(int position, BiConsumer<T, InetAddress> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, this::tryParseInetAddress, description, required));
+        return this;
+    }
+
     private int tryParseInt(String value) {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("expected integer but got '%s'".formatted(value), e);
+        }
+    }
+
+    private InetAddress tryParseInetAddress(String value) {
+        try {
+            return InetAddress.getByName(value);
+        } catch (UnknownHostException e) {
+            throw new IllegalArgumentException("failed to resolve hostname '%s'".formatted(value), e);
         }
     }
 

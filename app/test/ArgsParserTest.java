@@ -299,18 +299,15 @@ class ArgsParserTest {
     @Test
     void badPositionalValueIsWrappedWithContext() {
         ArgsParser<TestProps> parser = newParser()
-                .addStringPositional(0, (p, v) -> {
-                    if (v.isEmpty()) throw new IllegalArgumentException("must not be empty");
-                    p.input = v;
-                }, "input file", true);
+                .addInetAddressPositional(0, (p, v) -> p.input = v.toString(), "input file", true);
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> parser.parse(new String[]{""})
+                () -> parser.parse(new String[]{"|"})
         );
 
         assertTrue(ex.getMessage().contains("Illegal value at index 0"));
-        assertTrue(ex.getMessage().contains("must not be empty"));
+        assertTrue(ex.getMessage().contains("failed to resolve hostname"));
         assertNotNull(ex.getCause());
     }
 
