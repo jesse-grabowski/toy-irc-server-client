@@ -1,6 +1,6 @@
 public class Colorizer {
-    public static final String PREFIX = "\033[38;2;";
-    public static final String SUFFIX = "\033[0m";
+    private static final String PREFIX = "\033[38;2;";
+    private static final String SUFFIX = "\033[0m";
 
     public static String colorize(String s) {
         if (s == null) {
@@ -29,7 +29,7 @@ public class Colorizer {
         int[] rgb = hsvToRgb(hue, saturation, value);
         int r = rgb[0], g = rgb[1], b = rgb[2];
 
-        return PREFIX + r + ";" + g + ";" + b + "m";
+        return PREFIX + r + ";" + g + ";" + b + "m" + s + SUFFIX;
     }
 
     // I outsourced this to ChatGPT, but it probably won't blow up

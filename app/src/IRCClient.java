@@ -5,12 +5,15 @@ public class IRCClient {
     public static void main(String[] args) throws IOException {
         IRCClientProperties properties = parseArgs(args);
 
-        TUI.InteractiveTUI repl = new TUI.InteractiveTUI(System.in, System.out);
-        IRCClientEngine engine = new IRCClientEngine(properties, repl);
-        IRCClientCommandParser parser = new IRCClientCommandParser(repl, engine);
-        repl.addInputHandler(parser::accept);
+        TerminalUI terminalUI = STTY.isAvailable() && !properties.isUseSimpleTerminal()
+                ? new FancyTerminalUI()
+                : new StdIOTerminalUI();
+        terminalUI.start();
+
+        IRCClientEngine engine = new IRCClientEngine(properties, terminalUI);
+        IRCClientCommandParser parser = new IRCClientCommandParser(terminalUI, engine);
+        terminalUI.addInputHandler(parser::accept);
         engine.start();
-        repl.start();
     }
 
     private static IRCClientProperties parseArgs(String[] args) {

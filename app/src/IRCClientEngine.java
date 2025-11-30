@@ -13,9 +13,12 @@ import java.util.regex.Pattern;
 
 public class IRCClientEngine {
 
+    private static final String SYSTEM_SENDER = "SYSTEM";
+    private static final String SERVER_SENDER = "SERVER";
+
     private final BlockingQueue<IRCClientCommand> commands = new LinkedBlockingQueue<>();
     private final IRCClientProperties properties;
-    private final TUI terminal;
+    private final TerminalUI terminal;
 
     private volatile boolean running = false;
     private volatile IRCClientState state = IRCClientState.DISCONNECTED;
@@ -28,7 +31,7 @@ public class IRCClientEngine {
     private BufferedReader in;
     private PrintWriter out;
 
-    public IRCClientEngine(IRCClientProperties properties, TUI terminal) {
+    public IRCClientEngine(IRCClientProperties properties, TerminalUI terminal) {
         this.properties = properties;
         this.terminal = terminal;
     }
@@ -72,7 +75,7 @@ public class IRCClientEngine {
             if (socket != null) socket.close();
         } catch (IOException ignored) {}
 
-        terminal.println("IRCClientEngine stopped");
+        terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "IRCClientEngine stopped"));
     }
 
     /** Background thread: processes outgoing commands */
@@ -112,7 +115,7 @@ public class IRCClientEngine {
             }
         } catch (IOException e) {
             if (running) {
-                terminal.println("Error reading from server: " + e.getMessage());
+                terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Error reading from server: " + e.getMessage()));
             }
         } finally {
             stop();
@@ -122,16 +125,13 @@ public class IRCClientEngine {
     private void handleServerMessage(IRCMessage message) {
         switch (message.getCommand()) {
             case "001" -> {
-                terminal.setPrompt("[%s%s%s@%s%s%s]: ".formatted(
-                        Colorizer.colorize(properties.getNickname()), properties.getNickname(), Colorizer.SUFFIX,
-                        Colorizer.colorize(properties.getHost().getHostName()), properties.getHost().getHostName(), Colorizer.SUFFIX
-                ));
-                terminal.println(message.getParams().getLast());
+                terminal.setPrompt("[%s@%s]: ".formatted(properties.getNickname(), properties.getHost().getHostName()));
+                terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, message.getParams().getLast()));
                 this.state = IRCClientState.REGISTERED;
             }
             case "PING" -> sendPong(message.getParams().getFirst());
             case "PRIVMSG" -> printPrivateMessage(message);
-            default -> terminal.println("[SERVER] %s %s %s".formatted(message.getPrefix(), message.getCommand(), message.getParams()));
+            default -> terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, "%s %s %s".formatted(message.getPrefix(), message.getCommand(), message.getParams())));
         }
     }
 
@@ -139,18 +139,19 @@ public class IRCClientEngine {
         switch (message.getCommand()) {
             case "JOIN" -> sendJoin(message.getParams().getFirst());
             case "PRIVMSG" -> sendPrivateMessage(message.getParams().getFirst(), message.getParams().getLast());
+            case "EXIT" -> exit();
             default -> {}
         }
     }
 
     private void sendNicknameCommand() {
         out.printf("NICK %s\r\n", properties.getNickname());
-        terminal.println("[ENGINE] Sending nickname command");
+        terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending nickname command"));
     }
 
     private void sendUserCommand() {
         out.printf("USER %s 0 * :%s\r\n", properties.getNickname(), properties.getRealName());
-        terminal.println("[ENGINE] Sending user command");
+        terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending user command"));
     }
 
     private void sendPong(String value) {
@@ -170,7 +171,7 @@ public class IRCClientEngine {
         Pattern prefixPattern = Pattern.compile("^(?<nick>[a-zA-Z0-9]+)!(?<user>[a-zA-Z0-9~]+)@(?<host>[a-zA-Z0-9._-]+)$");
         Matcher matcher = prefixPattern.matcher(message.getPrefix());
         if (!matcher.matches()) {
-            terminal.println("Error receiving private message");
+            terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Error receiving private message"));
         }
         String nick = matcher.group("nick");
         String user = matcher.group("user");
@@ -180,11 +181,11 @@ public class IRCClientEngine {
     }
 
     private void printMessage(String nick, String channel, String text) {
-        String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-        terminal.println("%8s %s%10s%s -> %s%-10s%s \033[0;36m|\033[0m %s".formatted(
-                time,
-                Colorizer.colorize(nick), nick, Colorizer.SUFFIX,
-                Colorizer.colorize(channel), channel, Colorizer.SUFFIX,
-                text));
+        terminal.println(new TerminalMessage(LocalTime.now(), nick, text));
+    }
+
+    private void exit() {
+        this.stop();
+        terminal.stop();
     }
 }

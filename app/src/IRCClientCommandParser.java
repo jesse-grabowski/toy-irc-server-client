@@ -1,12 +1,13 @@
+import java.time.LocalTime;
 import java.util.List;
 
 public class IRCClientCommandParser {
 
-    private final TUI TUI;
+    private final TerminalUI terminal;
     private final IRCClientEngine engine;
 
-    public IRCClientCommandParser(TUI TUI, IRCClientEngine engine) {
-        this.TUI = TUI;
+    public IRCClientCommandParser(TerminalUI terminal, IRCClientEngine engine) {
+        this.terminal = terminal;
         this.engine = engine;
     }
 
@@ -15,7 +16,7 @@ public class IRCClientCommandParser {
         if (c != null) {
             engine.send(c);
         } else {
-            TUI.println("Failed to parse command: " + command);
+            terminal.println(new TerminalMessage(LocalTime.now(), "SYSTEM", "Failed to parse command: " + command));
         }
     }
 
@@ -32,6 +33,11 @@ public class IRCClientCommandParser {
                 IRCClientCommand c = new IRCClientCommand();
                 c.setCommand("PRIVMSG");
                 c.setParams(List.of(parts[1], command.split("\\s+", 3)[2]));
+                yield c;
+            }
+            case "/exit" -> {
+                IRCClientCommand c = new IRCClientCommand();
+                c.setCommand("EXIT");
                 yield c;
             }
             default -> null;
