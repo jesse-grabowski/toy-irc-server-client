@@ -15,7 +15,7 @@ public class IRCClientEngine {
 
     private final BlockingQueue<IRCClientCommand> commands = new LinkedBlockingQueue<>();
     private final IRCClientProperties properties;
-    private final REPL terminal;
+    private final TUI terminal;
 
     private volatile boolean running = false;
     private volatile IRCClientState state = IRCClientState.DISCONNECTED;
@@ -28,7 +28,7 @@ public class IRCClientEngine {
     private BufferedReader in;
     private PrintWriter out;
 
-    public IRCClientEngine(IRCClientProperties properties, REPL terminal) {
+    public IRCClientEngine(IRCClientProperties properties, TUI terminal) {
         this.properties = properties;
         this.terminal = terminal;
     }

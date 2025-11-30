@@ -5,7 +5,7 @@ public class IRCClient {
     public static void main(String[] args) throws IOException {
         IRCClientProperties properties = parseArgs(args);
 
-        REPL.InteractiveREPL repl = new REPL.InteractiveREPL(System.in, System.out);
+        TUI.InteractiveTUI repl = new TUI.InteractiveTUI(System.in, System.out);
         IRCClientEngine engine = new IRCClientEngine(properties, repl);
         IRCClientCommandParser parser = new IRCClientCommandParser(repl, engine);
         repl.addInputHandler(parser::accept);

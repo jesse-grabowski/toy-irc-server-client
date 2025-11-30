@@ -1,13 +1,12 @@
-import java.util.Arrays;
 import java.util.List;
 
 public class IRCClientCommandParser {
 
-    private final REPL repl;
+    private final TUI TUI;
     private final IRCClientEngine engine;
 
-    public IRCClientCommandParser(REPL repl, IRCClientEngine engine) {
-        this.repl = repl;
+    public IRCClientCommandParser(TUI TUI, IRCClientEngine engine) {
+        this.TUI = TUI;
         this.engine = engine;
     }
 
@@ -16,7 +15,7 @@ public class IRCClientCommandParser {
         if (c != null) {
             engine.send(c);
         } else {
-            repl.println("Failed to parse command: " + command);
+            TUI.println("Failed to parse command: " + command);
         }
     }
 
