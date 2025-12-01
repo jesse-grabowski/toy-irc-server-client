@@ -1,31 +1,56 @@
-import java.util.List;
+import java.util.SequencedMap;
 
-public class IRCMessage {
-    private String prefix;
-    private String command;
-    private List<String> params;
+public sealed abstract class IRCMessage permits
+        // standard messages
+        IRCMessageJOIN0, IRCMessageJOINNormal, IRCMessageNICK, IRCMessagePING, IRCMessagePONG, IRCMessagePRIVMSG, IRCMessageUSER,
+        // numerics
+        IRCMessage001,
+        // other / unsupported
+        IRCMessageUnsupported, IRCMessageParseError {
 
-    public String getPrefix() {
-        return prefix;
+    private final String rawMessage;
+
+    private final SequencedMap<String, String> tags;
+    private final String prefixName;
+    private final String prefixUser;
+    private final String prefixHost;
+    private final String command;
+
+    protected IRCMessage(String command,
+                         String rawMessage,
+                         SequencedMap<String, String> tags,
+                         String prefixName,
+                         String prefixUser,
+                         String prefixHost) {
+        this.rawMessage = rawMessage;
+        this.tags = tags;
+        this.prefixName = prefixName;
+        this.prefixUser = prefixUser;
+        this.prefixHost = prefixHost;
+        this.command = command;
     }
 
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
+    public String getRawMessage() {
+        return rawMessage;
+    }
+
+    public SequencedMap<String, String> getTags() {
+        return tags;
+    }
+
+    public String getPrefixName() {
+        return prefixName;
+    }
+
+    public String getPrefixUser() {
+        return prefixUser;
+    }
+
+    public String getPrefixHost() {
+        return prefixHost;
     }
 
     public String getCommand() {
         return command;
-    }
-
-    public void setCommand(String command) {
-        this.command = command;
-    }
-
-    public List<String> getParams() {
-        return params;
-    }
-
-    public void setParams(List<String> params) {
-        this.params = params;
     }
 }

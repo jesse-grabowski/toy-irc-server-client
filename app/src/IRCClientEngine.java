@@ -4,6 +4,8 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -109,7 +111,7 @@ public class IRCClientEngine {
         try {
             String line;
             while (running && (line = in.readLine()) != null) {
-                IRCMessage message = IRCMessageParser.parse(line);
+                IRCMessage message = new IRCMessageUnmarshaller().unmarshal(line);
                 handleServerMessage(message);
             }
         } catch (IOException e) {
@@ -122,15 +124,15 @@ public class IRCClientEngine {
     }
 
     private void handleServerMessage(IRCMessage message) {
-        switch (message.getCommand()) {
-            case "001" -> {
+        switch (message) {
+            case IRCMessage001 m -> {
                 terminal.setPrompt("[%s@%s]: ".formatted(properties.getNickname(), properties.getHost().getHostName()));
-                terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, message.getParams().getLast()));
+                terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, m.getMessage()));
                 this.state = IRCClientState.REGISTERED;
             }
-            case "PING" -> sendPong(message.getParams().getFirst());
-            case "PRIVMSG" -> printPrivateMessage(message);
-            default -> terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, "%s %s %s".formatted(message.getPrefix(), message.getCommand(), message.getParams())));
+            case IRCMessagePING m -> sendPong(m.getToken());
+            case IRCMessagePRIVMSG m -> printPrivateMessage(m);
+            default -> terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, message.getRawMessage()));
         }
     }
 
@@ -144,39 +146,35 @@ public class IRCClientEngine {
     }
 
     private void sendNicknameCommand() {
-        out.printf("NICK %s\r\n", properties.getNickname());
+        IRCMessageNICK message = new IRCMessageNICK(null, new LinkedHashMap<>(), null, null, null, properties.getNickname());
+        out.printf(new IRCMessageMarshaller().marshal(message));
         terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending nickname command"));
     }
 
     private void sendUserCommand() {
-        out.printf("USER %s 0 * :%s\r\n", properties.getNickname(), properties.getRealName());
+        IRCMessageUSER message = new IRCMessageUSER(null, new LinkedHashMap<>(), null, null, null, properties.getNickname(), properties.getRealName());
+        out.printf(new IRCMessageMarshaller().marshal(message));
         terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending user command"));
     }
 
     private void sendPong(String value) {
-        out.printf("PONG :%s\r\n", value);
+        IRCMessagePONG message = new IRCMessagePONG(null, new LinkedHashMap<>(), null, null, null, null, value);
+        out.printf(new IRCMessageMarshaller().marshal(message));
     }
 
     private void sendJoin(String channel) {
-        out.printf("JOIN :%s\r\n", channel);
+        IRCMessageJOINNormal message = new IRCMessageJOINNormal(null, new LinkedHashMap<>(), null, null, null, List.of(channel), null);
+        out.printf(new IRCMessageMarshaller().marshal(message));
     }
 
-    private void sendPrivateMessage(String channel, String message) {
-        out.printf("PRIVMSG %s :%s\r\n", channel, message);
-        printMessage(properties.getNickname(), channel, message);
+    private void sendPrivateMessage(String channel, String text) {
+        IRCMessagePRIVMSG message = new IRCMessagePRIVMSG(null, new LinkedHashMap<>(), null, null, null, List.of(channel), text);
+        out.printf(new IRCMessageMarshaller().marshal(message));
+        printMessage(properties.getNickname(), channel, text);
     }
 
-    private void printPrivateMessage(IRCMessage message) {
-        Pattern prefixPattern = Pattern.compile("^(?<nick>[a-zA-Z0-9]+)!(?<user>[a-zA-Z0-9~]+)@(?<host>[a-zA-Z0-9._-]+)$");
-        Matcher matcher = prefixPattern.matcher(message.getPrefix());
-        if (!matcher.matches()) {
-            terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Error receiving private message"));
-        }
-        String nick = matcher.group("nick");
-        String user = matcher.group("user");
-        String host = matcher.group("host");
-        String channel = message.getParams().getFirst();
-        printMessage(nick, channel, message.getParams().getLast());
+    private void printPrivateMessage(IRCMessagePRIVMSG message) {
+        printMessage(message.getPrefixName(), channel, message.getMessage());
     }
 
     private void printMessage(String nick, String channel, String text) {
