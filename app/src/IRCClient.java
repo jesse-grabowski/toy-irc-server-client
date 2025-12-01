@@ -11,7 +11,7 @@ public class IRCClient {
         terminalUI.start();
 
         IRCClientEngine engine = new IRCClientEngine(properties, terminalUI);
-        IRCClientCommandParser parser = new IRCClientCommandParser(terminalUI, engine);
+        ClientCommandParser parser = new ClientCommandParser(terminalUI, engine);
         terminalUI.addInputHandler(parser::accept);
         engine.start();
     }

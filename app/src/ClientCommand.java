@@ -1,6 +1,6 @@
 import java.util.List;
 
-public class IRCClientCommand {
+public class ClientCommand {
     private String command;
     private List<String> params;
 

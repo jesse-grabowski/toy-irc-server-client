@@ -1,0 +1,43 @@
+@startuml
+skinparam componentSpacing 40
+skinparam nodesep 20
+skinparam ranksep 10
+
+participant "Terminal" as term
+participant "Main" as main <<thread>>
+participant "TerminalUI-Loop" as tui <<thread>>
+participant "IRCClientEngine-Egress" as egress <<thread>>
+participant "IRCClientEngine-Ingress" as ingress <<thread>>
+participant "IRC Server" as server
+
+activate term
+
+term -> main : java [class] [args]
+activate main
+
+main -> main : Parse args
+
+main -> tui : Start TerminalUI
+activate tui
+
+main -> egress : Start Engine
+activate egress
+
+main -> ingress : Start Engine
+activate ingress
+
+deactivate main
+
+loop until termination
+    loop until newline
+        term <- tui : block on stdin (single character)
+        tui -> tui : Append to buffer\n& redraw
+    end
+    tui -> egress : Publish user command
+end
+
+deactivate ingress
+deactivate egress
+deactivate tui
+deactivate main
+@enduml

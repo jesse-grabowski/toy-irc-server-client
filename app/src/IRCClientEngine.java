@@ -4,7 +4,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -16,7 +15,7 @@ public class IRCClientEngine {
     private static final String SYSTEM_SENDER = "SYSTEM";
     private static final String SERVER_SENDER = "SERVER";
 
-    private final BlockingQueue<IRCClientCommand> commands = new LinkedBlockingQueue<>();
+    private final BlockingQueue<ClientCommand> commands = new LinkedBlockingQueue<>();
     private final IRCClientProperties properties;
     private final TerminalUI terminal;
 
@@ -36,7 +35,7 @@ public class IRCClientEngine {
         this.terminal = terminal;
     }
 
-    public boolean send(IRCClientCommand message) {
+    public boolean send(ClientCommand message) {
         return commands.offer(message);
     }
 
@@ -54,11 +53,11 @@ public class IRCClientEngine {
         running = true;
 
         // Outgoing command processing thread
-        workerThread = new Thread(this::handleClientCommand, "IRCClientEngine-Commands");
+        workerThread = new Thread(this::handleClientCommand, "IRCClientEngine-Egress");
         workerThread.start();
 
         // Incoming server listener thread
-        readerThread = new Thread(this::listenForServerMessages, "IRCClientEngine-ServerReader");
+        readerThread = new Thread(this::listenForServerMessages, "IRCClientEngine-Ingress");
         readerThread.start();
     }
 
@@ -93,7 +92,7 @@ public class IRCClientEngine {
                         Thread.sleep(100);
                         break;
                     case REGISTERED:
-                        IRCClientCommand command = commands.poll(100, TimeUnit.MILLISECONDS);
+                        ClientCommand command = commands.poll(100, TimeUnit.MILLISECONDS);
                         if (command != null) {
                             handleCommand(command);
                         }
@@ -135,7 +134,7 @@ public class IRCClientEngine {
         }
     }
 
-    private void handleCommand(IRCClientCommand message) {
+    private void handleCommand(ClientCommand message) {
         switch (message.getCommand()) {
             case "JOIN" -> sendJoin(message.getParams().getFirst());
             case "PRIVMSG" -> sendPrivateMessage(message.getParams().getFirst(), message.getParams().getLast());
