@@ -6,14 +6,14 @@ public class IRCMessageMarshaller {
 
     public String marshal(IRCMessage message) {
         return switch (message) {
-            case IRCMessageJOIN0 m -> marshal(m, this::marshallJoin0);
-            case IRCMessageJOINNormal m -> marshal(m, this::marshallJoinNormal);
-            case IRCMessageNICK m -> marshal(m, this::marshallNick);
-            case IRCMessagePING m -> marshal(m, this::marshallPing);
-            case IRCMessagePONG m -> marshal(m, this::marshallPong);
-            case IRCMessagePRIVMSG m -> marshal(m, this::marshallPrivmsg);
-            case IRCMessageUSER m -> marshal(m, this::marshallUser);
-            case IRCMessage001 m -> marshal(m, this::marshall001);
+            case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
+            case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
+            case IRCMessageNICK m -> marshal(m, this::marshalNick);
+            case IRCMessagePING m -> marshal(m, this::marshalPing);
+            case IRCMessagePONG m -> marshal(m, this::marshalPong);
+            case IRCMessagePRIVMSG m -> marshal(m, this::marshalPrivmsg);
+            case IRCMessageUSER m -> marshal(m, this::marshalUser);
+            case IRCMessage001 m -> marshal(m, this::marshal001);
             case IRCMessageUnsupported m -> m.getRawMessage();
             case IRCMessageParseError m -> m.getRawMessage();
         };
@@ -23,14 +23,14 @@ public class IRCMessageMarshaller {
         StringBuilder messageBuilder = new StringBuilder();
         if (message.getTags() != null && !message.getTags().isEmpty()) {
             messageBuilder.append('@');
-            messageBuilder.append(marshallTags(message.getTags()));
+            messageBuilder.append(marshalTags(message.getTags()));
             messageBuilder.append(' ');
         }
 
         if (message.getPrefixName() != null) {
             messageBuilder.append(':');
             messageBuilder.append(
-                    marshallPrefix(message.getPrefixName(), message.getPrefixUser(), message.getPrefixHost()));
+                    marshalPrefix(message.getPrefixName(), message.getPrefixUser(), message.getPrefixHost()));
             messageBuilder.append(' ');
         }
 
@@ -42,31 +42,51 @@ public class IRCMessageMarshaller {
             messageBuilder.append(params);
         }
 
-        messageBuilder.append('\r');
-        messageBuilder.append('\n');
-
         return messageBuilder.toString();
     }
 
-    private String marshallTags(SequencedMap<String, String> tags) {
+    private String marshalTags(SequencedMap<String, String> tags) {
         return tags.sequencedEntrySet().stream()
-                .map(e -> e.getValue() == null ? e.getKey() : e.getKey() + "=" + e.getValue())
+                .map(e -> e.getValue() == null || e.getValue().isEmpty()
+                        ? e.getKey()
+                        : e.getKey() + "=" + escapeTag(e.getValue()))
                 .collect(Collectors.joining(";"));
     }
 
-    private String marshallPrefix(String name, String user, String host) {
+    private String escapeTag(String value) {
+        StringBuilder result = new StringBuilder(value.length());
+
+        for (char c : value.toCharArray()) {
+            switch (c) {
+                case ';' -> result.append("\\:");
+                case ' ' -> result.append("\\s");
+                case '\\' -> result.append("\\\\");
+                case '\r' -> result.append("\\r");
+                case '\n' -> result.append("\\n");
+                default -> result.append(c);
+            }
+        }
+
+        return result.toString();
+    }
+
+    private String marshalPrefix(String name, String user, String host) {
         if (user != null && host != null) {
             return name + "!" + user + "@" + host;
+        } else if (user != null) {
+            return name + "!" + user;
+        } else if (host != null) {
+            return name + "@" + host;
         } else {
             return name;
         }
     }
 
-    private String marshallJoin0(IRCMessageJOIN0 message) {
+    private String marshalJoin0(IRCMessageJOIN0 message) {
         return "0";
     }
 
-    private String marshallJoinNormal(IRCMessageJOINNormal message) {
+    private String marshalJoinNormal(IRCMessageJOINNormal message) {
         StringBuilder result = new StringBuilder();
         result.append(String.join(",", message.getChannels()));
         if (message.getKeys() != null && !message.getKeys().isEmpty()) {
@@ -76,15 +96,15 @@ public class IRCMessageMarshaller {
         return result.toString();
     }
 
-    private String marshallNick(IRCMessageNICK message) {
+    private String marshalNick(IRCMessageNICK message) {
         return message.getNick();
     }
 
-    private String marshallPing(IRCMessagePING message) {
+    private String marshalPing(IRCMessagePING message) {
         return ":" + message.getToken();
     }
 
-    private String marshallPong(IRCMessagePONG message) {
+    private String marshalPong(IRCMessagePONG message) {
         StringBuilder result = new StringBuilder();
         if (message.getServer() != null && !message.getServer().isBlank()) {
             result.append(message.getServer());
@@ -95,15 +115,15 @@ public class IRCMessageMarshaller {
         return result.toString();
     }
 
-    private String marshallPrivmsg(IRCMessagePRIVMSG message) {
+    private String marshalPrivmsg(IRCMessagePRIVMSG message) {
         return String.join(",", message.getTargets()) + " :" + message.getMessage();
     }
 
-    private String marshallUser(IRCMessageUSER message) {
+    private String marshalUser(IRCMessageUSER message) {
         return message.getUser() + " 0 * :" + message.getRealName();
     }
 
-    private String marshall001(IRCMessage001 message) {
-        return ":" + message.getMessage();
+    private String marshal001(IRCMessage001 message) {
+        return message.getClient() + " :" + message.getMessage();
     }
 }

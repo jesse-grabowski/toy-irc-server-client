@@ -2,7 +2,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.SequencedMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,7 +12,7 @@ public class IRCMessageUnmarshaller {
     // This is really hard to read, but it's just splitting out the tags/prefix/command/params parts as defined
     // in the modern IRC grammar (but not processing individual tags/params yet)
     private static final Pattern MESSAGE_PATTERN = Pattern.compile(
-            "^(?:@(?<tags>[^\\s\\u0000]+)\\s+)?(?::(?<prefix>[^\\s\\u0000]+)\\s+)?(?<command>(?:[A-Za-z]+)|(?:\\d{3}))\\s+(?<params>.+)?$");
+            "^(?:@(?<tags>[^\\s\\u0000]+)\\s+)?(?::(?<prefix>[^\\s\\u0000]+)\\s+)?(?<command>(?:[A-Za-z]+)|(?:\\d{3}))(?:\\s+(?<params>.+))?\\s*$");
 
     private static final Pattern PREFIX_PATTERN = Pattern.compile(
             "^(?<name>[^\\s\\u0000!@]+)(?:!(?<user>[^\\s\\u0000@]+))?(?:@(?<host>[^\\s\\u0000]+))?$");
@@ -25,7 +25,7 @@ public class IRCMessageUnmarshaller {
 
         SequencedMap<String, String> tags = parseTags(matcher.group("tags"));
         PrefixParts prefix = parsePrefix(matcher.group("prefix"));
-        String command = matcher.group("command");
+        String command = matcher.group("command").toUpperCase(Locale.ROOT);
         List<String> params = parseParams(matcher.group("params"));
 
         try {
@@ -54,12 +54,38 @@ public class IRCMessageUnmarshaller {
         for (String tag : tags.split(";")) {
             String[] parts = tag.split("=", 2);
             if (parts.length == 1) { // boolean tag
-                results.put(parts[0], null);
+                results.put(parts[0], "");
             } else {
-                results.put(parts[0], parts[1]);
+                results.put(parts[0], unescapeTag(parts[1]));
             }
         }
         return results;
+    }
+
+    private String unescapeTag(String tag) {
+        StringBuilder result = new StringBuilder();
+        boolean escaped = false;
+        for (char c: tag.toCharArray()) {
+            if (escaped) {
+                escaped = false;
+                result.append(switch (c) {
+                    case ':' -> ";";
+                    case 's' -> " ";
+                    case '\\' -> "\\";
+                    case 'r' -> "\r";
+                    case 'n' -> "\n";
+                    default -> "\\" + c;
+                });
+            } else if (c == '\\') {
+                escaped = true;
+            } else {
+                result.append(c);
+            }
+        }
+        if (escaped) {
+            result.append('\\');
+        }
+        return result.toString();
     }
 
     private PrefixParts parsePrefix(String prefix) {
@@ -71,10 +97,9 @@ public class IRCMessageUnmarshaller {
         if (!matcher.matches()) {
             return new PrefixParts();
         }
-        Map<String, Integer> groups = matcher.namedGroups();
-        String name = groups.containsKey("name") ? matcher.group("name") : null;
-        String user = groups.containsKey("user") ? matcher.group("user") : null;
-        String host = groups.containsKey("host") ? matcher.group("host") : null;
+        String name = matcher.group("name");
+        String user = matcher.group("user");
+        String host = matcher.group("host");
         return new PrefixParts(name, user, host);
     }
 
@@ -103,7 +128,7 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessage parseJoin(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
         if (params.isEmpty()) {
-            throw new IllegalArgumentException("JOIN must have at least one parameters <channel>{,<channel>}");
+            throw new IllegalArgumentException("JOIN must have at least one parameter <channel>{,<channel>}");
         }
 
         if (params.size() == 1) {
@@ -117,15 +142,12 @@ public class IRCMessageUnmarshaller {
 
         List<String> channels = Arrays.asList(params.get(0).split(","));
         List<String> keys = Arrays.asList(params.get(1).split(","));
-        if (channels.size() != keys.size()) {
-            throw new IllegalArgumentException("JOIN must have the same number of channels and keys");
-        }
 
         return new IRCMessageJOINNormal(raw, tags, prefix.name(), prefix.user(), prefix.host(), channels, keys);
     }
 
     private IRCMessageNICK parseNick(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
-        return new IRCMessageNICK(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetLast(params));
+        return new IRCMessageNICK(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0));
     }
 
     private IRCMessagePING parsePing(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
@@ -148,11 +170,14 @@ public class IRCMessageUnmarshaller {
     }
 
     private IRCMessageUSER parseUser(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
-        return new IRCMessageUSER(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), safeGetIndex(params, 4));
+        if (params.size() < 4) {
+            throw new IllegalArgumentException("USER must have at least 4 parameters <user> ~ ~ <realName>");
+        }
+        return new IRCMessageUSER(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), safeGetIndex(params, 3));
     }
 
     private IRCMessage001 parse001(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
-        return new IRCMessage001(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetLast(params));
+        return new IRCMessage001(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), safeGetLast(params));
     }
 
     private String safeGetLast(List<String> params) {
@@ -160,7 +185,10 @@ public class IRCMessageUnmarshaller {
     }
 
     private String safeGetIndex(List<String> params, int index) {
-        return params.size() >= index ? params.get(index) : null;
+        if (index < 0 || index >= params.size()) {
+            return null;
+        }
+        return params.get(index);
     }
 
     private record PrefixParts(String name, String user, String host) {

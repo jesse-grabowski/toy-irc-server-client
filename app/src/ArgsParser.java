@@ -27,13 +27,15 @@ public class ArgsParser<T extends ArgsProperties> {
     private final List<FlagSpec<?>> flagSpecs;
     private final List<PositionalSpec<?>> positionalSpecs;
     private final Supplier<T> propertiesFactory;
-    private final String programName;
+    private final boolean registerHelpFlag;
+    private final String[] usageSamples;
 
-    public ArgsParser(Class<?> programClass, Supplier<T> propertiesFactory) {
+    public ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String ... usageSamples) {
         this.flagSpecs = new ArrayList<>();
         this.positionalSpecs = new ArrayList<>();
         this.propertiesFactory = Objects.requireNonNull(propertiesFactory, "propertiesFactory");
-        this.programName = programClass.getSimpleName();
+        this.registerHelpFlag = registerHelpFlag;
+        this.usageSamples = usageSamples;
     }
 
     public ArgsParser<T> addBooleanFlag(char shortKey, String longKey, BiConsumer<T, Boolean> propertiesSetter, String description, boolean required) {
@@ -114,7 +116,7 @@ public class ArgsParser<T extends ArgsProperties> {
         while (argsIterator.hasNext()) {
             String token = argsIterator.next();
 
-            if ("--help".equals(token) || "-h".equals(token)) {
+            if (registerHelpFlag && ("--help".equals(token) || "-h".equals(token))) {
                 throw new ArgsParserHelpRequestedException();
             }
 
@@ -223,12 +225,18 @@ public class ArgsParser<T extends ArgsProperties> {
     }
 
     public String getHelpText() {
-        var sb = new StringBuilder("Usage:\n");
+        var sb = new StringBuilder();
 
-        sb.append("\tjava ").append(programName).append(" [options] [args]\n");
+        if (usageSamples.length > 0 ) {
+            sb.append("Usage:\n");
+            for (String usageSample : usageSamples) {
+                sb.append('\t').append(usageSample).append('\n');
+            }
+            sb.append('\n');
+        }
 
         if (!flagSpecs.isEmpty()) {
-            sb.append("\nOptions:\n");
+            sb.append("Options:\n");
             for (FlagSpec<?> f : flagSpecs) {
                 sb.append("\t-").append(f.shortKey)
                         .append(", --").append(f.longKey)
@@ -237,10 +245,11 @@ public class ArgsParser<T extends ArgsProperties> {
                         .append(" : ").append(f.getDescription())
                         .append("\n");
             }
+            sb.append('\n');
         }
 
         if (!positionalSpecs.isEmpty()) {
-            sb.append("\nPositionals:\n");
+            sb.append("Positionals:\n");
             for (PositionalSpec<?> p : positionalSpecs) {
                 sb.append("\targ").append(p.position)
                         .append(p.isRequired() ? " (required)" : "")

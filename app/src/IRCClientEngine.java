@@ -147,30 +147,34 @@ public class IRCClientEngine {
 
     private void sendNicknameCommand() {
         IRCMessageNICK message = new IRCMessageNICK(null, new LinkedHashMap<>(), null, null, null, properties.getNickname());
-        out.printf(new IRCMessageMarshaller().marshal(message));
+        sendLine(message);
         terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending nickname command"));
     }
 
     private void sendUserCommand() {
         IRCMessageUSER message = new IRCMessageUSER(null, new LinkedHashMap<>(), null, null, null, properties.getNickname(), properties.getRealName());
-        out.printf(new IRCMessageMarshaller().marshal(message));
+        sendLine(message);
         terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending user command"));
     }
 
     private void sendPong(String value) {
         IRCMessagePONG message = new IRCMessagePONG(null, new LinkedHashMap<>(), null, null, null, null, value);
-        out.printf(new IRCMessageMarshaller().marshal(message));
+        sendLine(message);
     }
 
     private void sendJoin(String channel) {
         IRCMessageJOINNormal message = new IRCMessageJOINNormal(null, new LinkedHashMap<>(), null, null, null, List.of(channel), null);
-        out.printf(new IRCMessageMarshaller().marshal(message));
+        sendLine(message);
     }
 
     private void sendPrivateMessage(String channel, String text) {
         IRCMessagePRIVMSG message = new IRCMessagePRIVMSG(null, new LinkedHashMap<>(), null, null, null, List.of(channel), text);
-        out.printf(new IRCMessageMarshaller().marshal(message));
+        sendLine(message);
         printMessage(properties.getNickname(), channel, text);
+    }
+
+    private void sendLine(IRCMessage message) {
+        out.printf("%s\r\n", new IRCMessageMarshaller().marshal(message));
     }
 
     private void printPrivateMessage(IRCMessagePRIVMSG message) {

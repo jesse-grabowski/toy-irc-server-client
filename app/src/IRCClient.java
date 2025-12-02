@@ -17,7 +17,7 @@ public class IRCClient {
     }
 
     private static IRCClientProperties parseArgs(String[] args) {
-        ArgsParser<IRCClientProperties> argsParser = new ArgsParser<>(IRCClient.class, IRCClientProperties::new)
+        ArgsParser<IRCClientProperties> argsParser = new ArgsParser<>(IRCClientProperties::new, true, "java IRCClient [options] [args]")
                 .addInetAddressPositional(0, IRCClientProperties::setHost, "hostname of the IRC server", true)
                 .addIntegerFlag('p', "port", IRCClientProperties::setPort, "port of the IRC server (default 6667)", false)
                 .addBooleanFlag('s', "simple-ui", IRCClientProperties::setUseSimpleTerminal, "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)", false)

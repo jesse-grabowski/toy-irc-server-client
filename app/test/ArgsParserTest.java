@@ -17,7 +17,7 @@ class ArgsParserTest {
     }
 
     private ArgsParser<TestProps> newParser() {
-        return new ArgsParser<>(TestProps.class, TestProps::new);
+        return new ArgsParser<>(TestProps::new, true,"java TestProps [options] [args]");
     }
 
     @Test
@@ -175,6 +175,20 @@ class ArgsParserTest {
                 ArgsParserHelpRequestedException.class,
                 () -> parser.parse(new String[]{"-h"})
         );
+    }
+
+    @Test
+    void helpFlagThrowsIllegalArgumentExceptionWhenDisabled_long() {
+        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, false);
+
+        assertThrows(IllegalArgumentException.class, () -> parser.parse(new String[]{"--help"}));
+    }
+
+    @Test
+    void helpFlagThrowsIllegalArgumentExceptionWhenDisabled_short() {
+        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, false);
+
+        assertThrows(IllegalArgumentException.class, () -> parser.parse(new String[]{"-h"}));
     }
 
     @Test
