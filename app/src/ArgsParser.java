@@ -37,7 +37,7 @@ public class ArgsParser<T extends ArgsProperties> {
         this.usageExamples = new ArrayList<>();
         this.propertiesFactory = Objects.requireNonNull(propertiesFactory, "propertiesFactory");
         this.registerHelpFlag = registerHelpFlag;
-        this.description = description;
+        this.description = Objects.requireNonNull(description);
     }
 
     public ArgsParser<T> addUsageExample(String usageExample) {
