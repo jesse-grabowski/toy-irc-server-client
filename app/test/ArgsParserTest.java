@@ -17,7 +17,8 @@ class ArgsParserTest {
     }
 
     private ArgsParser<TestProps> newParser() {
-        return new ArgsParser<>(TestProps::new, true,"java TestProps [options] [args]");
+        return new ArgsParser<>(TestProps::new, true, "test parser")
+                .addUsageExample("java TestProps [options] [args]");
     }
 
     @Test
@@ -179,14 +180,14 @@ class ArgsParserTest {
 
     @Test
     void helpFlagThrowsIllegalArgumentExceptionWhenDisabled_long() {
-        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, false);
+        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, false, "test parser");
 
         assertThrows(IllegalArgumentException.class, () -> parser.parse(new String[]{"--help"}));
     }
 
     @Test
     void helpFlagThrowsIllegalArgumentExceptionWhenDisabled_short() {
-        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, false);
+        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, false, "test parser");
 
         assertThrows(IllegalArgumentException.class, () -> parser.parse(new String[]{"-h"}));
     }
@@ -214,6 +215,8 @@ class ArgsParserTest {
         String help = parser.getHelpText();
 
         String expected = """
+            test parser
+            
             Usage:
             \tjava TestProps [options] [args]
 
@@ -227,8 +230,7 @@ class ArgsParserTest {
             Positionals:
             \targ0 (required) : primary input file
             \targ1 : secondary input file
-            \targ2 : log directory
-            """;
+            \targ2 : log directory""";
 
         assertEquals(expected, help);
     }

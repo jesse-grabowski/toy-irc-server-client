@@ -26,16 +26,23 @@ public class ArgsParser<T extends ArgsProperties> {
 
     private final List<FlagSpec<?>> flagSpecs;
     private final List<PositionalSpec<?>> positionalSpecs;
+    private final List<String> usageExamples;
     private final Supplier<T> propertiesFactory;
     private final boolean registerHelpFlag;
-    private final String[] usageSamples;
+    private final String description;
 
-    public ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String ... usageSamples) {
+    public ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String description) {
         this.flagSpecs = new ArrayList<>();
         this.positionalSpecs = new ArrayList<>();
+        this.usageExamples = new ArrayList<>();
         this.propertiesFactory = Objects.requireNonNull(propertiesFactory, "propertiesFactory");
         this.registerHelpFlag = registerHelpFlag;
-        this.usageSamples = usageSamples;
+        this.description = description;
+    }
+
+    public ArgsParser<T> addUsageExample(String usageExample) {
+        usageExamples.add(usageExample);
+        return this;
     }
 
     public ArgsParser<T> addBooleanFlag(char shortKey, String longKey, BiConsumer<T, Boolean> propertiesSetter, String description, boolean required) {
@@ -225,36 +232,32 @@ public class ArgsParser<T extends ArgsProperties> {
     }
 
     public String getHelpText() {
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(description);
 
-        if (usageSamples.length > 0 ) {
-            sb.append("Usage:\n");
-            for (String usageSample : usageSamples) {
-                sb.append('\t').append(usageSample).append('\n');
+        if (!usageExamples.isEmpty()) {
+            sb.append("\n\nUsage:");
+            for (String usageSample : usageExamples) {
+                sb.append("\n\t").append(usageSample);
             }
-            sb.append('\n');
         }
 
         if (!flagSpecs.isEmpty()) {
-            sb.append("Options:\n");
+            sb.append("\n\nOptions:");
             for (FlagSpec<?> f : flagSpecs) {
-                sb.append("\t-").append(f.shortKey)
+                sb.append("\n\t-").append(f.shortKey)
                         .append(", --").append(f.longKey)
                         .append(f.takesValue ? " <value>" : "")
                         .append(f.isRequired() ? " (required)" : "")
-                        .append(" : ").append(f.getDescription())
-                        .append("\n");
+                        .append(" : ").append(f.getDescription());
             }
-            sb.append('\n');
         }
 
         if (!positionalSpecs.isEmpty()) {
-            sb.append("Positionals:\n");
+            sb.append("\n\nPositionals:");
             for (PositionalSpec<?> p : positionalSpecs) {
-                sb.append("\targ").append(p.position)
+                sb.append("\n\targ").append(p.position)
                         .append(p.isRequired() ? " (required)" : "")
-                        .append(" : ").append(p.getDescription())
-                        .append("\n");
+                        .append(" : ").append(p.getDescription());
             }
         }
 
