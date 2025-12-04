@@ -137,11 +137,12 @@ public class IRCClientEngine {
     }
 
     private void handleCommand(ClientCommand message) {
-        switch (message.getCommand()) {
-            case "JOIN" -> sendJoin(message.getParams().getFirst());
-            case "PRIVMSG" -> sendPrivateMessage(message.getParams().getFirst(), message.getParams().getLast());
-            case "EXIT" -> exit();
-            default -> {}
+        switch (message) {
+            case ClientCommandExit exit -> exit();
+            case ClientCommandHelp help -> { /* should never happen */ }
+            case ClientCommandJoin join -> sendJoin(join.getChannels().getFirst());
+            case ClientCommandMsg msg -> sendPrivateMessage(msg.getTargets().getFirst(), msg.getText());
+            case ClientCommandMsgCurrent msg -> {}
         }
     }
 

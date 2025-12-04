@@ -10,7 +10,7 @@ class ArgsParserTest {
     private final ArgsTokenizer tokenizer = new ArgsTokenizer();
 
     private ArgsParserBuilder<TestProps> newParser() {
-        return new ArgsParser<>(TestProps::new, true, "test parser")
+        return ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]");
     }
 
@@ -180,14 +180,14 @@ class ArgsParserTest {
 
     @Test
     void helpFlagThrowsIllegalArgumentExceptionWhenDisabled_long() {
-        ArgsParserBuilder<TestProps> parser = new ArgsParser<>(TestProps::new, false, "test parser");
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, false, "test parser");
 
         assertThrows(IllegalArgumentException.class, () -> parse(parser, "--help"));
     }
 
     @Test
     void helpFlagThrowsIllegalArgumentExceptionWhenDisabled_short() {
-        ArgsParserBuilder<TestProps> parser = new ArgsParser<>(TestProps::new, false, "test parser");
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, false, "test parser");
 
         assertThrows(IllegalArgumentException.class, () -> parse(parser, "-h"));
     }
@@ -238,7 +238,7 @@ class ArgsParserTest {
 
     @Test
     void helpTextForMsgCommandWithGreedyMessage_isExactlyAsExpected() {
-        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, true, "/msg: send a message")
+        ArgsParser<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/msg: send a message")
                 .addUsageExample("/msg [-server <name>] <target> <message>")
                 .addStringFlag('s', "server", (p, v) -> { /* ignore in test */ }, "server name", false)
                 .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
@@ -265,7 +265,7 @@ class ArgsParserTest {
 
     @Test
     void helpTextForPartCommandWithGreedyChannelList_isExactlyAsExpected() {
-        ArgsParser<TestProps> parser = new ArgsParser<>(TestProps::new, true, "/part: leave one or more channels")
+        ArgsParser<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/part: leave one or more channels")
                 .addUsageExample("/part [-quiet] <server> <channel> [<channel> ...]")
                 .addBooleanFlag('q', "quiet", (p, v) -> p.verbose = v, "do not send PART messages", false)
                 .addStringPositional(0, (p, v) -> p.input = v, "server name", true)
@@ -423,7 +423,7 @@ class ArgsParserTest {
 
     @Test
     void buildFailsWhenPositionalIndicesAreNotContiguous_singleGap() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 // Start at index 1, leaving index 0 empty
                 .addStringPositional(1, (p, v) -> p.input = v, "input file", true);
@@ -438,7 +438,7 @@ class ArgsParserTest {
 
     @Test
     void buildFailsWhenPositionalIndicesAreNotContiguous_multipleGaps() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 .addStringPositional(0, (p, v) -> { /* ignore */ }, "arg0", false)
                 .addStringPositional(2, (p, v) -> { /* ignore */ }, "arg2", false); // skips index 1
@@ -453,7 +453,7 @@ class ArgsParserTest {
 
     @Test
     void buildSucceedsWhenPositionalIndicesAreContiguous() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 .addStringPositional(0, (p, v) -> { /* ignore */ }, "arg0", false)
                 .addStringPositional(1, (p, v) -> { /* ignore */ }, "arg1", false)
@@ -466,7 +466,7 @@ class ArgsParserTest {
 
     @Test
     void buildFailsWhenGreedyStringPositionalIsNotLast() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 .addGreedyStringPositional(0, (p, v) -> p.input = v, "greedy", false)
                 .addStringPositional(1, (p, v) -> { /* ignore */ }, "non-greedy", false);
@@ -481,7 +481,7 @@ class ArgsParserTest {
 
     @Test
     void buildFailsWhenGreedyListPositionalIsNotLast() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 .addStringPositional(0, (p, v) -> { /* ignore */ }, "arg0", false)
                 .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "greedy list", false)
@@ -497,7 +497,7 @@ class ArgsParserTest {
 
     @Test
     void buildSucceedsWhenGreedyStringPositionalIsLast() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 .addStringPositional(0, (p, v) -> { /* ignore */ }, "arg0", false)
                 .addGreedyStringPositional(1, (p, v) -> p.input = v, "greedy", false);
@@ -508,7 +508,7 @@ class ArgsParserTest {
 
     @Test
     void buildSucceedsWhenGreedyListPositionalIsLast() {
-        ArgsParserBuilder<TestProps> builder = new ArgsParser<>(TestProps::new, true, "test parser")
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
                 .addStringPositional(0, (p, v) -> { /* ignore */ }, "arg0", false)
                 .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "greedy list", false);
@@ -519,7 +519,7 @@ class ArgsParserTest {
 
     @Test
     void parsesMsgCommandWithGreedyMessage() throws ArgsParserHelpRequestedException {
-        ArgsParserBuilder<TestProps> parser = new ArgsParser<>(TestProps::new, true, "/msg: send a message")
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/msg: send a message")
                 .addUsageExample("/msg [-server <name>] <target> <message>")
                 .addStringFlag('s', "server", (p, v) -> p.output = v, "server name", false)
                 .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
@@ -539,7 +539,7 @@ class ArgsParserTest {
 
     @Test
     void parsesMsgCommandWithGreedyQuotedMessage() throws ArgsParserHelpRequestedException {
-        ArgsParserBuilder<TestProps> parser = new ArgsParser<>(TestProps::new, true, "/msg: send a message")
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/msg: send a message")
                 .addUsageExample("/msg [-server <name>] <target> <message>")
                 .addStringFlag('s', "server", (p, v) -> p.output = v, "server name", false)
                 .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
@@ -559,7 +559,7 @@ class ArgsParserTest {
 
     @Test
     void parsesPartCommandWithGreedyChannelList() throws ArgsParserHelpRequestedException {
-        ArgsParserBuilder<TestProps> parser = new ArgsParser<>(TestProps::new, true, "/part: leave one or more channels")
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/part: leave one or more channels")
                 .addUsageExample("/part [-quiet] <server> <channel> [<channel> ...]")
                 .addBooleanFlag('q', "quiet", (p, v) -> p.verbose = v, "do not send PART messages", false)
                 .addStringPositional(0, (p, v) -> p.input = v, "server name", true)
@@ -579,6 +579,24 @@ class ArgsParserTest {
         assertEquals("irc.example.org", props.input, "server should be first positional");
         assertNotNull(props.extraArgs, "extraArgs should be initialized");
         assertEquals(List.of("#weechat", "#random", "#offtopic"), props.extraArgs, "greedy list should contain all channels in order");
+    }
+
+    @Test
+    void parsesCommaSeparatedListPositional() throws ArgsParserHelpRequestedException {
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/join: join channels")
+                .addUsageExample("/join <channel>[,<channel>...]")
+                .addCommaSeparatedListPositional(
+                        0,
+                        (p, v) -> p.extraArgs = v,
+                        "comma-separated channel list",
+                        true
+                );
+
+        // Simulates: /join #weechat,#random,#offtopic
+        TestProps props = parse(parser, "#weechat,#random,#offtopic");
+
+        assertNotNull(props.extraArgs, "extraArgs should be initialized");
+        assertEquals(List.of("#weechat", "#random", "#offtopic"), props.extraArgs);
     }
 
     private static class TestProps implements ArgsProperties {

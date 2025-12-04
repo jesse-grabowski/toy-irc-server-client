@@ -1,6 +1,7 @@
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,10 +36,14 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
 
     private boolean built = false;
 
-    public ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String description) {
+    private ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String description) {
         this.propertiesFactory = Objects.requireNonNull(propertiesFactory, "propertiesFactory");
         this.registerHelpFlag = registerHelpFlag;
         this.description = Objects.requireNonNull(description);
+    }
+
+    public static <T extends ArgsProperties> ArgsParserBuilder<T> builder(Supplier<T> propertiesFactory, boolean registerHelpFlag, String description) {
+        return new ArgsParser<>(propertiesFactory, registerHelpFlag, description);
     }
 
     @Override
@@ -77,6 +82,12 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     @Override
     public ArgsParserBuilder<T> addInetAddressPositional(int position, BiConsumer<T, InetAddress> propertiesSetter, String description, boolean required) {
         addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, this::tryParseInetAddress, description, required, TokenConsumption.SELF));
+        return this;
+    }
+
+    @Override
+    public ArgsParserBuilder<T> addCommaSeparatedListPositional(int position, BiConsumer<T, List<String>> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, this::tryParseCommaSeparatedList, description, required, TokenConsumption.SELF));
         return this;
     }
 
@@ -124,6 +135,10 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException("failed to resolve hostname '%s'".formatted(value), e);
         }
+    }
+
+    private List<String> tryParseCommaSeparatedList(String value) {
+        return Arrays.asList(value.split(","));
     }
 
     private void addFlagSpec(FlagSpec<?> newFlag) {
@@ -297,6 +312,10 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
         } catch (Exception e) {
             throw new IllegalArgumentException("Illegal value at index %d: %s".formatted(spec.getPosition(), e.getMessage()), e);
         }
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public String getHelpText() {

@@ -12,13 +12,13 @@ public class IRCClient {
         terminalUI.start();
 
         IRCClientEngine engine = new IRCClientEngine(properties, terminalUI);
-        ClientCommandParser parser = new ClientCommandParser(terminalUI, engine);
-        terminalUI.addInputHandler(parser::accept);
+        ClientCommandDispatcher parser = new ClientCommandDispatcher(terminalUI, engine);
+        terminalUI.addInputHandler(parser::process);
         engine.start();
     }
 
     private static IRCClientProperties parseArgs(String[] args) {
-        ArgsParser<IRCClientProperties> argsParser = new ArgsParser<>(IRCClientProperties::new, true, "Pure-Java IRC Client")
+        ArgsParser<IRCClientProperties> argsParser = ArgsParser.builder(IRCClientProperties::new, true, "Pure-Java IRC Client")
                 .addUsageExample("java IRCClient [options] [args]")
                 .addInetAddressPositional(0, IRCClientProperties::setHost, "hostname of the IRC server", true)
                 .addIntegerFlag('p', "port", IRCClientProperties::setPort, "port of the IRC server (default 6667)", false)
