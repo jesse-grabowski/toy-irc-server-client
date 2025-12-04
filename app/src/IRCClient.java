@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.util.List;
 
 public class IRCClient {
 
@@ -23,10 +24,15 @@ public class IRCClient {
                 .addIntegerFlag('p', "port", IRCClientProperties::setPort, "port of the IRC server (default 6667)", false)
                 .addBooleanFlag('s', "simple-ui", IRCClientProperties::setUseSimpleTerminal, "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)", false)
                 .addStringFlag('n', "nickname", IRCClientProperties::setNickname, "nickname of the IRC user", false)
-                .addStringFlag('r', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false);
+                .addStringFlag('r', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false)
+                .build();
+
+        ArgsTokenizer tokenizer = new ArgsTokenizer();
 
         try {
-            return argsParser.parse(args);
+            String syntheticRaw = tokenizer.toSyntheticRaw(args);
+            List<ArgsToken> tokens = tokenizer.tokenize(args);
+            return argsParser.parse(syntheticRaw, tokens);
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             System.out.println(argsParser.getHelpText());

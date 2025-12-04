@@ -1,6 +1,7 @@
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -18,55 +19,94 @@ import java.util.regex.Pattern;
  *
  * @param <T> properties class type
  */
-public class ArgsParser<T extends ArgsProperties> {
+public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T> {
 
     private static final Pattern TOKEN_FLAGS_END = Pattern.compile("^--$");
     private static final Pattern TOKEN_FLAGS = Pattern.compile("^-(?<flag>[a-zA-Z0-9]+)$");
     private static final Pattern TOKEN_FLAGS_LONG = Pattern.compile("^--(?<flag>[a-zA-Z-]+)$");
 
-    private final List<FlagSpec<?>> flagSpecs;
-    private final List<PositionalSpec<?>> positionalSpecs;
-    private final List<String> usageExamples;
+    private final List<FlagSpec<?>> flagSpecs = new ArrayList<>();
+    private final List<PositionalSpec<?>> positionalSpecs = new ArrayList<>();
+    private final List<String> usageExamples = new ArrayList<>();
+
     private final Supplier<T> propertiesFactory;
     private final boolean registerHelpFlag;
     private final String description;
 
+    private boolean built = false;
+
     public ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String description) {
-        this.flagSpecs = new ArrayList<>();
-        this.positionalSpecs = new ArrayList<>();
-        this.usageExamples = new ArrayList<>();
         this.propertiesFactory = Objects.requireNonNull(propertiesFactory, "propertiesFactory");
         this.registerHelpFlag = registerHelpFlag;
         this.description = Objects.requireNonNull(description);
     }
 
-    public ArgsParser<T> addUsageExample(String usageExample) {
+    @Override
+    public ArgsParserBuilder<T> addUsageExample(String usageExample) {
+        if (built) {
+            throw new IllegalStateException("ArgsParser already built");
+        }
         usageExamples.add(usageExample);
         return this;
     }
 
-    public ArgsParser<T> addBooleanFlag(char shortKey, String longKey, BiConsumer<T, Boolean> propertiesSetter, String description, boolean required) {
+    @Override
+    public ArgsParserBuilder<T> addBooleanFlag(char shortKey, String longKey, BiConsumer<T, Boolean> propertiesSetter, String description, boolean required) {
         addFlagSpec(new FlagSpec<>(shortKey, longKey, false, propertiesSetter, x -> true, description, required));
         return this;
     }
 
-    public ArgsParser<T> addStringFlag(char shortKey, String longKey, BiConsumer<T, String> propertiesSetter, String description, boolean required) {
+    @Override
+    public ArgsParserBuilder<T> addStringFlag(char shortKey, String longKey, BiConsumer<T, String> propertiesSetter, String description, boolean required) {
         addFlagSpec(new FlagSpec<>(shortKey, longKey, true, propertiesSetter, Function.identity(), description, required));
         return this;
     }
 
-    public ArgsParser<T> addIntegerFlag(char shortKey, String longKey, BiConsumer<T, Integer> propertiesSetter, String description, boolean required) {
+    @Override
+    public ArgsParserBuilder<T> addIntegerFlag(char shortKey, String longKey, BiConsumer<T, Integer> propertiesSetter, String description, boolean required) {
         addFlagSpec(new FlagSpec<>(shortKey, longKey, true, propertiesSetter, this::tryParseInt, description, required));
         return this;
     }
 
-    public ArgsParser<T> addStringPositional(int position, BiConsumer<T, String> propertiesSetter, String description, boolean required) {
-        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, Function.identity(), description, required));
+    @Override
+    public ArgsParserBuilder<T> addStringPositional(int position, BiConsumer<T, String> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, Function.identity(), description, required, TokenConsumption.SELF));
         return this;
     }
 
-    public ArgsParser<T> addInetAddressPositional(int position, BiConsumer<T, InetAddress> propertiesSetter, String description, boolean required) {
-        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, this::tryParseInetAddress, description, required));
+    @Override
+    public ArgsParserBuilder<T> addInetAddressPositional(int position, BiConsumer<T, InetAddress> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, this::tryParseInetAddress, description, required, TokenConsumption.SELF));
+        return this;
+    }
+
+    @Override
+    public ArgsParserBuilder<T> addGreedyStringPositional(int position, BiConsumer<T, String> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new PositionalSpec<>(position, propertiesSetter, Function.identity(), description, required, TokenConsumption.DRAIN_RAW));
+        return this;
+    }
+
+    @Override
+    public ArgsParserBuilder<T> addGreedyListPositional(int position, Function<T, List<String>> propertiesGetter,
+                                                 BiConsumer<T, List<String>> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new GreedyCollectionPositionalSpec<>(position, ArrayList::new, propertiesGetter, propertiesSetter, description, required));
+        return this;
+    }
+
+    @Override
+    public ArgsParser<T> build() {
+        if (built) {
+            throw new IllegalStateException("ArgsParser already built");
+        }
+        if (positionalSpecs.size() != positionalSpecs.stream().mapToInt(PositionalSpec::getPosition).max().orElse(-1) + 1) {
+            throw new IllegalStateException("Positional arguments do not span all positions");
+        }
+        for (PositionalSpec<?> spec : positionalSpecs) {
+            if (spec.getTokenConsumption() != TokenConsumption.SELF && spec.getPosition() != positionalSpecs.size() - 1) {
+                throw new IllegalStateException("Greedy positional arguments may only be at the final position");
+            }
+        }
+        built = true;
         return this;
     }
 
@@ -87,6 +127,9 @@ public class ArgsParser<T extends ArgsProperties> {
     }
 
     private void addFlagSpec(FlagSpec<?> newFlag) {
+        if (built) {
+            throw new IllegalStateException("ArgsParser already built");
+        }
         for (FlagSpec<?> flag : flagSpecs) {
             if (flag.shortKey == newFlag.shortKey) {
                 throw new IllegalArgumentException("Flag with key '-%c' already exists".formatted(flag.shortKey));
@@ -99,35 +142,49 @@ public class ArgsParser<T extends ArgsProperties> {
     }
 
     private void addPositionalSpec(PositionalSpec<?> newPositional) {
+        if (built) {
+            throw new IllegalStateException("ArgsParser already built");
+        }
         for (PositionalSpec<?> positional : positionalSpecs) {
-            if (positional.position == newPositional.position) {
-                throw new IllegalArgumentException("Positional argument at %d already exists".formatted(positional.position));
+            if (positional.getPosition() == newPositional.getPosition()) {
+                throw new IllegalArgumentException("Positional argument at %d already exists".formatted(positional.getPosition()));
             }
         }
         positionalSpecs.add(newPositional);
     }
 
     /**
-     * Parse command line arguments into a properties object
+     * Parse a command line represented by a raw input string and its tokenized form.
+     * <p>
+     * The {@code raw} string preserves the original text exactly as written,
+     * while {@code tokens} contains the already–tokenized arguments with
+     * span information (as produced by {@link ArgsTokenizer}).
      *
-     * @param args raw command line input
-     * @return a properties object with some or all fields populated
-     * @throws IllegalArgumentException when an unknown property is supplied or a property is missing
+     * @param raw the original unmodified command line text
+     * @param tokens the list of parsed {@link ArgsToken} objects derived from {@code raw}
+     * @return a populated properties object
+     * @throws ArgsParserHelpRequestedException if the {@code -h} or {@code --help} flag was encountered
+     * @throws IllegalArgumentException if an unknown option is supplied, a required
+     *         argument is missing, or a value fails to parse
      */
-    public T parse(String[] args) throws ArgsParserHelpRequestedException {
-        Set<ArgSpec<?>> usedSpecs = new HashSet<>();
+    public T parse(String raw, List<ArgsToken> tokens) throws ArgsParserHelpRequestedException {
+        if (!built) {
+            throw new IllegalStateException("ArgsParser not yet built");
+        }
+
+        Set<ArgSpec> usedSpecs = new HashSet<>();
         T properties = propertiesFactory.get();
 
         int position = 0;
-        Iterator<String> argsIterator = List.of(args).iterator();
+        Iterator<ArgsToken> argsIterator = tokens.iterator();
         while (argsIterator.hasNext()) {
-            String token = argsIterator.next();
+            ArgsToken token = argsIterator.next();
 
-            if (registerHelpFlag && ("--help".equals(token) || "-h".equals(token))) {
+            if (registerHelpFlag && ("--help".equals(token.token()) || "-h".equals(token.token()))) {
                 throw new ArgsParserHelpRequestedException();
             }
 
-            Matcher flagMatcher = TOKEN_FLAGS.matcher(token);
+            Matcher flagMatcher = TOKEN_FLAGS.matcher(token.token());
             if (flagMatcher.matches()) {
                 String flags = flagMatcher.group("flag");
                 if (flags.length() == 1) {
@@ -141,7 +198,7 @@ public class ArgsParser<T extends ArgsProperties> {
                         usedSpecs.add(spec);
                         specs.add(spec);
                     }
-                    if (specs.stream().filter(s -> s.takesValue).count() > 1) {
+                    if (specs.stream().filter(s -> s.getTokenConsumption() != TokenConsumption.SELF).count() > 1) {
                         throw new IllegalArgumentException("Flag group contains multiple value-taking flags: '%s'".formatted(flags));
                     }
                     specs.forEach(spec -> parseFlagSpec(argsIterator, spec, properties, false));
@@ -149,7 +206,7 @@ public class ArgsParser<T extends ArgsProperties> {
                 continue;
             }
 
-            flagMatcher = TOKEN_FLAGS_LONG.matcher(token);
+            flagMatcher = TOKEN_FLAGS_LONG.matcher(token.token());
             if (flagMatcher.matches()) {
                 String flag = flagMatcher.group("flag");
                 FlagSpec<?> flagSpec = findByLongKey(flag);
@@ -158,26 +215,26 @@ public class ArgsParser<T extends ArgsProperties> {
                 continue;
             }
 
-            if (TOKEN_FLAGS_END.matcher(token).matches()) {
+            if (TOKEN_FLAGS_END.matcher(token.token()).matches()) {
                 // all arguments from this point are positional regardless of shape
                 while (argsIterator.hasNext()) {
                     token = argsIterator.next();
                     PositionalSpec<?> positionalSpec = findByPosition(position);
                     usedSpecs.add(positionalSpec);
-                    parsePositionalSpec(token, positionalSpec, properties);
+                    parsePositionalSpec(raw, argsIterator, token, positionalSpec, properties);
                     position++;
                 }
                 break;
             }
 
-            if (token.startsWith("-")) {
+            if (token.token().startsWith("-")) {
                 // catch accidental single-hyphen long names and similar
-                throw new IllegalArgumentException("Unrecognized option: '%s'".formatted(token));
+                throw new IllegalArgumentException("Unrecognized option: '%s'".formatted(token.token()));
             }
 
             PositionalSpec<?> positionalSpec = findByPosition(position);
             usedSpecs.add(positionalSpec);
-            parsePositionalSpec(token, positionalSpec, properties);
+            parsePositionalSpec(raw, argsIterator, token, positionalSpec, properties);
             position++;
         }
 
@@ -189,7 +246,7 @@ public class ArgsParser<T extends ArgsProperties> {
 
         for (PositionalSpec<?> spec : positionalSpecs) {
             if (spec.isRequired() && !usedSpecs.contains(spec)) {
-                throw new IllegalArgumentException("Missing required positional argument at index %d".formatted(spec.position));
+                throw new IllegalArgumentException("Missing required positional argument at index %d".formatted(spec.getPosition()));
             }
         }
 
@@ -198,22 +255,19 @@ public class ArgsParser<T extends ArgsProperties> {
         return properties;
     }
 
-    private void parseFlagSpec(Iterator<String> argsIterator, FlagSpec<?> spec, T properties, boolean useLongKey) {
-        String value;
-        if (spec.takesValue) {
-            if (argsIterator.hasNext()) {
-                value = argsIterator.next();
-            } else if (useLongKey) {
-                throw new IllegalArgumentException("Missing expected value for flag: '--%s <value>'".formatted(spec.longKey));
-            } else {
-                throw new IllegalArgumentException("Missing expected value for flag: '-%c <value>'".formatted(spec.shortKey));
-            }
-        } else {
-            value = "";
-        }
-
+    private void parseFlagSpec(Iterator<ArgsToken> argsIterator, FlagSpec<?> spec, T properties, boolean useLongKey) {
         try {
-            spec.apply(value, properties);
+            switch (spec.getTokenConsumption()) {
+                case SELF -> spec.apply("", properties);
+                case NEXT -> {
+                    if (argsIterator.hasNext()) {
+                        spec.apply(argsIterator.next().token(), properties);
+                    } else {
+                        throw new IllegalArgumentException("no value provided");
+                    }
+                }
+                default -> throw new UnsupportedOperationException("invalid token consumption mode %s".formatted(spec.getTokenConsumption()));
+            }
         } catch (Exception e) {
             if (useLongKey) {
                 throw new IllegalArgumentException("Illegal value for flag '--%s': %s".formatted(spec.longKey, e.getMessage()), e);
@@ -223,11 +277,25 @@ public class ArgsParser<T extends ArgsProperties> {
         }
     }
 
-    private void parsePositionalSpec(String token, PositionalSpec<?> spec, T properties) {
+    private void parsePositionalSpec(String raw, Iterator<ArgsToken> argsIterator, ArgsToken token, PositionalSpec<?> spec, T properties) {
         try {
-            spec.apply(token, properties);
+            switch (spec.getTokenConsumption()) {
+                case SELF -> spec.apply(token.token(), properties);
+                case DRAIN_CONSUME -> {
+                    spec.apply(token.token(), properties);
+                    while (argsIterator.hasNext()) {
+                        ArgsToken next = argsIterator.next();
+                        spec.apply(next.token(), properties);
+                    }
+                }
+                case DRAIN_RAW -> {
+                    spec.apply(raw.substring(token.startInclusive()), properties);
+                    argsIterator.forEachRemaining(t -> { /* do nothing */ });
+                }
+                default -> throw new UnsupportedOperationException("invalid token consumption mode %s".formatted(spec.getTokenConsumption()));
+            }
         } catch (Exception e) {
-            throw new IllegalArgumentException("Illegal value at index %d: %s".formatted(spec.position, e.getMessage()), e);
+            throw new IllegalArgumentException("Illegal value at index %d: %s".formatted(spec.getPosition(), e.getMessage()), e);
         }
     }
 
@@ -246,7 +314,12 @@ public class ArgsParser<T extends ArgsProperties> {
             for (FlagSpec<?> f : flagSpecs) {
                 sb.append("\n\t-").append(f.shortKey)
                         .append(", --").append(f.longKey)
-                        .append(f.takesValue ? " <value>" : "")
+                        .append(switch (f.getTokenConsumption()) {
+                            case SELF -> "";
+                            case NEXT -> " <value>";
+                            case DRAIN_RAW -> " <remaining text>";
+                            case DRAIN_CONSUME -> " <value> <value> ...";
+                        })
                         .append(f.isRequired() ? " (required)" : "")
                         .append(" : ").append(f.getDescription());
             }
@@ -255,7 +328,13 @@ public class ArgsParser<T extends ArgsProperties> {
         if (!positionalSpecs.isEmpty()) {
             sb.append("\n\nPositionals:");
             for (PositionalSpec<?> p : positionalSpecs) {
-                sb.append("\n\targ").append(p.position)
+                sb.append("\n\t")
+                        .append(switch (p.getTokenConsumption()) {
+                            case SELF -> "arg" + p.getPosition();
+                            case NEXT -> "arg" + p.getPosition() + " arg" + (p.getPosition() + 1);
+                            case DRAIN_RAW -> "arg" + p.getPosition() + "...";
+                            case DRAIN_CONSUME -> "arg" + p.getPosition() + " ... argN";
+                        })
                         .append(p.isRequired() ? " (required)" : "")
                         .append(" : ").append(p.getDescription());
             }
@@ -284,46 +363,42 @@ public class ArgsParser<T extends ArgsProperties> {
 
     private PositionalSpec<?> findByPosition(int position) {
         for (PositionalSpec<?> positionalSpec : positionalSpecs) {
-            if (position == positionalSpec.position) {
+            if (position == positionalSpec.getPosition()) {
                 return positionalSpec;
             }
         }
         throw new IllegalArgumentException("Unsupported positional argument at index %d".formatted(position));
     }
 
-    private abstract class ArgSpec<F> {
-        private final BiConsumer<T, F> propertiesSetter;
-        private final Function<String, F> propertyMapper;
+    private abstract static class ArgSpec {
         private final String description;
         private final boolean required;
+        private final TokenConsumption tokenConsumption;
 
-        protected ArgSpec(BiConsumer<T, F> propertiesSetter,
-                          Function<String, F> propertyMapper,
-                          String description,
-                          boolean required) {
-            this.propertiesSetter = Objects.requireNonNull(propertiesSetter, "propertiesSetter");
-            this.propertyMapper = Objects.requireNonNull(propertyMapper, "propertyMapper");
+        protected ArgSpec(String description, boolean required, TokenConsumption tokenConsumption) {
             this.description = Objects.requireNonNull(description, "description");
             this.required = required;
+            this.tokenConsumption = Objects.requireNonNull(tokenConsumption, "tokenConsumption");
         }
 
-        protected void apply(String value, T properties) {
-            propertiesSetter.accept(properties, propertyMapper.apply(value));
-        }
-
-        protected String getDescription() {
+        public String getDescription() {
             return description;
         }
 
-        protected boolean isRequired() {
+        public boolean isRequired() {
             return required;
+        }
+
+        public TokenConsumption getTokenConsumption() {
+            return tokenConsumption;
         }
     }
 
-    private class FlagSpec<F> extends ArgSpec<F> {
+    private class FlagSpec<F> extends ArgSpec {
+        private final BiConsumer<T, F> propertiesSetter;
+        private final Function<String, F> propertyMapper;
         private final char shortKey;
         private final String longKey;
-        private final boolean takesValue;
 
         public FlagSpec(char shortKey,
                         String longKey,
@@ -332,24 +407,77 @@ public class ArgsParser<T extends ArgsProperties> {
                         Function<String, F> propertyMapper,
                         String description,
                         boolean required) {
-            super(propertiesSetter, propertyMapper, description, required);
-
+            super(description, required, takesValue ? TokenConsumption.NEXT : TokenConsumption.SELF);
+            this.propertiesSetter = Objects.requireNonNull(propertiesSetter, "propertiesSetter");
+            this.propertyMapper = Objects.requireNonNull(propertyMapper, "propertyMapper");
             this.shortKey = shortKey;
             this.longKey = Objects.requireNonNull(longKey, "longKey");
-            this.takesValue = takesValue;
+        }
+
+        public void apply(String value, T properties) {
+            propertiesSetter.accept(properties, propertyMapper.apply(value));
         }
     }
 
-    private class PositionalSpec<F> extends ArgSpec<F> {
+    private class PositionalSpec<F> extends ArgSpec {
+        private final BiConsumer<T, F> propertiesSetter;
+        private final Function<String, F> propertyMapper;
         private final int position;
 
         public PositionalSpec(int position,
                               BiConsumer<T, F> propertiesSetter,
                               Function<String, F> propertyMapper,
                               String description,
-                              boolean required) {
-            super(propertiesSetter, propertyMapper, description, required);
+                              boolean required,
+                              TokenConsumption tokenConsumption) {
+            super(description, required, tokenConsumption);
+            this.propertiesSetter = Objects.requireNonNull(propertiesSetter, "propertiesSetter");
+            this.propertyMapper = Objects.requireNonNull(propertyMapper, "propertyMapper");
             this.position = position;
         }
+
+        public int getPosition() {
+            return position;
+        }
+
+        public void apply(String value, T properties) {
+            propertiesSetter.accept(properties, propertyMapper.apply(value));
+        }
+    }
+
+    private class GreedyCollectionPositionalSpec<C extends Collection<String>> extends PositionalSpec<C> {
+        private final Supplier<C> collectionSupplier;
+        private final Function<T, C> propertiesGetter;
+        private final BiConsumer<T, C> propertiesSetter;
+
+        public GreedyCollectionPositionalSpec(int position,
+                                              Supplier<C> collectionSupplier,
+                                              Function<T, C> propertiesGetter,
+                                              BiConsumer<T, C> propertiesSetter,
+                                              String description,
+                                              boolean required) {
+            // pass a fake mapper to the parent to satisfy the constructor, we override apply so it doesn't matter
+            super(position, propertiesSetter, unused -> null, description, required, TokenConsumption.DRAIN_CONSUME);
+            this.collectionSupplier = Objects.requireNonNull(collectionSupplier, "collectionSupplier");
+            this.propertiesGetter = Objects.requireNonNull(propertiesGetter, "propertiesGetter");
+            this.propertiesSetter = Objects.requireNonNull(propertiesSetter, "propertiesSetter");
+        }
+
+        @Override
+        public void apply(String value, T properties) {
+            C collection = propertiesGetter.apply(properties);
+            if (collection == null) {
+                collection = collectionSupplier.get();
+            }
+            collection.add(value);
+            propertiesSetter.accept(properties, collection);
+        }
+    }
+
+    private enum TokenConsumption {
+        SELF,
+        NEXT,
+        DRAIN_RAW,
+        DRAIN_CONSUME
     }
 }
