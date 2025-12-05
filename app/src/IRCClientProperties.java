@@ -1,4 +1,6 @@
 import java.net.InetAddress;
+import java.nio.file.Paths;
+import java.util.logging.Level;
 
 // oh lombok how my heart yearns for thee
 public class IRCClientProperties implements ArgsProperties {
@@ -8,11 +10,23 @@ public class IRCClientProperties implements ArgsProperties {
     private boolean useSimpleTerminal = false;
     private String nickname = "auto";
     private String realName = "Unknown";
+    private String logFile = "irc-client.log";
+    private String logLevel = Level.INFO.getName();
 
     @Override
     public void validate() {
         if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("port must be between 0 and 65535");
+        }
+        try {
+            Paths.get(logFile);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("log file path must be a valid path");
+        }
+        try {
+            Level.parse(logLevel);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("invalid log level '%s': expected integer or valid jul level name".formatted(logLevel));
         }
     }
 
@@ -54,5 +68,21 @@ public class IRCClientProperties implements ArgsProperties {
 
     public void setRealName(String realName) {
         this.realName = realName;
+    }
+
+    public String getLogFile() {
+        return logFile;
+    }
+
+    public void setLogFile(String logFile) {
+        this.logFile = logFile;
+    }
+
+    public String getLogLevel() {
+        return logLevel;
+    }
+
+    public void setLogLevel(String logLevel) {
+        this.logLevel = logLevel;
     }
 }

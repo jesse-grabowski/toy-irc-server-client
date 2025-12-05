@@ -1,10 +1,13 @@
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Level;
 
 public class IRCClient {
 
     public static void main(String[] args) throws IOException {
         IRCClientProperties properties = parseArgs(args);
+
+        LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()));
 
         TerminalUI terminalUI = STTY.isAvailable() && !properties.isUseSimpleTerminal()
                 ? new FancyTerminalUI()
@@ -25,6 +28,8 @@ public class IRCClient {
                 .addBooleanFlag('s', "simple-ui", IRCClientProperties::setUseSimpleTerminal, "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)", false)
                 .addStringFlag('n', "nickname", IRCClientProperties::setNickname, "nickname of the IRC user", false)
                 .addStringFlag('r', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false)
+                .addStringFlag('l', "log-file", IRCClientProperties::setLogFile, "log file pattern, supports %u and %g formats for rotation", false)
+                .addStringFlag('L', "log-level", IRCClientProperties::setLogLevel, "log level, integer or j.u.l.Level well-known name", false)
                 .build();
 
         ArgsTokenizer tokenizer = new ArgsTokenizer();

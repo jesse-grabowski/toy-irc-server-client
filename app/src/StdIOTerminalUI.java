@@ -1,8 +1,11 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.logging.Logger;
 
 public class StdIOTerminalUI extends TerminalUI {
+
+    private static final Logger LOG = Logger.getLogger(StdIOTerminalUI.class.getName());
 
     private final BufferedReader reader =
             new BufferedReader(new InputStreamReader(System.in));
@@ -36,7 +39,7 @@ public class StdIOTerminalUI extends TerminalUI {
 
     @Override
     protected void initialize() {
-        // No-op
+        LOG.info("Initializing StdIOTerminalUI");
     }
 
     @Override

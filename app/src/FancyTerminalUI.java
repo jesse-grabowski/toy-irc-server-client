@@ -10,8 +10,11 @@ import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 public class FancyTerminalUI extends TerminalUI {
+
+    private static final Logger LOG = Logger.getLogger(FancyTerminalUI.class.getName());
 
     private static final int FOOTER_ROWS = 3;
     private static final int MAX_MESSAGES = 200;
@@ -72,8 +75,11 @@ public class FancyTerminalUI extends TerminalUI {
 
     @Override
     protected synchronized void initialize() {
+        LOG.info("Initializing FancyTerminalUI");
         STTY.restoreTerminalStateOnExit();
+        LOG.info("Registered STTY restoration shutdown hook");
         STTY.enableRawMode();
+        LOG.info("Enabled Raw terminal mode");
 
         setDimensions(STTY.getTerminalSize());
 
@@ -83,6 +89,7 @@ public class FancyTerminalUI extends TerminalUI {
                 500,
                 TimeUnit.MILLISECONDS
         );
+        LOG.info("Started terminal size monitor");
 
         redraw();
     }
@@ -159,6 +166,7 @@ public class FancyTerminalUI extends TerminalUI {
     }
 
     private synchronized void redraw() {
+        LOG.fine("Redrawing TerminalUI");
         renderMessages();
         renderFooter();
     }
