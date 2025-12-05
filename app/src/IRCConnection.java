@@ -5,89 +5,152 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class IRCConnection implements Closeable {
+
+    private static final Logger LOG = Logger.getLogger(IRCConnection.class.getName());
 
     private static final ThreadFactory INGRESS_THREAD_FACTORY = Thread.ofVirtual().name("irc-ingress-", 0).factory();
     private static final ThreadFactory EGRESS_THREAD_FACTORY = Thread.ofVirtual().name("irc-egress-", 0).factory();
 
-    private final BlockingQueue<String> egressQueue = new LinkedBlockingQueue<>();
+    // we'll use an arbitrarily high value of 100 here; in practice we really won't have more than ~10
+    // messages in this queue at any given time
+    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(100);
+
     private final List<Consumer<String>> ingressHandlers = new CopyOnWriteArrayList<>();
-    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final List<Runnable> shutdownHandlers = new CopyOnWriteArrayList<>();
+
+    private final AtomicReference<ConnectionState> state = new AtomicReference<>(ConnectionState.NEW);
 
     private final Socket socket;
-    private final BufferedReader bufferedReader;
-    private final BufferedWriter bufferedWriter;
-
+    private final Charset charset;
     private final Thread ingressThread;
     private final Thread egressThread;
 
-    public IRCConnection(Socket socket) throws IOException {
-        this.socket = Objects.requireNonNull(socket);
+    private BufferedReader bufferedReader;
+    private BufferedWriter bufferedWriter;
 
-        bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-        bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+    /**
+     * Create a new full-duplex IRC connection. Assumes the use of UTF-8 encoding.
+     *
+     * @param socket a preconfigured socket
+     */
+    public IRCConnection(Socket socket) {
+        this(socket, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Create a new full-duplex IRC connection.
+     *
+     * @param socket a preconfigured socket
+     * @param charset the encoding used for communication
+     */
+    public IRCConnection(Socket socket, Charset charset) {
+        this.socket = Objects.requireNonNull(socket);
+        this.charset = Objects.requireNonNull(charset);
 
         ingressThread = INGRESS_THREAD_FACTORY.newThread(this::doIngress);
         egressThread = EGRESS_THREAD_FACTORY.newThread(this::doEgress);
     }
 
+    /**
+     * Add a handler to be called each time a new message is received
+     *
+     * @param handler handler to be called
+     */
     public void addIngressHandler(Consumer<String> handler) {
-        ingressHandlers.add(handler);
+        ingressHandlers.add(Objects.requireNonNull(handler, "handler"));
     }
 
-    public boolean send(String line) {
+    /**
+     * Add a handler to be called the first time the connection is closed (either explicity, or implicitly
+     * by a startup failure)
+     *
+     * @param handler handler to be called
+     */
+    public void addShutdownHandler(Runnable handler) {
+        shutdownHandlers.add(Objects.requireNonNull(handler, "handler"));
+    }
+
+    /**
+     * Make a best-effort attempt to enqueue a line for egress. This method does not
+     * guarantee that the message will be sent (e.g. if the connection closes while
+     * it is enqueued the message will be lost).
+     *
+     * @param line a well-formed IRC message line
+     * @return true if the message was successfully enqueued, false otherwise.
+     */
+    public boolean offer(String line) {
+        if (state.get() != ConnectionState.ACTIVE) {
+            return false;
+        }
         return egressQueue.offer(Objects.requireNonNull(line));
     }
 
-    public void start() {
-        if (!running.compareAndSet(false, true)) {
-            return; // not stopped
+    public void start() throws IOException {
+        if (!state.compareAndSet(ConnectionState.NEW, ConnectionState.INITIALIZING)) {
+            throw new IllegalStateException("connection already started or closed");
         }
 
-        ingressThread.start();
-        egressThread.start();
-    }
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream(), charset));
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), charset));
 
-    public boolean isRunning() {
-        return running.get();
+            ingressThread.start();
+            egressThread.start();
+
+            if (!state.compareAndSet(ConnectionState.INITIALIZING, ConnectionState.ACTIVE)) {
+                throw new IOException("inconsistent state in initialization");
+            }
+
+            LOG.finest("Started IRC connection");
+        } catch (IOException | RuntimeException e) {
+            LOG.log(Level.WARNING, "Failed to start IRC connection", e);
+            close();
+            throw e;
+        }
     }
 
     private void doIngress() {
         try {
             String line;
-            while (running.get() && (line = bufferedReader.readLine()) != null) {
+            while (state.get() != ConnectionState.CLOSED && (line = bufferedReader.readLine()) != null) {
                 for (Consumer<String> handler : ingressHandlers) {
                     try {
                         handler.accept(line);
-                    } catch (Throwable t) {
-                        // should never happen but just in case
+                    } catch (Exception e) {
+                        // we control all the handler implementations, and they should be incapable of throwing
+                        // under normal operation, so we consider any error here to be fatal and kill the connection
+                        LOG.log(Level.SEVERE, "Error in IRC line consumer", e);
+                        return;
                     }
                 }
             }
         } catch (IOException e) {
-            // connection is broken, cannot recover without intervention
+            LOG.log(Level.WARNING, "Failed to read from IRC socket", e);
         } finally {
-            running.set(false);
-            closeSilently();
+            close();
         }
     }
 
     private void doEgress() {
         try {
-            while (running.get() && !Thread.currentThread().isInterrupted()) {
+            while (state.get() != ConnectionState.CLOSED && !Thread.currentThread().isInterrupted()) {
                 String line = egressQueue.take();
 
-                if (!running.get()) {
+                if (state.get() == ConnectionState.CLOSED) {
                     break;
                 }
 
@@ -98,30 +161,48 @@ public class IRCConnection implements Closeable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (IOException e) {
-            // connection is broken, cannot recover without intervention
+            LOG.log(Level.WARNING, "Failed to write to IRC socket", e);
         } finally {
-            running.set(false);
-            closeSilently();
-        }
-    }
-
-    private void closeSilently() {
-        try {
-            socket.close();
-        } catch (IOException ignored) {
-            // unhandled
+            close();
         }
     }
 
     @Override
-    public void close() throws IOException {
-        if (!running.compareAndSet(true, false)) {
-            return; // already stopped
+    public void close() {
+        ConnectionState oldState = state.getAndSet(ConnectionState.CLOSED);
+        if (oldState == ConnectionState.CLOSED) {
+            return;
         }
 
-        closeSilently();
+        try {
+            if (!socket.isClosed()) {
+                socket.close();
+            }
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Failed to close IRC socket / socket already closed", e);
+        }
 
-        ingressThread.interrupt();
-        egressThread.interrupt();
+        Thread current = Thread.currentThread();
+        if (ingressThread != current) {
+            ingressThread.interrupt();
+        }
+        if (egressThread != current) {
+            egressThread.interrupt();
+        }
+
+        for (Runnable handler : shutdownHandlers) {
+            try {
+                handler.run();
+            } catch (Exception e) {
+                LOG.log(Level.SEVERE, "Error in IRC shutdown handler", e);
+            }
+        }
+    }
+
+    private enum ConnectionState {
+        NEW,
+        INITIALIZING,
+        ACTIVE,
+        CLOSED
     }
 }
