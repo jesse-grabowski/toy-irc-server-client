@@ -1,3 +1,4 @@
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.SequencedMap;
 
@@ -18,6 +19,10 @@ public final class IRCMessageJOINNormal extends IRCMessage {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.channels = channels;
         this.keys = keys;
+    }
+
+    public IRCMessageJOINNormal(List<String> channels, List<String> keys) {
+        this(null, new LinkedHashMap<>(), null, null, null, channels, keys);
     }
 
     public List<String> getChannels() {

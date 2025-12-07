@@ -25,9 +25,12 @@ public class IRCClient {
                 .addUsageExample("java IRCClient [options] [args]")
                 .addInetAddressPositional(0, IRCClientProperties::setHost, "hostname of the IRC server", true)
                 .addIntegerFlag('p', "port", IRCClientProperties::setPort, "port of the IRC server (default 6667)", false)
+                .addIntegerFlag('r', "read-timeout", IRCClientProperties::setReadTimeout, "idle timeout before closing connection (default 600000)", false)
+                .addIntegerFlag('c', "connect-timeout", IRCClientProperties::setConnectTimeout, "timeout for establishing server connection (default 10000)", false)
+                .addStringFlag('C', "charset", IRCClientProperties::setCharset, "charset used for communication with the server (default UTF-8)", false)
                 .addBooleanFlag('s', "simple-ui", IRCClientProperties::setUseSimpleTerminal, "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)", false)
                 .addStringFlag('n', "nickname", IRCClientProperties::setNickname, "nickname of the IRC user", false)
-                .addStringFlag('r', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false)
+                .addStringFlag('R', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false)
                 .addStringFlag('l', "log-file", IRCClientProperties::setLogFile, "log file pattern, supports %u and %g formats for rotation", false)
                 .addStringFlag('L', "log-level", IRCClientProperties::setLogLevel, "log level, integer or j.u.l.Level well-known name", false)
                 .build();

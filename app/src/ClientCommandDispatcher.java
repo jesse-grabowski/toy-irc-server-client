@@ -30,7 +30,7 @@ public class ClientCommandDispatcher {
                 String helpText = parser.getHelpText();
                 terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", helpText));
             }
-            default -> ircClientEngine.send(command);
+            default -> ircClientEngine.accept(command);
         }
     }
 }

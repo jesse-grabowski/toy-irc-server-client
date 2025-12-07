@@ -1,3 +1,4 @@
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.SequencedMap;
 
@@ -18,6 +19,10 @@ public final class IRCMessagePRIVMSG extends IRCMessage {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.targets = targets;
         this.message = message;
+    }
+
+    public IRCMessagePRIVMSG(List<String> targets, String message) {
+        this(null, new LinkedHashMap<>(), null, null, null, targets, message);
     }
 
     public List<String> getTargets() {

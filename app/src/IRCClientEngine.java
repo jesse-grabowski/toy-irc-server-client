@@ -1,193 +1,287 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.io.Closeable;
+import java.nio.charset.Charset;
 import java.time.LocalTime;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.Comparator;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class IRCClientEngine {
+public class IRCClientEngine implements Closeable {
 
-    private static final String SYSTEM_SENDER = "SYSTEM";
-    private static final String SERVER_SENDER = "SERVER";
+    private static final Logger LOG = Logger.getLogger(IRCClientEngine.class.getName());
+    private static final IRCMessageUnmarshaller UNMARSHALLER = new IRCMessageUnmarshaller();
+    private static final IRCMessageMarshaller MARSHALLER = new IRCMessageMarshaller();
 
-    private final BlockingQueue<ClientCommand> commands = new LinkedBlockingQueue<>();
+    private final AtomicReference<IRCConnection> connectionHolder = new AtomicReference<>();
+    private final AtomicReference<IRCClientEngineState> engineState = new AtomicReference<>(IRCClientEngineState.NEW);
+    private final BlockingQueue<IRCClientEngineWork> workQueue = new PriorityBlockingQueue<>(11, Comparator.comparing(IRCClientEngineWork::priority));
+
+    private final StateGuard<IRCClientState> clientStateGuard = new StateGuard<>();
+
     private final IRCClientProperties properties;
     private final TerminalUI terminal;
-
-    private volatile boolean running = false;
-    private volatile IRCClientState state = IRCClientState.DISCONNECTED;
-    private volatile String channel = null;
-
-    private Thread workerThread; // handles outgoing commands
-    private Thread readerThread; // handles incoming server messages
-
-    private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
+    private final Thread thread;
 
     public IRCClientEngine(IRCClientProperties properties, TerminalUI terminal) {
         this.properties = properties;
         this.terminal = terminal;
+        this.thread = new Thread(this::run, "irc-client-engine");
     }
 
-    public boolean send(ClientCommand message) {
-        return commands.offer(message);
+    private void connect() {
+        if (!engineState.compareAndSet(IRCClientEngineState.DISCONNECTED, IRCClientEngineState.CONNECTING)) {
+            IRCClientEngineState current = engineState.get();
+            terminal.println(makeSystemTerminalMessage("Cannot create connection from state " + current));
+            return;
+        }
+        connectionHolder.set(null);
+
+        IRCConnection connection = null;
+        try {
+            connection = IRCClientConnectionFactory.create(
+                    properties.getHost(),
+                    properties.getPort(),
+                    Charset.forName(properties.getCharset()),
+                    properties.getConnectTimeout(),
+                    properties.getReadTimeout());
+            connection.addShutdownHandler(this::afterDisconnect);
+            connection.addIngressHandler(this::receive);
+            connection.start();
+
+            connectionHolder.set(connection);
+            if (!engineState.compareAndSet(IRCClientEngineState.CONNECTING, IRCClientEngineState.CONNECTED)) {
+                throw new IllegalStateException("inconsistent state while establishing IRC connection");
+            }
+
+            IRCClientState state = new IRCClientState();
+            String nick = NicknameGenerator.generate(properties.getNickname());
+            state.setNick(nick);
+            clientStateGuard.setState(state);
+
+            enqueueSend(new IRCMessageNICK(nick));
+            enqueueSend(new IRCMessageUSER(nick, properties.getRealName()));
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Failed to connect to IRC server", e);
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (Exception unused) {
+                    // do nothing
+                }
+            }
+            if (!engineState.compareAndSet(IRCClientEngineState.CONNECTING, IRCClientEngineState.DISCONNECTED)) {
+                LOG.log(Level.SEVERE, "inconsistent state while establishing IRC connection");
+                terminal.println(makeSystemTerminalMessage("Fatal error during connection establishment"));
+                close();
+            }
+        }
     }
 
-    public synchronized void start() throws IOException {
-        if (running) {
+    private void disconnect() {
+        IRCClientEngineState state = engineState.get();
+        if (state == IRCClientEngineState.CLOSED) {
             return;
         }
 
-        // Connect to IRC server
-        socket = new Socket(properties.getHost(), properties.getPort());
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        out = new PrintWriter(socket.getOutputStream(), true);
-
-        state = IRCClientState.CONNECTING;
-        running = true;
-
-        // Outgoing command processing thread
-        workerThread = new Thread(this::handleClientCommand, "IRCClientEngine-Egress");
-        workerThread.start();
-
-        // Incoming server listener thread
-        readerThread = new Thread(this::listenForServerMessages, "IRCClientEngine-Ingress");
-        readerThread.start();
-    }
-
-    /** Stop engine, threads, and socket */
-    public synchronized void stop() {
-        running = false;
-
-        try {
-            if (workerThread != null) workerThread.interrupt();
-            if (readerThread != null) readerThread.interrupt();
-        } catch (Exception ignored) {}
-
-        try {
-            if (socket != null) socket.close();
-        } catch (IOException ignored) {}
-
-        terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "IRCClientEngine stopped"));
-    }
-
-    /** Background thread: processes outgoing commands */
-    public void handleClientCommand() {
-        while (running) {
+        IRCConnection connection = connectionHolder.getAndSet(null);
+        if (connection != null) {
             try {
-                switch (state) {
-                    case DISCONNECTED: break; // do nothing
-                    case CONNECTING:
-                        sendNicknameCommand();
-                        sendUserCommand();
-                        this.state = IRCClientState.REGISTERING;
-                        break;
-                    case REGISTERING:
-                        Thread.sleep(100);
-                        break;
-                    case REGISTERED:
-                        ClientCommand command = commands.poll(100, TimeUnit.MILLISECONDS);
-                        if (command != null) {
-                            handleCommand(command);
-                        }
-                        break;
+                connection.close();
+            } catch (Exception unused) {
+                // do nothing
+            }
+        }
+    }
+
+    // called by IRC connection as it closes
+    private void afterDisconnect() {
+        workQueue.add(new IRCClientEngineWork(() -> {
+            IRCClientEngineState s = engineState.get();
+            if (s == IRCClientEngineState.CLOSED) {
+                return;
+            }
+            clientStateGuard.setState(null);
+            if (!engineState.compareAndSet(s, IRCClientEngineState.DISCONNECTED)) {
+                if (engineState.get() != IRCClientEngineState.CLOSED) {
+                    throw new IllegalStateException("inconsistent state while disconnecting");
                 }
-            } catch (InterruptedException e) {
-                if (!running) break;
             }
+        }, Integer.MIN_VALUE));
+    }
+
+    public void accept(ClientCommand command) {
+        workQueue.add(new IRCClientEngineWork(() -> handle(command), -1));
+    }
+
+    private boolean send(String message) {
+        IRCConnection connection = connectionHolder.get();
+        if (connection == null) {
+            return false;
+        }
+        return connection.offer(message);
+    }
+
+    private boolean send(IRCMessage message) {
+        return send(MARSHALLER.marshal(message));
+    }
+
+    private void enqueueSend(IRCMessage message) {
+        Runnable work = () -> {
+            if (!send(message)) {
+                terminal.println(makeSystemTerminalMessage("Fatal error during send"));
+            }
+        };
+        workQueue.add(new IRCClientEngineWork(work, 0));
+    }
+
+    private void receive(String message) {
+        receive(UNMARSHALLER.unmarshal(message));
+    }
+
+    private void receive(IRCMessage message) {
+        workQueue.add(new IRCClientEngineWork(() -> handle(message), 0));
+    }
+
+    private void handle(IRCMessage message) {
+        switch (message) {
+            case IRCMessagePING m -> handle(m);
+            case IRCMessage001 m -> handle(m);
+            default -> terminal.println(makeSystemTerminalMessage("» " + message.getRawMessage()));
         }
     }
 
-    /** Background thread: reads messages from server */
-    private void listenForServerMessages() {
+    private void handle(IRCMessagePING ping) {
+        send(new IRCMessagePONG(null, ping.getToken()));
+    }
+
+    private void handle(IRCMessage001 message) {
+        if (!engineState.compareAndSet(IRCClientEngineState.CONNECTED, IRCClientEngineState.REGISTERED)) {
+            terminal.println(makeSystemTerminalMessage("Fatal error during registration"));
+            disconnect();
+        }
+    }
+
+    private void handle(ClientCommand command) {
+        switch (command) {
+            case ClientCommandExit c -> handle(c);
+            case ClientCommandJoin c -> handle(c);
+            case ClientCommandMsg c -> handle(c);
+            default -> terminal.println(makeSystemTerminalMessage("Unknown command: " + command));
+        }
+    }
+
+    private void handle(ClientCommandExit command) {
+        close();
+    }
+
+    private void handle(ClientCommandJoin command) {
+        send(new IRCMessageJOINNormal(command.getChannels(), command.getKeys()));
+    }
+
+    private void handle(ClientCommandMsg command) {
+        send(new IRCMessagePRIVMSG(command.getTargets(), command.getText()));
+    }
+
+    private TerminalMessage makeSystemTerminalMessage(String message) {
+        return new TerminalMessage(LocalTime.now(), "SYSTEM", message);
+    }
+
+    private void run() {
         try {
-            String line;
-            while (running && (line = in.readLine()) != null) {
-                IRCMessage message = new IRCMessageUnmarshaller().unmarshal(line);
-                handleServerMessage(message);
+            while (engineState.get() != IRCClientEngineState.CLOSED && !Thread.currentThread().isInterrupted()) {
+                IRCClientEngineWork work = workQueue.take();
+                try {
+                    work.task().run();
+                } catch (Exception e) {
+                    LOG.log(Level.WARNING, "error running task", e);
+                }
             }
-        } catch (IOException e) {
-            if (running) {
-                terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Error reading from server: " + e.getMessage()));
-            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } finally {
-            stop();
+            close();
         }
     }
 
-    private void handleServerMessage(IRCMessage message) {
-        switch (message) {
-            case IRCMessage001 m -> {
-                terminal.setPrompt("[%s@%s]: ".formatted(properties.getNickname(), properties.getHost().getHostName()));
-                terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, m.getMessage()));
-                this.state = IRCClientState.REGISTERED;
+    public void start() {
+        if (!engineState.compareAndSet(IRCClientEngineState.NEW, IRCClientEngineState.INITIALIZING)) {
+            throw new IllegalStateException("IRCClientEngine has already been started");
+        }
+
+        try {
+            thread.start();
+
+            if (!engineState.compareAndSet(IRCClientEngineState.INITIALIZING, IRCClientEngineState.DISCONNECTED)) {
+                throw new IllegalStateException("inconsistent state in initialization");
             }
-            case IRCMessagePING m -> sendPong(m.getToken());
-            case IRCMessagePRIVMSG m -> printPrivateMessage(m);
-            default -> terminal.println(new TerminalMessage(LocalTime.now(), SERVER_SENDER, message.getRawMessage()));
+
+            LOG.info("IRCClientEngine started");
+
+            workQueue.add(new IRCClientEngineWork(this::connect));
+        } catch (RuntimeException e) {
+            LOG.log(Level.WARNING, "failed to initialize IRCClientEngine", e);
+            close();
+            throw e;
         }
     }
 
-    private void handleCommand(ClientCommand message) {
-        switch (message) {
-            case ClientCommandExit exit -> exit();
-            case ClientCommandHelp help -> { /* should never happen */ }
-            case ClientCommandJoin join -> sendJoin(join.getChannels().getFirst());
-            case ClientCommandMsg msg -> sendPrivateMessage(msg.getTargets().getFirst(), msg.getText());
-            case ClientCommandMsgCurrent msg -> {}
+    @Override
+    public void close() {
+        IRCClientEngineState oldState = engineState.getAndSet(IRCClientEngineState.CLOSED);
+        if (oldState == IRCClientEngineState.CLOSED) {
+            return;
+        }
+
+        if (Thread.currentThread() != thread) {
+            thread.interrupt();
+        }
+
+        IRCConnection connection = connectionHolder.getAndSet(null);
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (Exception unused) {
+                // do nothing
+            }
         }
     }
 
-    private void sendNicknameCommand() {
-        IRCMessageNICK message = new IRCMessageNICK(null, new LinkedHashMap<>(), null, null, null, properties.getNickname());
-        sendLine(message);
-        terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending nickname command"));
+    private record IRCClientEngineWork(Runnable task, int priority) {
+
+        public IRCClientEngineWork(Runnable task) {
+            this(task, 0);
+        }
     }
 
-    private void sendUserCommand() {
-        IRCMessageUSER message = new IRCMessageUSER(null, new LinkedHashMap<>(), null, null, null, properties.getNickname(), properties.getRealName());
-        sendLine(message);
-        terminal.println(new TerminalMessage(LocalTime.now(), SYSTEM_SENDER, "Sending user command"));
+    private class StateGuard<T> {
+        private T state;
+
+        public T getState() {
+            assertEngineThread();
+            return state;
+        }
+
+        public void setState(T state) {
+            assertEngineThread();
+            this.state = state;
+        }
+
+        private void assertEngineThread() {
+            if (Thread.currentThread() != thread) {
+                throw new IllegalStateException("state can only be accessed from the engine thread");
+            }
+        }
     }
 
-    private void sendPong(String value) {
-        IRCMessagePONG message = new IRCMessagePONG(null, new LinkedHashMap<>(), null, null, null, null, value);
-        sendLine(message);
-    }
-
-    private void sendJoin(String channel) {
-        IRCMessageJOINNormal message = new IRCMessageJOINNormal(null, new LinkedHashMap<>(), null, null, null, List.of(channel), null);
-        sendLine(message);
-    }
-
-    private void sendPrivateMessage(String channel, String text) {
-        IRCMessagePRIVMSG message = new IRCMessagePRIVMSG(null, new LinkedHashMap<>(), null, null, null, List.of(channel), text);
-        sendLine(message);
-        printMessage(properties.getNickname(), channel, text);
-    }
-
-    private void sendLine(IRCMessage message) {
-        out.printf("%s\r\n", new IRCMessageMarshaller().marshal(message));
-    }
-
-    private void printPrivateMessage(IRCMessagePRIVMSG message) {
-        printMessage(message.getPrefixName(), channel, message.getMessage());
-    }
-
-    private void printMessage(String nick, String channel, String text) {
-        terminal.println(new TerminalMessage(LocalTime.now(), nick, text));
-    }
-
-    private void exit() {
-        this.stop();
-        terminal.stop();
+    private enum IRCClientEngineState {
+        NEW,
+        INITIALIZING,
+        DISCONNECTED,
+        CONNECTING,
+        CONNECTED,
+        REGISTERED,
+        CLOSED
     }
 }

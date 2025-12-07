@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -112,7 +113,7 @@ public class IRCConnection implements Closeable {
             egressThread.start();
 
             if (!state.compareAndSet(ConnectionState.INITIALIZING, ConnectionState.ACTIVE)) {
-                throw new IOException("inconsistent state in initialization");
+                throw new IllegalStateException("inconsistent state in initialization");
             }
 
             LOG.finest("Started IRC connection");
@@ -138,8 +139,12 @@ public class IRCConnection implements Closeable {
                     }
                 }
             }
+        } catch (SocketTimeoutException e) {
+            LOG.log(Level.WARNING, "read timeout", e);
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "Failed to read from IRC socket", e);
+            if (state.get() != ConnectionState.CLOSED) {
+                LOG.log(Level.WARNING, "ingress socket exception", e);
+            }
         } finally {
             close();
         }
@@ -161,7 +166,9 @@ public class IRCConnection implements Closeable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "Failed to write to IRC socket", e);
+            if (state.get() != ConnectionState.CLOSED) {
+                LOG.log(Level.WARNING, "egress socket exception", e);
+            }
         } finally {
             close();
         }
@@ -179,7 +186,7 @@ public class IRCConnection implements Closeable {
                 socket.close();
             }
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "Failed to close IRC socket / socket already closed", e);
+            LOG.log(Level.WARNING, "failed to close socket", e);
         }
 
         Thread current = Thread.currentThread();

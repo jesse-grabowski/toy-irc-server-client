@@ -1,4 +1,5 @@
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.logging.Level;
 
@@ -7,6 +8,9 @@ public class IRCClientProperties implements ArgsProperties {
 
     private InetAddress host;
     private int port = 6667;
+    private int connectTimeout = 10000;
+    private int readTimeout = 10 * 60 * 1000;
+    private String charset = "UTF-8";
     private boolean useSimpleTerminal = false;
     private String nickname = "auto";
     private String realName = "Unknown";
@@ -17,6 +21,15 @@ public class IRCClientProperties implements ArgsProperties {
     public void validate() {
         if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("port must be between 0 and 65535");
+        }
+        if (connectTimeout < 0) {
+            throw new IllegalArgumentException("connectTimeout must be greater than 0");
+        }
+        if (readTimeout < 0) {
+            throw new IllegalArgumentException("readTimeout must be greater than 0");
+        }
+        if (!Charset.isSupported(charset)) {
+            throw new IllegalArgumentException("charset must be one of " + Charset.availableCharsets().keySet());
         }
         try {
             Paths.get(logFile);
@@ -44,6 +57,30 @@ public class IRCClientProperties implements ArgsProperties {
 
     public void setPort(int port) {
         this.port = port;
+    }
+
+    public int getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    public int getReadTimeout() {
+        return readTimeout;
+    }
+
+    public void setReadTimeout(int readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    public String getCharset() {
+        return charset;
+    }
+
+    public void setCharset(String charset) {
+        this.charset = charset;
     }
 
     public boolean isUseSimpleTerminal() {

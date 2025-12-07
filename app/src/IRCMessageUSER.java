@@ -1,3 +1,4 @@
+import java.util.LinkedHashMap;
 import java.util.SequencedMap;
 
 public final class IRCMessageUSER extends IRCMessage {
@@ -17,6 +18,10 @@ public final class IRCMessageUSER extends IRCMessage {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.user = user;
         this.realName = realName;
+    }
+
+    public IRCMessageUSER(String user, String realName) {
+        this(null, new LinkedHashMap<>(), null, null, null, user, realName);
     }
 
     public String getUser() {

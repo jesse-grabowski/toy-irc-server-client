@@ -1,3 +1,4 @@
+import java.util.LinkedHashMap;
 import java.util.SequencedMap;
 
 public final class IRCMessagePING extends IRCMessage {
@@ -14,6 +15,10 @@ public final class IRCMessagePING extends IRCMessage {
                              String token) {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.token = token;
+    }
+
+    public IRCMessagePING(String token) {
+        this(null, new LinkedHashMap<>(), null, null, null, token);
     }
 
     public String getToken() {
