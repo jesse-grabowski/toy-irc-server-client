@@ -17,18 +17,18 @@ public class ClientCommandDispatcher {
         try {
             command = parser.parse(line);
         } catch (Exception e) {
-            terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", e.getMessage()));
+            terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", null, e.getMessage()));
             return;
         }
 
         switch (command) {
             case ClientCommandHelp help when help.getCommand() != null -> {
                 String helpText = parser.getHelpText(help.getCommand());
-                terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", helpText));
+                terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", null, helpText));
             }
             case ClientCommandHelp help -> {
                 String helpText = parser.getHelpText();
-                terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", helpText));
+                terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", null, helpText));
             }
             default -> ircClientEngine.accept(command);
         }

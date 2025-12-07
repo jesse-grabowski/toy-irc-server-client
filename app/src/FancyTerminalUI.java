@@ -18,7 +18,9 @@ public class FancyTerminalUI extends TerminalUI {
 
     private static final int FOOTER_ROWS = 3;
     private static final int MAX_MESSAGES = 200;
-    private static final int METADATA_WIDTH = 16;
+    private static final int METADATA_SENDER_WIDTH = 9;
+    private static final int METADATA_RECEIVER_WIDTH = 9;
+    private static final int METADATA_WIDTH = METADATA_SENDER_WIDTH + METADATA_RECEIVER_WIDTH + 12;
     private static final String BLANK_METADATA = " ".repeat(METADATA_WIDTH);
     private static final DateTimeFormatter METADATA_TIMESTAMP = DateTimeFormatter.ofPattern("HH:mm:ss");
 
@@ -248,17 +250,30 @@ public class FancyTerminalUI extends TerminalUI {
         StringBuilder metadataBuilder = new StringBuilder();
         metadataBuilder.append(message.time() != null ? METADATA_TIMESTAMP.format(message.time()) : "XX:XX:XX");
         metadataBuilder.append(' ');
-        metadataBuilder.append(Colorizer.colorize(formatExactLength(message.sender(), 7, "unknown")));
+        if (message.receiver() == null) {
+            metadataBuilder.append(Colorizer.colorize(formatExactLength(message.sender(), METADATA_SENDER_WIDTH + 3 + METADATA_RECEIVER_WIDTH, false)));
+        } else {
+            metadataBuilder.append(Colorizer.colorize(formatExactLength(message.sender(), METADATA_SENDER_WIDTH, true)));
+            metadataBuilder.append(" » ");
+            metadataBuilder.append(Colorizer.colorize(formatExactLength(message.receiver(), METADATA_RECEIVER_WIDTH, false)));
+        }
         return metadataBuilder.toString();
     }
 
-    private String formatExactLength(String string, int length, String defaultValue) {
+    private String formatExactLength(String string, int length, boolean alignEnd) {
         if (string == null) {
-            return defaultValue;
-        } else if (string.length() > length) {
+            return " ".repeat(length);
+        }
+
+        if (string.length() > length) {
             return string.substring(0, length);
         } else {
-            return string + " ".repeat(length - string.length());
+            String padding = " ".repeat(length - string.length());
+            if (alignEnd) {
+                return padding + string;
+            } else {
+                return string + padding;
+            }
         }
     }
 

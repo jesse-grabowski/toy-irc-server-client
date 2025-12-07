@@ -22,6 +22,7 @@ public class IRCMessageRoundTripTest {
 
     static Stream<Arguments> rawMessages() {
         return Stream.of(
+                // Basic messages
                 Arguments.of("PING :12345", "PING :12345"),
                 Arguments.of("PONG :12345", "PONG :12345"),
                 Arguments.of("PONG irc.example.com :12345", "PONG irc.example.com :12345"),
@@ -38,7 +39,37 @@ public class IRCMessageRoundTripTest {
                         "@a=1;b=hello\\sworld :nick!user@host PRIVMSG #chan :hi there",
                         "@a=1;b=hello\\sworld :nick!user@host PRIVMSG #chan :hi there"
                 ),
-                Arguments.of("FOOCMD arg1 arg2", "FOOCMD arg1 arg2")
+                Arguments.of("FOOCMD arg1 arg2", "FOOCMD arg1 arg2"),
+
+                // --- CAP client commands ---
+                // CAP LS (with version)
+                Arguments.of("CAP LS 302", "CAP LS 302"),
+                // CAP LIST (request)
+                Arguments.of("CAP LIST", "CAP LIST"),
+                // CAP REQ (enable / disable capabilities)
+                Arguments.of("CAP REQ :multi-prefix sasl -batch", "CAP REQ :multi-prefix sasl -batch"),
+                // CAP END
+                Arguments.of("CAP END", "CAP END"),
+
+                // --- CAP server replies / notifications ---
+                // CAP <nick> ACK
+                Arguments.of("CAP nick ACK :multi-prefix -batch", "CAP nick ACK :multi-prefix -batch"),
+                // CAP <nick> NAK
+                Arguments.of("CAP nick NAK :multi-prefix -batch", "CAP nick NAK :multi-prefix -batch"),
+                // CAP <nick> NEW
+                Arguments.of("CAP nick NEW :multi-prefix sasl", "CAP nick NEW :multi-prefix sasl"),
+                // CAP <nick> DEL
+                Arguments.of("CAP nick DEL :multi-prefix sasl", "CAP nick DEL :multi-prefix sasl"),
+
+                // CAP <nick> LS (no more, capabilities in one line)
+                Arguments.of("CAP nick LS :multi-prefix sasl", "CAP nick LS :multi-prefix sasl"),
+                // CAP <nick> LS * (hasMore = true)
+                Arguments.of("CAP nick LS * :multi-prefix sasl", "CAP nick LS * :multi-prefix sasl"),
+
+                // CAP <nick> LIST (no more)
+                Arguments.of("CAP nick LIST :multi-prefix sasl", "CAP nick LIST :multi-prefix sasl"),
+                // CAP <nick> LIST * (hasMore = true)
+                Arguments.of("CAP nick LIST * :multi-prefix sasl", "CAP nick LIST * :multi-prefix sasl")
         );
     }
 
@@ -51,6 +82,7 @@ public class IRCMessageRoundTripTest {
 
     static Stream<Arguments> messageTypes() {
         return Stream.of(
+                // Basic messages
                 Arguments.of("PING :12345", IRCMessagePING.class),
                 Arguments.of("PONG :12345", IRCMessagePONG.class),
                 Arguments.of("JOIN 0", IRCMessageJOIN0.class),
@@ -60,7 +92,25 @@ public class IRCMessageRoundTripTest {
                 Arguments.of("PRIVMSG #chan :hi", IRCMessagePRIVMSG.class),
                 Arguments.of("USER myuser 0 * :Real Name", IRCMessageUSER.class),
                 Arguments.of("001 mynick :Welcome", IRCMessage001.class),
-                Arguments.of("FOOCMD arg1 arg2", IRCMessageUnsupported.class)
+                Arguments.of("FOOCMD arg1 arg2", IRCMessageUnsupported.class),
+
+                // --- CAP client commands ---
+                Arguments.of("CAP LS 302", IRCMessageCAPLS.class),
+                Arguments.of("CAP LIST", IRCMessageCAPLIST.class),
+                Arguments.of("CAP REQ :multi-prefix sasl -batch", IRCMessageCAPREQ.class),
+                Arguments.of("CAP END", IRCMessageCAPEND.class),
+
+                // --- CAP server replies / notifications ---
+                Arguments.of("CAP nick ACK :multi-prefix -batch", IRCMessageCAPACK.class),
+                Arguments.of("CAP nick NAK :multi-prefix -batch", IRCMessageCAPNAK.class),
+                Arguments.of("CAP nick NEW :multi-prefix sasl", IRCMessageCAPNEW.class),
+                Arguments.of("CAP nick DEL :multi-prefix sasl", IRCMessageCAPDEL.class),
+
+                Arguments.of("CAP nick LS :multi-prefix sasl", IRCMessageCAPLS.class),
+                Arguments.of("CAP nick LS * :multi-prefix sasl", IRCMessageCAPLS.class),
+
+                Arguments.of("CAP nick LIST :multi-prefix sasl", IRCMessageCAPLIST.class),
+                Arguments.of("CAP nick LIST * :multi-prefix sasl", IRCMessageCAPLIST.class)
         );
     }
 }

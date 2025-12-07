@@ -4,6 +4,7 @@ import java.util.Optional;
 
 public enum IRCCapability {
 
+    CAP_NOTIFY("cap-notify"),
     ECHO_MESSAGE("echo-message"),
     MESSAGE_TAGS("message-tags"),
     SERVER_TIME("server-time");
@@ -20,6 +21,10 @@ public enum IRCCapability {
 
     IRCCapability(String name) {
         this.name = name;
+    }
+
+    public String getName() {
+        return name;
     }
 
     public static Optional<IRCCapability> forName(String name) {

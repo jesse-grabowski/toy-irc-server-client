@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.SequencedMap;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +17,8 @@ public class IRCMessageUnmarshaller {
 
     private static final Pattern PREFIX_PATTERN = Pattern.compile(
             "^(?<name>[^\\s\\u0000!@]+)(?:!(?<user>[^\\s\\u0000@]+))?(?:@(?<host>[^\\s\\u0000]+))?$");
+
+    private static final Set<String> CAP_KNOWN_SUBCOMMANDS = Set.of("LS", "LIST", "REQ", "ACK", "NAK", "END", "NEW", "DEL");
 
     public IRCMessage unmarshal(String message) {
         Matcher matcher = MESSAGE_PATTERN.matcher(message);
@@ -30,6 +33,7 @@ public class IRCMessageUnmarshaller {
 
         try {
             return switch (command) {
+                case IRCMessageCAPLS.COMMAND -> parseCap(message, tags, prefix, params);
                 case IRCMessageJOINNormal.COMMAND -> parseJoin(message, tags, prefix, params);
                 case IRCMessageNICK.COMMAND -> parseNick(message, tags, prefix, params);
                 case IRCMessagePING.COMMAND -> parsePing(message, tags, prefix, params);
@@ -124,6 +128,130 @@ public class IRCMessageUnmarshaller {
             results.add(parts[1]);
         }
         return results;
+    }
+
+    private IRCMessage parseCap(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        if (params.isEmpty()) {
+            throw new IllegalArgumentException("CAP must have at least one parameter <subcommand>");
+        }
+
+        String nickOrSubcommand = safeGetIndex(params, 0);
+        if (CAP_KNOWN_SUBCOMMANDS.contains(nickOrSubcommand)) {
+            return switch (nickOrSubcommand) {
+                case "END" -> new IRCMessageCAPEND(raw, tags, prefix.name(), prefix.user(), prefix.host());
+                case "LS" -> new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), null, safeGetIndex(params, 1), false, List.of());
+                case "LIST" -> new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), null, false, List.of());
+                case "REQ" -> {
+                    String rawCapabilities = safeGetIndex(params, 1);
+                    if (rawCapabilities == null) {
+                        yield new IRCMessageCAPREQ(raw, tags, prefix.name(), prefix.user(), prefix.host(), List.of(), List.of());
+                    }
+
+                    List<String> enabledCapabilities = new ArrayList<>();
+                    List<String> disabledCapabilities = new ArrayList<>();
+                    for (String cap : rawCapabilities.split("\\s+")) {
+                        if (cap.startsWith("-")) {
+                            disabledCapabilities.add(cap.substring(1));
+                        } else {
+                            enabledCapabilities.add(cap);
+                        }
+                    }
+                    yield new IRCMessageCAPREQ(raw, tags, prefix.name(), prefix.user(), prefix.host(), enabledCapabilities, disabledCapabilities);
+                }
+                default -> throw new IllegalArgumentException("Unsupported subcommand: " + nickOrSubcommand);
+            };
+        } else {
+            String subcommand = safeGetIndex(params, 1);
+            return switch (subcommand) {
+                case "ACK" -> {
+                    String rawCapabilities = safeGetIndex(params, 2);
+                    if (rawCapabilities == null) {
+                        yield new IRCMessageCAPACK(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, List.of(), List.of());
+                    }
+
+                    List<String> enabledCapabilities = new ArrayList<>();
+                    List<String> disabledCapabilities = new ArrayList<>();
+                    for (String cap : rawCapabilities.split("\\s+")) {
+                        if (cap.startsWith("-")) {
+                            disabledCapabilities.add(cap.substring(1));
+                        } else {
+                            enabledCapabilities.add(cap);
+                        }
+                    }
+                    yield new IRCMessageCAPACK(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, enabledCapabilities, disabledCapabilities);
+                }
+                case "DEL" -> {
+                    String rawCapabilities = safeGetIndex(params, 2);
+                    if (rawCapabilities == null) {
+                        yield new IRCMessageCAPDEL(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, List.of());
+                    }
+                    yield new IRCMessageCAPDEL(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, Arrays.asList(rawCapabilities.split("\\s+")));
+                }
+                case "LS" -> {
+                    if (params.size() == 4) {
+                        String capabilities = safeGetIndex(params, 3);
+                        if (capabilities == null || capabilities.isBlank()) {
+                            yield new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, null, true, List.of());
+                        } else {
+                            yield new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, null, true, Arrays.asList(capabilities.split("\\s+")));
+                        }
+                    } else if (params.size() == 3) {
+                        String capabilities = safeGetIndex(params, 2);
+                        if (capabilities == null || capabilities.isBlank()) {
+                            yield new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, null, false, List.of());
+                        } else {
+                            yield new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, null, false, Arrays.asList(capabilities.split("\\s+")));
+                        }
+                    } else {
+                        throw new IllegalArgumentException("Incorrect arguments for subcommand: " + subcommand);
+                    }
+                }
+                case "LIST" -> {
+                    if (params.size() == 4) {
+                        String capabilities = safeGetIndex(params, 3);
+                        if (capabilities == null || capabilities.isBlank()) {
+                            yield new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, true, List.of());
+                        } else {
+                            yield new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, true, Arrays.asList(capabilities.split("\\s+")));
+                        }
+                    } else if (params.size() == 3) {
+                        String capabilities = safeGetIndex(params, 2);
+                        if (capabilities == null || capabilities.isBlank()) {
+                            yield new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, false, List.of());
+                        } else {
+                            yield new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, false, Arrays.asList(capabilities.split("\\s+")));
+                        }
+                    } else {
+                        throw new IllegalArgumentException("Incorrect arguments for subcommand: " + subcommand);
+                    }
+                }
+                case "NAK" -> {
+                    String rawCapabilities = safeGetIndex(params, 2);
+                    if (rawCapabilities == null) {
+                        yield new IRCMessageCAPNAK(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, List.of(), List.of());
+                    }
+
+                    List<String> enabledCapabilities = new ArrayList<>();
+                    List<String> disabledCapabilities = new ArrayList<>();
+                    for (String cap : rawCapabilities.split("\\s+")) {
+                        if (cap.startsWith("-")) {
+                            disabledCapabilities.add(cap.substring(1));
+                        } else {
+                            enabledCapabilities.add(cap);
+                        }
+                    }
+                    yield new IRCMessageCAPNAK(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, enabledCapabilities, disabledCapabilities);
+                }
+                case "NEW" -> {
+                    String rawCapabilities = safeGetIndex(params, 2);
+                    if (rawCapabilities == null) {
+                        yield new IRCMessageCAPNEW(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, List.of());
+                    }
+                    yield new IRCMessageCAPNEW(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, Arrays.asList(rawCapabilities.split("\\s+")));
+                }
+                default -> throw new IllegalArgumentException("Unsupported subcommand: " + subcommand);
+            };
+        }
     }
 
     private IRCMessage parseJoin(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {

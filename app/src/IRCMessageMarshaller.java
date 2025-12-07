@@ -1,11 +1,20 @@
 import java.util.SequencedMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class IRCMessageMarshaller {
 
     public String marshal(IRCMessage message) {
         return switch (message) {
+            case IRCMessageCAPACK m -> marshal(m, this::marshalCapACK);
+            case IRCMessageCAPDEL m -> marshal(m, this::marshalCapDEL);
+            case IRCMessageCAPEND m -> marshal(m, this::marshalCapEND);
+            case IRCMessageCAPLIST m -> marshal(m, this::marshalCapLIST);
+            case IRCMessageCAPLS m -> marshal(m, this::marshalCapLS);
+            case IRCMessageCAPNAK m -> marshal(m, this::marshalCapNAK);
+            case IRCMessageCAPNEW m -> marshal(m, this::marshalCapNEW);
+            case IRCMessageCAPREQ m -> marshal(m, this::marshalCapREQ);
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
             case IRCMessageNICK m -> marshal(m, this::marshalNick);
@@ -80,6 +89,67 @@ public class IRCMessageMarshaller {
         } else {
             return name;
         }
+    }
+
+    private String marshalCapACK(IRCMessageCAPACK message) {
+        return message.getNick() + " ACK :" + Stream.concat(
+                message.getEnableCapabilities().stream(),
+                message.getDisableCapabilities().stream().map(s -> "-" + s)
+        ).collect(Collectors.joining(" "));
+    }
+
+    private String marshalCapDEL(IRCMessageCAPDEL message) {
+        return message.getNick() + " DEL :" + String.join(" ", message.getCapabilities());
+    }
+
+    private String marshalCapEND(IRCMessageCAPEND message) {
+        return "END";
+    }
+
+    private String marshalCapLIST(IRCMessageCAPLIST message) {
+        if (message.getNick() == null) { // request
+            return "LIST";
+        }
+
+        if (message.isHasMore()) {
+            return "%s LIST * :%s".formatted(message.getNick(), String.join(" ", message.getCapabilities()));
+        } else {
+            return "%s LIST :%s".formatted(message.getNick(), String.join(" ", message.getCapabilities()));
+        }
+    }
+
+    private String marshalCapLS(IRCMessageCAPLS message) {
+        if (message.getNick() == null) { // request
+            if (message.getVersion() == null) {
+                return "LS";
+            } else {
+                return "LS %s".formatted(message.getVersion());
+            }
+        }
+
+        if (message.isHasMore()) {
+            return "%s LS * :%s".formatted(message.getNick(), String.join(" ", message.getCapabilities()));
+        } else {
+            return "%s LS :%s".formatted(message.getNick(), String.join(" ", message.getCapabilities()));
+        }
+    }
+
+    private String marshalCapNAK(IRCMessageCAPNAK message) {
+        return message.getNick() + " NAK :" + Stream.concat(
+                message.getEnableCapabilities().stream(),
+                message.getDisableCapabilities().stream().map(s -> "-" + s)
+        ).collect(Collectors.joining(" "));
+    }
+
+    private String marshalCapNEW(IRCMessageCAPNEW message) {
+        return message.getNick() + " NEW :" + String.join(" ", message.getCapabilities());
+    }
+
+    private String marshalCapREQ(IRCMessageCAPREQ message) {
+        return "REQ :" + Stream.concat(
+                message.getEnableCapabilities().stream(),
+                message.getDisableCapabilities().stream().map(s -> "-" + s)
+        ).collect(Collectors.joining(" "));
     }
 
     private String marshalJoin0(IRCMessageJOIN0 message) {

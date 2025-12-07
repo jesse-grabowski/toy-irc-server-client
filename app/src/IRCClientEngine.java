@@ -1,14 +1,22 @@
 import java.io.Closeable;
 import java.nio.charset.Charset;
+import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class IRCClientEngine implements Closeable {
+
+    private static final DateTimeFormatter SERVER_TIME_FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
     private static final Logger LOG = Logger.getLogger(IRCClientEngine.class.getName());
     private static final IRCMessageUnmarshaller UNMARSHALLER = new IRCMessageUnmarshaller();
@@ -60,6 +68,7 @@ public class IRCClientEngine implements Closeable {
             state.setNick(nick);
             clientStateGuard.setState(state);
 
+            enqueueSend(new IRCMessageCAPLS(null, "302", false, List.of()));
             enqueueSend(new IRCMessageNICK(nick));
             enqueueSend(new IRCMessageUSER(nick, properties.getRealName()));
         } catch (Exception e) {
@@ -146,29 +155,122 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(IRCMessage message) {
         switch (message) {
+            case IRCMessageCAPACK m -> handle(m);
+            case IRCMessageCAPLS m -> handle(m);
+            case IRCMessageCAPNAK m -> handle(m);
+            case IRCMessageJOINNormal m -> handle(m);
             case IRCMessagePING m -> handle(m);
+            case IRCMessagePRIVMSG m -> handle(m);
             case IRCMessage001 m -> handle(m);
             default -> terminal.println(makeSystemTerminalMessage("» " + message.getRawMessage()));
         }
+    }
+
+    private void handle(IRCMessageCAPLS message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.CONNECTED) {
+            LOG.warning("Unexpected CAP LS message after registration");
+            return;
+        }
+
+        for (String capabilityString : message.getCapabilities()) {
+            IRCCapability.forName(capabilityString).ifPresent(state.getServerCapabilities()::add);
+        }
+
+        if (!message.isHasMore()) {
+            if (state.getServerCapabilities().isEmpty()) {
+                terminal.println(makeSystemTerminalMessage("Server does not support any known capabilities"));
+                send(new IRCMessageCAPEND());
+            } else {
+                terminal.println(makeSystemTerminalMessage("Server supports capabilities: " + state.getServerCapabilities()));
+                send(new IRCMessageCAPREQ(state.getServerCapabilities().stream().map(IRCCapability::getName).toList(), List.of()));
+            }
+        }
+    }
+
+    private void handle(IRCMessageCAPACK message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.CONNECTED) {
+            LOG.warning("Unexpected CAP ACK message after registration");
+            return;
+        }
+
+        for (String capabilityString : message.getEnableCapabilities()) {
+            IRCCapability.forName(capabilityString).ifPresent(state.getClaimedCapabilities()::add);
+        }
+
+        terminal.println(makeSystemTerminalMessage("Client enabled capabilities: " + state.getClaimedCapabilities()));
+        send(new IRCMessageCAPEND());
+    }
+
+    private void handle(IRCMessageCAPNAK message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.CONNECTED) {
+            LOG.warning("Unexpected CAP NAK message after registration");
+            return;
+        }
+
+        terminal.println(makeSystemTerminalMessage("Server rejected capabilities: " + message.getEnableCapabilities()));
+        send(new IRCMessageCAPEND());
+    }
+
+    private void handle(IRCMessageJOINNormal message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        for (String channelName : message.getChannels()) {
+            if (Objects.equals(state.getNick(), message.getPrefixName())) {
+                state.getJoinedChannels().push(channelName);
+                state.setCurrentChannel(channelName);
+            }
+            var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
+            channel.getMembers().add(message.getPrefixName());
+            terminal.setPrompt("[%s@%s/%s]: ".formatted(
+                    Colorizer.colorize(state.getNick()),
+                    Colorizer.colorize(properties.getHost().getHostName()),
+                    Colorizer.colorize(channelName)));
+        }
+        terminal.setStatus("Chatting in %s".formatted(state.getJoinedChannels().stream().sorted().map(Colorizer::colorize).collect(Collectors.joining(", "))));
+        terminal.println(makeSystemTerminalMessage("Successfully registered with server"));
     }
 
     private void handle(IRCMessagePING ping) {
         send(new IRCMessagePONG(null, ping.getToken()));
     }
 
+    private void handle(IRCMessagePRIVMSG message) {
+        if (engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        LocalTime time = getMessageTime(message);
+        for (String target : message.getTargets()) {
+            terminal.println(new TerminalMessage(time, message.getPrefixName(), target, message.getMessage()));
+        }
+    }
+
     private void handle(IRCMessage001 message) {
-        if (!engineState.compareAndSet(IRCClientEngineState.CONNECTED, IRCClientEngineState.REGISTERED)) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || !engineState.compareAndSet(IRCClientEngineState.CONNECTED, IRCClientEngineState.REGISTERED)) {
             terminal.println(makeSystemTerminalMessage("Fatal error during registration"));
             disconnect();
+            return;
         }
+
+        terminal.setPrompt("[%s@%s]: ".formatted(
+                Colorizer.colorize(state.getNick()),
+                Colorizer.colorize(properties.getHost().getHostName())));
     }
 
     private void handle(ClientCommand command) {
         switch (command) {
             case ClientCommandExit c -> handle(c);
+            case ClientCommandHelp c -> { /* handled externally */ }
             case ClientCommandJoin c -> handle(c);
             case ClientCommandMsg c -> handle(c);
-            default -> terminal.println(makeSystemTerminalMessage("Unknown command: " + command));
+            case ClientCommandMsgCurrent c -> handle(c);
         }
     }
 
@@ -181,11 +283,55 @@ public class IRCClientEngine implements Closeable {
     }
 
     private void handle(ClientCommandMsg command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemTerminalMessage("Could not send message -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessagePRIVMSG(command.getTargets(), command.getText()));
+
+        if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
+            for (String target : command.getTargets()) {
+                terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), target, command.getText()));
+            }
+        }
+    }
+
+    private void handle(ClientCommandMsgCurrent command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemTerminalMessage("Could not send message -- connection not yet registered"));
+            return;
+        }
+
+        if (state.getCurrentChannel() == null) {
+            terminal.println(makeSystemTerminalMessage("Failed to send message -- no channel selected"));
+            return;
+        }
+
+        send(new IRCMessagePRIVMSG(List.of(state.getCurrentChannel()), command.getText()));
+
+        if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
+            terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), state.getCurrentChannel(), command.getText()));
+        }
+    }
+
+    private LocalTime getMessageTime(IRCMessage message) {
+        String serverTime = message.getTags().get("time");
+        if (serverTime != null) {
+            try {
+                return Instant.parse(serverTime).atZone(ZoneId.systemDefault()).toLocalTime();
+            } catch (Exception e) {
+                return LocalTime.now();
+            }
+        } else {
+            return LocalTime.now();
+        }
     }
 
     private TerminalMessage makeSystemTerminalMessage(String message) {
-        return new TerminalMessage(LocalTime.now(), "SYSTEM", message);
+        return new TerminalMessage(LocalTime.now(), "SYSTEM", null, message);
     }
 
     private void run() {
