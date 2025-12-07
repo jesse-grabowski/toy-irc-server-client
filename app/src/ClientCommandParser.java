@@ -18,6 +18,9 @@ public class ClientCommandParser {
                 .build();
 
         parsers = new LinkedHashMap<>();
+        parsers.put("/connect", ArgsParser.builder(ClientCommandConnect::new, false, "reconnect to the server")
+                .addUsageExample("/connect")
+                .build());
         parsers.put("/exit", ArgsParser.builder(ClientCommandExit::new, false, "quit RitsIRC")
                 .addUsageExample("/exit")
                 .build());
@@ -42,6 +45,12 @@ public class ClientCommandParser {
                         .addUsageExample("/msg #channel hello there")
                 .addCommaSeparatedListPositional(0, ClientCommandMsg::setTargets, "nick or channel (may be mask, \"*\" = current channel)", true)
                         .addGreedyStringPositional(1, ClientCommandMsg::setText, "text to send", true)
+                .build());
+        parsers.put("/quit", ArgsParser.builder(ClientCommandQuit::new, false, "disconnect from the server")
+                .addUsageExample("/quit [<reason>]")
+                .addUsageExample("/quit")
+                .addUsageExample("/quit jobs done")
+                .addGreedyStringPositional(0, ClientCommandQuit::setReason, "reason for disconnection", false)
                 .build());
 
         List<String> commands = new ArrayList<>(parsers.keySet());

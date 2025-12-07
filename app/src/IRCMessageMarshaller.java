@@ -22,6 +22,7 @@ public class IRCMessageMarshaller {
             case IRCMessagePONG m -> marshal(m, this::marshalPong);
             case IRCMessagePRIVMSG m -> marshal(m, this::marshalPrivmsg);
             case IRCMessageUSER m -> marshal(m, this::marshalUser);
+            case IRCMessageQUIT m -> marshal(m, this::marshalQuit);
             case IRCMessage001 m -> marshal(m, this::marshal001);
             case IRCMessageUnsupported m -> m.getRawMessage();
             case IRCMessageParseError m -> m.getRawMessage();
@@ -191,6 +192,10 @@ public class IRCMessageMarshaller {
 
     private String marshalUser(IRCMessageUSER message) {
         return message.getUser() + " 0 * :" + message.getRealName();
+    }
+
+    private String marshalQuit(IRCMessageQUIT message) {
+        return message.getReason() == null ? null : ":" + message.getReason();
     }
 
     private String marshal001(IRCMessage001 message) {

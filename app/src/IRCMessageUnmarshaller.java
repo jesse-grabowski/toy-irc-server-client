@@ -40,6 +40,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessagePONG.COMMAND -> parsePong(message, tags, prefix, params);
                 case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(message, tags, prefix, params);
                 case IRCMessageUSER.COMMAND -> parseUser(message, tags, prefix, params);
+                case IRCMessageQUIT.COMMAND -> parseQuit(message, tags, prefix, params);
                 case IRCMessage001.COMMAND -> parse001(message, tags, prefix, params);
                 default ->
                         new IRCMessageUnsupported(command, message, tags, prefix.name(), prefix.user(), prefix.host());
@@ -302,6 +303,10 @@ public class IRCMessageUnmarshaller {
             throw new IllegalArgumentException("USER must have at least 4 parameters <user> ~ ~ <realName>");
         }
         return new IRCMessageUSER(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), safeGetIndex(params, 3));
+    }
+
+    private IRCMessageQUIT parseQuit(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        return new IRCMessageQUIT(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetLast(params));
     }
 
     private IRCMessage001 parse001(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {

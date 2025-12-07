@@ -72,6 +72,9 @@ public class IRCClientEngine implements Closeable {
             enqueueSend(new IRCMessageNICK(nick));
             enqueueSend(new IRCMessageUSER(nick, properties.getRealName()));
         } catch (Exception e) {
+            terminal.println(makeSystemTerminalMessage(
+                    "Failed to connect to IRC server %s:%d, try again with /connect".formatted(
+                            properties.getHost().getHostName(), properties.getPort())));
             LOG.log(Level.WARNING, "Failed to connect to IRC server", e);
             if (connection != null) {
                 try {
@@ -266,12 +269,18 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommand command) {
         switch (command) {
+            case ClientCommandConnect c -> handle(c);
             case ClientCommandExit c -> handle(c);
             case ClientCommandHelp c -> { /* handled externally */ }
             case ClientCommandJoin c -> handle(c);
             case ClientCommandMsg c -> handle(c);
             case ClientCommandMsgCurrent c -> handle(c);
+            case ClientCommandQuit c -> handle(c);
         }
+    }
+
+    private void handle(ClientCommandConnect command) {
+        connect();
     }
 
     private void handle(ClientCommandExit command) {
@@ -315,6 +324,10 @@ public class IRCClientEngine implements Closeable {
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
             terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), state.getCurrentChannel(), command.getText()));
         }
+    }
+
+    private void handle(ClientCommandQuit command) {
+        send(new IRCMessageQUIT(command.getReason()));
     }
 
     private LocalTime getMessageTime(IRCMessage message) {
