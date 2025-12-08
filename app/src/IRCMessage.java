@@ -2,9 +2,11 @@ import java.util.SequencedMap;
 
 public sealed abstract class IRCMessage permits
         // capability negotiation
-        IRCMessageCAPACK, IRCMessageCAPDEL, IRCMessageCAPEND, IRCMessageCAPLIST, IRCMessageCAPLS, IRCMessageCAPNAK, IRCMessageCAPNEW, IRCMessageCAPREQ,
+        IRCMessageCAPACK, IRCMessageCAPDEL, IRCMessageCAPEND, IRCMessageCAPLIST, IRCMessageCAPLS, IRCMessageCAPNAK,
+        IRCMessageCAPNEW, IRCMessageCAPREQ,
         // standard messages
-        IRCMessageJOIN0, IRCMessageJOINNormal, IRCMessageNICK, IRCMessagePING, IRCMessagePONG, IRCMessagePRIVMSG, IRCMessageUSER, IRCMessageQUIT,
+        IRCMessageJOIN0, IRCMessageJOINNormal, IRCMessageNICK, IRCMessagePASS, IRCMessagePING, IRCMessagePONG,
+        IRCMessagePRIVMSG, IRCMessageUSER, IRCMessageQUIT,
         // numerics
         IRCMessage001,
         // other / unsupported

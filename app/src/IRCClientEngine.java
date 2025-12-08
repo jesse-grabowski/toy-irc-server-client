@@ -69,9 +69,12 @@ public class IRCClientEngine implements Closeable {
             state.setNick(nick);
             clientStateGuard.setState(state);
 
-            enqueueSend(new IRCMessageCAPLS(null, "302", false, List.of()));
-            enqueueSend(new IRCMessageNICK(nick));
-            enqueueSend(new IRCMessageUSER(nick, properties.getRealName()));
+            send(new IRCMessageCAPLS(null, "302", false, List.of()));
+            if (properties.getPassword() != null && !properties.getPassword().isBlank()) {
+                send(new IRCMessagePASS(properties.getPassword()));
+            }
+            send(new IRCMessageNICK(nick));
+            send(new IRCMessageUSER(nick, properties.getRealName()));
             updateStatusAndPrompt();
         } catch (Exception e) {
             terminal.println(makeSystemTerminalMessage(
@@ -142,15 +145,6 @@ public class IRCClientEngine implements Closeable {
         return send(MARSHALLER.marshal(message));
     }
 
-    private void enqueueSend(IRCMessage message) {
-        Runnable work = () -> {
-            if (!send(message)) {
-                terminal.println(makeSystemTerminalMessage("Fatal error during send"));
-            }
-        };
-        workQueue.add(new IRCClientEngineWork(work, 0));
-    }
-
     private void receive(String message) {
         receive(UNMARSHALLER.unmarshal(message));
     }
@@ -162,13 +156,25 @@ public class IRCClientEngine implements Closeable {
     private void handle(IRCMessage message) {
         switch (message) {
             case IRCMessageCAPACK m -> handle(m);
+            case IRCMessageCAPDEL m -> { /* ignore */ }
+            case IRCMessageCAPEND m -> { /* ignore */ }
+            case IRCMessageCAPLIST m -> { /* ignore */ }
             case IRCMessageCAPLS m -> handle(m);
             case IRCMessageCAPNAK m -> handle(m);
+            case IRCMessageCAPNEW m -> { /* ignore */ }
+            case IRCMessageCAPREQ m -> { /* ignore */ }
+            case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
+            case IRCMessageNICK m -> { /* ignore */ }
+            case IRCMessagePASS m -> { /* ignore */ }
             case IRCMessagePING m -> handle(m);
+            case IRCMessagePONG m -> { /* ignore */ }
             case IRCMessagePRIVMSG m -> handle(m);
+            case IRCMessageQUIT m -> { /* ignore */ }
+            case IRCMessageUSER m -> { /* ignore */ }
             case IRCMessage001 m -> handle(m);
-            default -> terminal.println(makeSystemTerminalMessage("» " + message.getRawMessage()));
+            case IRCMessageUnsupported m -> terminal.println(makeSystemTerminalMessage("» " + m.getRawMessage()));
+            case IRCMessageParseError m -> terminal.println(makeSystemTerminalMessage("(PARSE ERROR) » " + m.getRawMessage()));
         }
         updateStatusAndPrompt();
     }
@@ -231,11 +237,22 @@ public class IRCClientEngine implements Closeable {
             if (Objects.equals(state.getNick(), message.getPrefixName())) {
                 state.getJoinedChannels().push(channelName);
                 state.setCurrentChannel(channelName);
+
+                var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
+                channel.getMembers().add(message.getPrefixName());
+                terminal.setPrompt("[%s@%s/%s]: ".formatted(
+                        Colorizer.colorize(state.getNick()),
+                        Colorizer.colorize(properties.getHost().getHostName()),
+                        Colorizer.colorize(channelName)));
+                terminal.setStatus("Chatting in %s".formatted(state.getJoinedChannels().stream().sorted().map(Colorizer::colorize).collect(Collectors.joining(", "))));
+            } else {
+                terminal.println(new TerminalMessage(
+                        getMessageTime(message),
+                        f(message.getPrefixName()),
+                        f(channelName),
+                        s(f(message.getPrefixName()), " joined channel ", f(channelName), "!")));
             }
-            var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
-            channel.getMembers().add(message.getPrefixName());
         }
-        terminal.println(makeSystemTerminalMessage("Successfully registered with server"));
     }
 
     private void handle(IRCMessagePING ping) {
@@ -249,7 +266,7 @@ public class IRCClientEngine implements Closeable {
 
         LocalTime time = getMessageTime(message);
         for (String target : message.getTargets()) {
-            terminal.println(new TerminalMessage(time, message.getPrefixName(), target, message.getMessage()));
+            terminal.println(new TerminalMessage(time, f(message.getPrefixName()), f(target), s(message.getMessage())));
         }
     }
 
@@ -297,7 +314,7 @@ public class IRCClientEngine implements Closeable {
 
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
             for (String target : command.getTargets()) {
-                terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), target, command.getText()));
+                terminal.println(new TerminalMessage(LocalTime.now(), f(state.getNick()), f(target), s(command.getText())));
             }
         }
     }
@@ -317,7 +334,7 @@ public class IRCClientEngine implements Closeable {
         send(new IRCMessagePRIVMSG(List.of(state.getCurrentChannel()), command.getText()));
 
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
-            terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), state.getCurrentChannel(), command.getText()));
+            terminal.println(new TerminalMessage(LocalTime.now(), f(state.getNick()), f(state.getCurrentChannel()), s(command.getText())));
         }
     }
 
@@ -339,7 +356,7 @@ public class IRCClientEngine implements Closeable {
     }
 
     private TerminalMessage makeSystemTerminalMessage(String message) {
-        return new TerminalMessage(LocalTime.now(), "SYSTEM", null, message);
+        return new TerminalMessage(LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, s(message));
     }
 
     private void updateStatusAndPrompt() {
@@ -472,5 +489,19 @@ public class IRCClientEngine implements Closeable {
         CONNECTED,
         REGISTERED,
         CLOSED
+    }
+
+    // We can't import static from the default package so we reimplement these here
+    // to use them as single-character functions
+    private static RichString s(Object arg0, Object ... args) {
+        return RichString.s(arg0, args);
+    }
+
+    private static RichString f(Object arg0) {
+        return RichString.f(arg0);
+    }
+
+    private static RichString f(Color color, Object arg0) {
+        return RichString.f(color, arg0);
     }
 }

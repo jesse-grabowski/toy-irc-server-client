@@ -1,3 +1,4 @@
+import java.awt.Color;
 import java.time.LocalTime;
 
 public class ClientCommandDispatcher {
@@ -17,18 +18,18 @@ public class ClientCommandDispatcher {
         try {
             command = parser.parse(line);
         } catch (Exception e) {
-            terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", null, e.getMessage()));
+            terminalUI.println(new TerminalMessage(LocalTime.now(), RichString.f(Color.YELLOW, "SYSTEM"), null, RichString.s(e.getMessage())));
             return;
         }
 
         switch (command) {
             case ClientCommandHelp help when help.getCommand() != null -> {
                 String helpText = parser.getHelpText(help.getCommand());
-                terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", null, helpText));
+                terminalUI.println(new TerminalMessage(LocalTime.now(), RichString.f(Color.YELLOW, "SYSTEM"), null, RichString.s(helpText)));
             }
             case ClientCommandHelp help -> {
                 String helpText = parser.getHelpText();
-                terminalUI.println(new TerminalMessage(LocalTime.now(), "SYSTEM", null, helpText));
+                terminalUI.println(new TerminalMessage(LocalTime.now(), RichString.f(Color.YELLOW, "SYSTEM"), null, RichString.s(helpText)));
             }
             default -> ircClientEngine.accept(command);
         }

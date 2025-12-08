@@ -14,6 +14,7 @@ public class IRCClientProperties implements ArgsProperties {
     private boolean useSimpleTerminal = false;
     private String nickname = "auto";
     private String realName = "Unknown";
+    private String password;
     private String logFile = "irc-client.log";
     private String logLevel = Level.INFO.getName();
 
@@ -105,6 +106,14 @@ public class IRCClientProperties implements ArgsProperties {
 
     public void setRealName(String realName) {
         this.realName = realName;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public String getLogFile() {

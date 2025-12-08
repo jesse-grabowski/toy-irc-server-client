@@ -1,3 +1,4 @@
+import java.awt.Color;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
@@ -6,6 +7,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -15,6 +17,25 @@ import java.util.logging.Logger;
 public class FancyTerminalUI extends TerminalUI {
 
     private static final Logger LOG = Logger.getLogger(FancyTerminalUI.class.getName());
+
+    private static final Map<Color, Integer> NAMED_ANSI_FOREGROUND = Map.ofEntries(
+            Map.entry(Color.BLACK, 30),
+            Map.entry(Color.RED, 31),
+            Map.entry(Color.GREEN, 32),
+            Map.entry(Color.YELLOW, 33),
+            Map.entry(Color.BLUE, 34),
+            // no java Color for Purple
+            Map.entry(Color.CYAN, 36),
+            Map.entry(Color.WHITE, 37));
+    private static final Map<Color, Integer> NAMED_ANSI_BACKGROUND = Map.ofEntries(
+            Map.entry(Color.BLACK, 40),
+            Map.entry(Color.RED, 41),
+            Map.entry(Color.GREEN, 42),
+            Map.entry(Color.YELLOW, 43),
+            Map.entry(Color.BLUE, 44),
+            // no java Color for Purple
+            Map.entry(Color.CYAN, 46),
+            Map.entry(Color.WHITE, 47));
 
     private static final int FOOTER_ROWS = 3;
     private static final int MAX_MESSAGES = 200;
@@ -197,8 +218,8 @@ public class FancyTerminalUI extends TerminalUI {
             TerminalMessage message = messageIterator.next();
             String meta = formatMetadata(message);
 
-            String text = message.message() != null ? message.message() : "";
-            List<String> messageLines = Arrays.stream(text.split("\\R", -1))
+            RichString text = message.message() != null ? message.message() : RichString.s("");
+            List<RichString> messageLines = Arrays.stream(text.split("\\R", -1))
                     .map(l -> splitByLength(l, messageWidth))
                     .flatMap(List::stream)
                     .toList();
@@ -207,7 +228,7 @@ public class FancyTerminalUI extends TerminalUI {
             for (int i = 0; i < messageLines.size(); i++) {
                 String metaPart = first ? meta : BLANK_METADATA;
                 // we add at i and not 0 so that the lines maintain their order within the message
-                visualRows.add(i, metaPart + " " + COLOR_RULE + VERTICAL_RULE + COLOR_RESET + " " + messageLines.get(i));
+                visualRows.add(i, metaPart + " " + COLOR_RULE + VERTICAL_RULE + COLOR_RESET + " " + toString(messageLines.get(i)));
                 first = false;
             }
         }
@@ -230,8 +251,8 @@ public class FancyTerminalUI extends TerminalUI {
         System.out.flush();
     }
 
-    private List<String> splitByLength(String line, int length) {
-        List<String> results = new ArrayList<>();
+    private List<RichString> splitByLength(RichString line, int length) {
+        List<RichString> results = new ArrayList<>();
 
         if (line.isEmpty()) {
             results.add(line);
@@ -251,18 +272,18 @@ public class FancyTerminalUI extends TerminalUI {
         metadataBuilder.append(message.time() != null ? METADATA_TIMESTAMP.format(message.time()) : "XX:XX:XX");
         metadataBuilder.append(' ');
         if (message.receiver() == null) {
-            metadataBuilder.append(Colorizer.colorize(formatExactLength(message.sender(), METADATA_SENDER_WIDTH + 3 + METADATA_RECEIVER_WIDTH, false)));
+            metadataBuilder.append(toString(formatExactLength(message.sender(), METADATA_SENDER_WIDTH + 3 + METADATA_RECEIVER_WIDTH, false)));
         } else {
-            metadataBuilder.append(Colorizer.colorize(formatExactLength(message.sender(), METADATA_SENDER_WIDTH, true)));
+            metadataBuilder.append(toString(formatExactLength(message.sender(), METADATA_SENDER_WIDTH, true)));
             metadataBuilder.append(" » ");
-            metadataBuilder.append(Colorizer.colorize(formatExactLength(message.receiver(), METADATA_RECEIVER_WIDTH, false)));
+            metadataBuilder.append(toString(formatExactLength(message.receiver(), METADATA_RECEIVER_WIDTH, false)));
         }
         return metadataBuilder.toString();
     }
 
-    private String formatExactLength(String string, int length, boolean alignEnd) {
+    private RichString formatExactLength(RichString string, int length, boolean alignEnd) {
         if (string == null) {
-            return " ".repeat(length);
+            return RichString.s(" ".repeat(length));
         }
 
         if (string.length() > length) {
@@ -270,9 +291,9 @@ public class FancyTerminalUI extends TerminalUI {
         } else {
             String padding = " ".repeat(length - string.length());
             if (alignEnd) {
-                return padding + string;
+                return RichString.s(padding, string);
             } else {
-                return string + padding;
+                return RichString.s(string, padding);
             }
         }
     }
@@ -330,6 +351,53 @@ public class FancyTerminalUI extends TerminalUI {
     private void clearLine() {
         // ANSI escape: ESC[2K clears entire current line
         System.out.print("\u001B[2K");
+    }
+
+    private String toString(RichString string) {
+        return switch (string) {
+            case RichString.TextRichString s -> s.getText();
+            case RichString.BackgroundColorRichString s -> colorizeBackground(s);
+            case RichString.ForegroundColorRichString s -> colorizeForeground(s);
+            case RichString.CompositeRichString s -> {
+                StringBuilder sb = new StringBuilder();
+                for (RichString rs : s.getChildren()) {
+                    sb.append(toString(rs));
+                }
+                yield sb.toString();
+            }
+        };
+    }
+
+    private String colorizeForeground(RichString.ForegroundColorRichString string) {
+        if (NAMED_ANSI_FOREGROUND.containsKey(string.getColor())) {
+            return "\u001b["
+                    + NAMED_ANSI_FOREGROUND.get(string.getColor())
+                    + "m"
+                    + toString(string.getChild())
+                    + "\u001b[39m";
+        }
+
+        return "\u001b[38;5;" + toANSI256(string.getColor()) + "m" + toString(string.getChild()) + "\u001b[39m";
+    }
+
+    private String colorizeBackground(RichString.BackgroundColorRichString string) {
+        if (NAMED_ANSI_BACKGROUND.containsKey(string.getColor())) {
+            return "\u001b["
+                    + NAMED_ANSI_BACKGROUND.get(string.getColor())
+                    + "m"
+                    + toString(string.getChild())
+                    + "\u001b[49m";
+        }
+
+        return "\u001b[48;5;" + toANSI256(string.getColor()) + "m" + toString(string.getChild()) + "\u001b[49m";
+    }
+
+    // should work on most terminals
+    private int toANSI256(Color color) {
+        int r6 = Math.clamp(Math.round(color.getRed() / 51f), 0, 5);
+        int g6 = Math.clamp(Math.round(color.getGreen() / 51f), 0, 5);
+        int b6 = Math.clamp(Math.round(color.getBlue() / 51f), 0, 5);
+        return 16 + 36 * r6 + 6 * g6 + b6;
     }
 
     @Override

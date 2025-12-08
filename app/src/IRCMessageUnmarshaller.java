@@ -36,6 +36,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageCAPLS.COMMAND -> parseCap(message, tags, prefix, params);
                 case IRCMessageJOINNormal.COMMAND -> parseJoin(message, tags, prefix, params);
                 case IRCMessageNICK.COMMAND -> parseNick(message, tags, prefix, params);
+                case IRCMessagePASS.COMMAND -> parsePass(message, tags, prefix, params);
                 case IRCMessagePING.COMMAND -> parsePing(message, tags, prefix, params);
                 case IRCMessagePONG.COMMAND -> parsePong(message, tags, prefix, params);
                 case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(message, tags, prefix, params);
@@ -277,6 +278,10 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageNICK parseNick(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
         return new IRCMessageNICK(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0));
+    }
+
+    private IRCMessagePASS parsePass(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        return new IRCMessagePASS(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0));
     }
 
     private IRCMessagePING parsePing(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
