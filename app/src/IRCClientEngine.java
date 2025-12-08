@@ -240,11 +240,6 @@ public class IRCClientEngine implements Closeable {
 
                 var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
                 channel.getMembers().add(message.getPrefixName());
-                terminal.setPrompt("[%s@%s/%s]: ".formatted(
-                        Colorizer.colorize(state.getNick()),
-                        Colorizer.colorize(properties.getHost().getHostName()),
-                        Colorizer.colorize(channelName)));
-                terminal.setStatus("Chatting in %s".formatted(state.getJoinedChannels().stream().sorted().map(Colorizer::colorize).collect(Collectors.joining(", "))));
             } else {
                 terminal.println(new TerminalMessage(
                         getMessageTime(message),
@@ -361,32 +356,25 @@ public class IRCClientEngine implements Closeable {
 
     private void updateStatusAndPrompt() {
         IRCClientEngineState ies = engineState.get();
-        String prompt = switch (ies) {
-            case NEW, INITIALIZING, DISCONNECTED, CONNECTING, CLOSED -> "[%s]: ".formatted(Colorizer.colorize(properties.getNickname()));
-            case CONNECTED, REGISTERED -> "[%s@%s]: ".formatted(
-                    Colorizer.colorize(properties.getNickname()),
-                    Colorizer.colorize(properties.getHost().getHostName()));
+        RichString prompt = switch (ies) {
+            case NEW, INITIALIZING, DISCONNECTED, CONNECTING, CLOSED -> s("[", f(properties.getNickname()), "]:");
+            case CONNECTED, REGISTERED -> s("[", f(properties.getNickname()), "@", f(properties.getHost().getHostName()), "]:");
         };
-        String status = switch (ies) {
-            case NEW, INITIALIZING -> "Initializing client, please wait...";
-            case DISCONNECTED -> "Disconnected: Reconnect using `/connect` or view more options with `/help`";
-            case CONNECTING -> "Establishing connection, please wait...";
-            case CONNECTED -> "Registering client, please wait...";
-            case REGISTERED -> "Waiting to chat, join a channel using `/join <name>` or view more options with `/help`";
-            case CLOSED -> "Shutting down...";
+        RichString status = switch (ies) {
+            case NEW, INITIALIZING -> s("Initializing client, please wait...");
+            case DISCONNECTED -> s("Disconnected: Reconnect using `/connect` or view more options with `/help`");
+            case CONNECTING -> s("Establishing connection, please wait...");
+            case CONNECTED -> s("Registering client, please wait...");
+            case REGISTERED -> s("Waiting to chat, join a channel using `/join <name>` or view more options with `/help`");
+            case CLOSED -> s("Shutting down...");
         };
         if (ies == IRCClientEngineState.REGISTERED) {
             IRCClientState state = clientStateGuard.getState();
             if (state != null) {
-                prompt = "[%s@%s]: ".formatted(
-                        Colorizer.colorize(state.getNick()),
-                        Colorizer.colorize(properties.getHost().getHostName()));
+                prompt = s("[", f(state.getNick()), "@", f(properties.getHost().getHostName()), "]:");
                 if (state.getCurrentChannel() != null) {
-                    status = "Chatting in %s".formatted(Colorizer.colorize(state.getCurrentChannel()));
-                    prompt = "[%s@%s/%s]: ".formatted(
-                            Colorizer.colorize(state.getNick()),
-                            Colorizer.colorize(properties.getHost().getHostName()),
-                            Colorizer.colorize(state.getCurrentChannel()));
+                    status = s("Chatting in ", f(state.getCurrentChannel()));
+                    prompt = s("[", f(state.getNick()), "@", f(properties.getHost().getHostName()), "/", f(state.getCurrentChannel()), "]:");
                 }
             }
         }

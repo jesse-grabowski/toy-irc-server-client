@@ -43,12 +43,12 @@ public class StdIOTerminalUI extends TerminalUI {
     }
 
     @Override
-    public void setPrompt(String prompt) {
+    public void setPrompt(RichString prompt) {
         // No-op
     }
 
     @Override
-    public void setStatus(String status) {
+    public void setStatus(RichString status) {
         // No-op
     }
 }

@@ -2,6 +2,8 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -224,10 +226,37 @@ public sealed abstract class RichString permits RichString.TextRichString,
 
         @Override
         public RichString[] split(String regex, int limit) {
-            return Arrays.stream(children)
-                    .map(c -> c.split(regex, limit))
-                    .flatMap(Arrays::stream)
-                    .toArray(RichString[]::new);
+            // this feels like it should be simple, but since we need to combine children
+            // across child boundaries, this winds up being a fair bit more involved
+            String rawText = toString();
+            Pattern pattern = Pattern.compile(regex);
+            Matcher matcher = pattern.matcher(rawText);
+
+            List<RichString> segments = new ArrayList<>();
+            int position = 0;
+            while (matcher.find()) {
+                if (limit > 0 && segments.size() == limit - 1) {
+                    break;
+                }
+
+                int start = matcher.start();
+                segments.add(substring(position, start));
+                position = matcher.end();
+            }
+            segments.add(substring(position, length()));
+
+            // replicate String.split behavior & remove trailing empties
+            if (limit == 0) {
+                for (int i = segments.size() - 1; i >= 0; i--) {
+                    if (segments.get(i).length() == 0) {
+                        segments.remove(i);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            return segments.toArray(RichString[]::new);
         }
 
         @Override

@@ -54,8 +54,8 @@ public abstract class TerminalUI {
         }
     }
 
-    public abstract void setPrompt(String prompt);
-    public abstract void setStatus(String status);
+    public abstract void setPrompt(RichString prompt);
+    public abstract void setStatus(RichString status);
     public abstract void println(TerminalMessage message);
 
     protected abstract void initialize();

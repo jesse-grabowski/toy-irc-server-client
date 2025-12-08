@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -65,18 +66,18 @@ public class FancyTerminalUI extends TerminalUI {
     private final Deque<TerminalMessage> messageBuffer = new ArrayDeque<>(MAX_MESSAGES);
 
     private STTY.TerminalDimensions dimensions = new STTY.UnknownTerminalDimensions();
-    private String prompt = ">";
-    private String status = "";
+    private RichString prompt = RichString.s("[]:");
+    private RichString status = RichString.s("");
 
     @Override
-    public synchronized void setPrompt(String prompt) {
-        this.prompt = (prompt != null) ? prompt : "";
+    public synchronized void setPrompt(RichString prompt) {
+        this.prompt = (prompt != null) ? prompt : RichString.s("");
         renderFooter();
     }
 
     @Override
-    public synchronized void setStatus(String status) {
-        this.status = (status != null) ? status : "";
+    public synchronized void setStatus(RichString status) {
+        this.status = (status != null) ? status : RichString.s("");
         renderFooter();
     }
 
@@ -319,16 +320,16 @@ public class FancyTerminalUI extends TerminalUI {
         // status line
         moveCursor(rows - 1, 1);
         clearLine();
-        String statusText = (status != null) ? status : "";
+        RichString statusText = (status != null) ? status : RichString.s("");
         if (statusText.length() > cols) {
             statusText = statusText.substring(0, cols);
         }
-        System.out.print(statusText);
+        System.out.print(toString(statusText));
 
         // user input
         moveCursor(rows, 1);
         clearLine();
-        String prefix = (prompt != null ? prompt : "") + " ";
+        RichString prefix = RichString.s(prompt != null ? prompt : "[]:", " ");
         int inputColumns = cols - prefix.length();
         if (inputColumns < 0) {
             inputColumns = 0;
@@ -337,7 +338,7 @@ public class FancyTerminalUI extends TerminalUI {
         if (inputText.length() > inputColumns) {
             inputText = inputText.substring(inputText.length() - inputColumns);
         }
-        String full = prefix + inputText;
+        String full = toString(prefix) + inputText;
         System.out.print(full);
 
         System.out.flush();
@@ -369,27 +370,38 @@ public class FancyTerminalUI extends TerminalUI {
     }
 
     private String colorizeForeground(RichString.ForegroundColorRichString string) {
-        if (NAMED_ANSI_FOREGROUND.containsKey(string.getColor())) {
-            return "\u001b["
-                    + NAMED_ANSI_FOREGROUND.get(string.getColor())
-                    + "m"
-                    + toString(string.getChild())
-                    + "\u001b[39m";
+        String text = toString(string.getChild());
+        Color color = string.isAuto() ? getColor(text) : string.getColor();
+
+        if (NAMED_ANSI_FOREGROUND.containsKey(color)) {
+            return "\u001b[" + NAMED_ANSI_FOREGROUND.get(color) + "m" + text + "\u001b[39m";
         }
 
-        return "\u001b[38;5;" + toANSI256(string.getColor()) + "m" + toString(string.getChild()) + "\u001b[39m";
+        return "\u001b[38;5;" + toANSI256(color) + "m" + text + "\u001b[39m";
     }
 
     private String colorizeBackground(RichString.BackgroundColorRichString string) {
-        if (NAMED_ANSI_BACKGROUND.containsKey(string.getColor())) {
-            return "\u001b["
-                    + NAMED_ANSI_BACKGROUND.get(string.getColor())
-                    + "m"
-                    + toString(string.getChild())
-                    + "\u001b[49m";
+        String text = toString(string.getChild());
+        Color color = string.isAuto() ? getColor(text) : string.getColor();
+
+        if (NAMED_ANSI_BACKGROUND.containsKey(color)) {
+            return "\u001b[" + NAMED_ANSI_BACKGROUND.get(color) + "m" + text + "\u001b[49m";
         }
 
-        return "\u001b[48;5;" + toANSI256(string.getColor()) + "m" + toString(string.getChild()) + "\u001b[49m";
+        return "\u001b[48;5;" + toANSI256(color) + "m" + text + "\u001b[49m";
+    }
+
+    private Color getColor(String text) {
+        // seeded random gives us a variety of colors w/
+        // consistent results for the same input
+        Random r = new Random(text.hashCode());
+        // This looks weird, but just cuts out the blue
+        // range of hues (hard to read on black terminal)
+        float hue = r.nextFloat();
+        if (hue >= 0.62f) {
+            hue = 0.62f + (hue - 0.72f);
+        }
+        return Color.getHSBColor(hue, r.nextFloat(0.5f, 1f), r.nextFloat(0.5f, 0.85f));
     }
 
     // should work on most terminals
