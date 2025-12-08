@@ -1,3 +1,4 @@
+import java.awt.Color;
 import java.io.Closeable;
 import java.nio.charset.Charset;
 import java.time.Instant;
@@ -71,6 +72,7 @@ public class IRCClientEngine implements Closeable {
             enqueueSend(new IRCMessageCAPLS(null, "302", false, List.of()));
             enqueueSend(new IRCMessageNICK(nick));
             enqueueSend(new IRCMessageUSER(nick, properties.getRealName()));
+            updateStatusAndPrompt();
         } catch (Exception e) {
             terminal.println(makeSystemTerminalMessage(
                     "Failed to connect to IRC server %s:%d, try again with /connect".formatted(
@@ -120,6 +122,7 @@ public class IRCClientEngine implements Closeable {
                     throw new IllegalStateException("inconsistent state while disconnecting");
                 }
             }
+            updateStatusAndPrompt();
         }, Integer.MIN_VALUE));
     }
 
@@ -167,6 +170,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage001 m -> handle(m);
             default -> terminal.println(makeSystemTerminalMessage("» " + message.getRawMessage()));
         }
+        updateStatusAndPrompt();
     }
 
     private void handle(IRCMessageCAPLS message) {
@@ -230,12 +234,7 @@ public class IRCClientEngine implements Closeable {
             }
             var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
             channel.getMembers().add(message.getPrefixName());
-            terminal.setPrompt("[%s@%s/%s]: ".formatted(
-                    Colorizer.colorize(state.getNick()),
-                    Colorizer.colorize(properties.getHost().getHostName()),
-                    Colorizer.colorize(channelName)));
         }
-        terminal.setStatus("Chatting in %s".formatted(state.getJoinedChannels().stream().sorted().map(Colorizer::colorize).collect(Collectors.joining(", "))));
         terminal.println(makeSystemTerminalMessage("Successfully registered with server"));
     }
 
@@ -259,12 +258,7 @@ public class IRCClientEngine implements Closeable {
         if (state == null || !engineState.compareAndSet(IRCClientEngineState.CONNECTED, IRCClientEngineState.REGISTERED)) {
             terminal.println(makeSystemTerminalMessage("Fatal error during registration"));
             disconnect();
-            return;
         }
-
-        terminal.setPrompt("[%s@%s]: ".formatted(
-                Colorizer.colorize(state.getNick()),
-                Colorizer.colorize(properties.getHost().getHostName())));
     }
 
     private void handle(ClientCommand command) {
@@ -277,6 +271,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandMsgCurrent c -> handle(c);
             case ClientCommandQuit c -> handle(c);
         }
+        updateStatusAndPrompt();
     }
 
     private void handle(ClientCommandConnect command) {
@@ -345,6 +340,41 @@ public class IRCClientEngine implements Closeable {
 
     private TerminalMessage makeSystemTerminalMessage(String message) {
         return new TerminalMessage(LocalTime.now(), "SYSTEM", null, message);
+    }
+
+    private void updateStatusAndPrompt() {
+        IRCClientEngineState ies = engineState.get();
+        String prompt = switch (ies) {
+            case NEW, INITIALIZING, DISCONNECTED, CONNECTING, CLOSED -> "[%s]: ".formatted(Colorizer.colorize(properties.getNickname()));
+            case CONNECTED, REGISTERED -> "[%s@%s]: ".formatted(
+                    Colorizer.colorize(properties.getNickname()),
+                    Colorizer.colorize(properties.getHost().getHostName()));
+        };
+        String status = switch (ies) {
+            case NEW, INITIALIZING -> "Initializing client, please wait...";
+            case DISCONNECTED -> "Disconnected: Reconnect using `/connect` or view more options with `/help`";
+            case CONNECTING -> "Establishing connection, please wait...";
+            case CONNECTED -> "Registering client, please wait...";
+            case REGISTERED -> "Waiting to chat, join a channel using `/join <name>` or view more options with `/help`";
+            case CLOSED -> "Shutting down...";
+        };
+        if (ies == IRCClientEngineState.REGISTERED) {
+            IRCClientState state = clientStateGuard.getState();
+            if (state != null) {
+                prompt = "[%s@%s]: ".formatted(
+                        Colorizer.colorize(state.getNick()),
+                        Colorizer.colorize(properties.getHost().getHostName()));
+                if (state.getCurrentChannel() != null) {
+                    status = "Chatting in %s".formatted(Colorizer.colorize(state.getCurrentChannel()));
+                    prompt = "[%s@%s/%s]: ".formatted(
+                            Colorizer.colorize(state.getNick()),
+                            Colorizer.colorize(properties.getHost().getHostName()),
+                            Colorizer.colorize(state.getCurrentChannel()));
+                }
+            }
+        }
+        terminal.setStatus(status);
+        terminal.setPrompt(prompt);
     }
 
     private void run() {
