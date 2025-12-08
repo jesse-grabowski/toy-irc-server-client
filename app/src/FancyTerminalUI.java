@@ -197,7 +197,7 @@ public class FancyTerminalUI extends TerminalUI {
             TerminalMessage message = messageIterator.next();
             String meta = formatMetadata(message);
 
-            String text = message.message() != null ? message.message() : "";
+            RichString text = message.message() != null ? message.message() : RichString.s("");
             List<String> messageLines = Arrays.stream(text.split("\\R", -1))
                     .map(l -> splitByLength(l, messageWidth))
                     .flatMap(List::stream)

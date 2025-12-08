@@ -254,11 +254,9 @@ public class IRCClientEngine implements Closeable {
             } else {
                 terminal.println(new TerminalMessage(
                         getMessageTime(message),
-                        message.getPrefixName(),
-                        channelName,
-                        "%s joined channel %s!".formatted(
-                                Colorizer.colorize(message.getPrefixName()),
-                                Colorizer.colorize(channelName))));
+                        f(message.getPrefixName()),
+                        f(channelName),
+                        s(f(message.getPrefixName()), " joined channel ", f(channelName), "!")));
             }
         }
     }
@@ -274,7 +272,7 @@ public class IRCClientEngine implements Closeable {
 
         LocalTime time = getMessageTime(message);
         for (String target : message.getTargets()) {
-            terminal.println(new TerminalMessage(time, message.getPrefixName(), target, message.getMessage()));
+            terminal.println(new TerminalMessage(time, f(message.getPrefixName()), f(target), s(message.getMessage())));
         }
     }
 
@@ -326,7 +324,7 @@ public class IRCClientEngine implements Closeable {
 
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
             for (String target : command.getTargets()) {
-                terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), target, command.getText()));
+                terminal.println(new TerminalMessage(LocalTime.now(), f(state.getNick()), f(target), s(command.getText())));
             }
         }
     }
@@ -346,7 +344,7 @@ public class IRCClientEngine implements Closeable {
         send(new IRCMessagePRIVMSG(List.of(state.getCurrentChannel()), command.getText()));
 
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
-            terminal.println(new TerminalMessage(LocalTime.now(), state.getNick(), state.getCurrentChannel(), command.getText()));
+            terminal.println(new TerminalMessage(LocalTime.now(), f(state.getNick()), f(state.getCurrentChannel()), s(command.getText())));
         }
     }
 
@@ -368,7 +366,7 @@ public class IRCClientEngine implements Closeable {
     }
 
     private TerminalMessage makeSystemTerminalMessage(String message) {
-        return new TerminalMessage(LocalTime.now(), "SYSTEM", null, message);
+        return new TerminalMessage(LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, s(message));
     }
 
     private void run() {
@@ -466,5 +464,19 @@ public class IRCClientEngine implements Closeable {
         CONNECTED,
         REGISTERED,
         CLOSED
+    }
+
+    // We can't import static from the default package so we reimplement these here
+    // to use them as single-character functions
+    private static RichString s(Object arg0, Object ... args) {
+        return RichString.s(arg0, args);
+    }
+
+    private static RichString f(Object arg0) {
+        return RichString.f(arg0);
+    }
+
+    private static RichString f(Color color, Object arg0) {
+        return RichString.f(color, arg0);
     }
 }
