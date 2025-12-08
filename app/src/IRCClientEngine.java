@@ -1,3 +1,4 @@
+import java.awt.Color;
 import java.io.Closeable;
 import java.nio.charset.Charset;
 import java.time.Instant;
@@ -68,9 +69,12 @@ public class IRCClientEngine implements Closeable {
             state.setNick(nick);
             clientStateGuard.setState(state);
 
-            enqueueSend(new IRCMessageCAPLS(null, "302", false, List.of()));
-            enqueueSend(new IRCMessageNICK(nick));
-            enqueueSend(new IRCMessageUSER(nick, properties.getRealName()));
+            send(new IRCMessageCAPLS(null, "302", false, List.of()));
+            if (properties.getPassword() != null && !properties.getPassword().isBlank()) {
+                send(new IRCMessagePASS(properties.getPassword()));
+            }
+            send(new IRCMessageNICK(nick));
+            send(new IRCMessageUSER(nick, properties.getRealName()));
         } catch (Exception e) {
             terminal.println(makeSystemTerminalMessage(
                     "Failed to connect to IRC server %s:%d, try again with /connect".formatted(
@@ -159,13 +163,25 @@ public class IRCClientEngine implements Closeable {
     private void handle(IRCMessage message) {
         switch (message) {
             case IRCMessageCAPACK m -> handle(m);
+            case IRCMessageCAPDEL m -> { /* ignore */ }
+            case IRCMessageCAPEND m -> { /* ignore */ }
+            case IRCMessageCAPLIST m -> { /* ignore */ }
             case IRCMessageCAPLS m -> handle(m);
             case IRCMessageCAPNAK m -> handle(m);
+            case IRCMessageCAPNEW m -> { /* ignore */ }
+            case IRCMessageCAPREQ m -> { /* ignore */ }
+            case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
+            case IRCMessageNICK m -> { /* ignore */ }
+            case IRCMessagePASS m -> { /* ignore */ }
             case IRCMessagePING m -> handle(m);
+            case IRCMessagePONG m -> { /* ignore */ }
             case IRCMessagePRIVMSG m -> handle(m);
+            case IRCMessageQUIT m -> { /* ignore */ }
+            case IRCMessageUSER m -> { /* ignore */ }
             case IRCMessage001 m -> handle(m);
-            default -> terminal.println(makeSystemTerminalMessage("» " + message.getRawMessage()));
+            case IRCMessageUnsupported m -> terminal.println(makeSystemTerminalMessage("» " + m.getRawMessage()));
+            case IRCMessageParseError m -> terminal.println(makeSystemTerminalMessage("(PARSE ERROR) » " + m.getRawMessage()));
         }
     }
 
@@ -227,16 +243,24 @@ public class IRCClientEngine implements Closeable {
             if (Objects.equals(state.getNick(), message.getPrefixName())) {
                 state.getJoinedChannels().push(channelName);
                 state.setCurrentChannel(channelName);
+
+                var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
+                channel.getMembers().add(message.getPrefixName());
+                terminal.setPrompt("[%s@%s/%s]: ".formatted(
+                        Colorizer.colorize(state.getNick()),
+                        Colorizer.colorize(properties.getHost().getHostName()),
+                        Colorizer.colorize(channelName)));
+                terminal.setStatus("Chatting in %s".formatted(state.getJoinedChannels().stream().sorted().map(Colorizer::colorize).collect(Collectors.joining(", "))));
+            } else {
+                terminal.println(new TerminalMessage(
+                        getMessageTime(message),
+                        message.getPrefixName(),
+                        channelName,
+                        "%s joined channel %s!".formatted(
+                                Colorizer.colorize(message.getPrefixName()),
+                                Colorizer.colorize(channelName))));
             }
-            var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
-            channel.getMembers().add(message.getPrefixName());
-            terminal.setPrompt("[%s@%s/%s]: ".formatted(
-                    Colorizer.colorize(state.getNick()),
-                    Colorizer.colorize(properties.getHost().getHostName()),
-                    Colorizer.colorize(channelName)));
         }
-        terminal.setStatus("Chatting in %s".formatted(state.getJoinedChannels().stream().sorted().map(Colorizer::colorize).collect(Collectors.joining(", "))));
-        terminal.println(makeSystemTerminalMessage("Successfully registered with server"));
     }
 
     private void handle(IRCMessagePING ping) {
