@@ -8,7 +8,7 @@ public sealed abstract class IRCMessage permits
         IRCMessageJOIN0, IRCMessageJOINNormal, IRCMessageNICK, IRCMessagePASS, IRCMessagePING, IRCMessagePONG,
         IRCMessagePRIVMSG, IRCMessageUSER, IRCMessageQUIT,
         // numerics
-        IRCMessage001,
+        IRCMessage001, IRCMessage353,
         // other / unsupported
         IRCMessageUnsupported, IRCMessageParseError {
 

@@ -36,6 +36,9 @@ public class IRCMessageRoundTripTest {
                 Arguments.of("USER myuser 0 * :Real Name", "USER myuser 0 * :Real Name"),
                 Arguments.of("USER myuser x y :Real Name", "USER myuser 0 * :Real Name"),
                 Arguments.of("001 mynick :Welcome to IRC", "001 mynick :Welcome to IRC"),
+                Arguments.of("353 mynick = #chan :nick1", "353 mynick = #chan :nick1"),
+                Arguments.of("353 mynick = #chan :nick1 nick2", "353 mynick = #chan :nick1 nick2"),
+                Arguments.of("353 mynick = #chan :@nick1 +nick2 %nick3", "353 mynick = #chan :@nick1 +nick2 %nick3"),
                 Arguments.of(
                         "@a=1;b=hello\\sworld :nick!user@host PRIVMSG #chan :hi there",
                         "@a=1;b=hello\\sworld :nick!user@host PRIVMSG #chan :hi there"
@@ -94,6 +97,7 @@ public class IRCMessageRoundTripTest {
                 Arguments.of("PRIVMSG #chan :hi", IRCMessagePRIVMSG.class),
                 Arguments.of("USER myuser 0 * :Real Name", IRCMessageUSER.class),
                 Arguments.of("001 mynick :Welcome", IRCMessage001.class),
+                Arguments.of("353 mynick = #chan :@nick1 +nick2 %nick3", IRCMessage353.class),
                 Arguments.of("FOOCMD arg1 arg2", IRCMessageUnsupported.class),
 
                 // --- CAP client commands ---

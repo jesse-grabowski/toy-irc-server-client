@@ -13,7 +13,6 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 public class IRCClientEngine implements Closeable {
 
@@ -66,7 +65,7 @@ public class IRCClientEngine implements Closeable {
 
             IRCClientState state = new IRCClientState();
             String nick = NicknameGenerator.generate(properties.getNickname());
-            state.setNick(nick);
+            state.getMe().setNick(nick);
             clientStateGuard.setState(state);
 
             send(new IRCMessageCAPLS(null, "302", false, List.of()));
@@ -153,6 +152,10 @@ public class IRCClientEngine implements Closeable {
         workQueue.add(new IRCClientEngineWork(() -> handle(message), 0));
     }
 
+    // note that I'm using sealed classes + switch expressions
+    // to force compile-time handling of all subtypes
+    // traditionally this would have been done with the
+    // visitor pattern but we're living in the future
     private void handle(IRCMessage message) {
         switch (message) {
             case IRCMessageCAPACK m -> handle(m);
@@ -165,7 +168,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageCAPREQ m -> { /* ignore */ }
             case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
-            case IRCMessageNICK m -> { /* ignore */ }
+            case IRCMessageNICK m -> handle(m);
             case IRCMessagePASS m -> { /* ignore */ }
             case IRCMessagePING m -> handle(m);
             case IRCMessagePONG m -> { /* ignore */ }
@@ -173,6 +176,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageQUIT m -> { /* ignore */ }
             case IRCMessageUSER m -> { /* ignore */ }
             case IRCMessage001 m -> handle(m);
+            case IRCMessage353 m -> handle(m);
             case IRCMessageUnsupported m -> terminal.println(makeSystemTerminalMessage("» " + m.getRawMessage()));
             case IRCMessageParseError m -> terminal.println(makeSystemTerminalMessage("(PARSE ERROR) » " + m.getRawMessage()));
         }
@@ -234,12 +238,9 @@ public class IRCClientEngine implements Closeable {
         }
 
         for (String channelName : message.getChannels()) {
-            if (Objects.equals(state.getNick(), message.getPrefixName())) {
+            if (Objects.equals(state.getMe().getNick(), message.getPrefixName())) {
                 state.getJoinedChannels().push(channelName);
                 state.setCurrentChannel(channelName);
-
-                var channel = state.getChannels().computeIfAbsent(channelName, x -> new IRCClientState.IRCClientChannelState());
-                channel.getMembers().add(message.getPrefixName());
             } else {
                 terminal.println(new TerminalMessage(
                         getMessageTime(message),
@@ -248,6 +249,17 @@ public class IRCClientEngine implements Closeable {
                         s(f(message.getPrefixName()), " joined channel ", f(channelName), "!")));
             }
         }
+    }
+
+    private void handle(IRCMessageNICK nick) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        state.renameMember(nick.getPrefixName(), nick.getNick());
+        terminal.println(new TerminalMessage(getMessageTime(nick), f(nick.getNick()), null,
+                s(f(nick.getPrefixName()), " changed their nick to ", f(nick.getNick()))));
     }
 
     private void handle(IRCMessagePING ping) {
@@ -270,6 +282,26 @@ public class IRCClientEngine implements Closeable {
         if (state == null || !engineState.compareAndSet(IRCClientEngineState.CONNECTED, IRCClientEngineState.REGISTERED)) {
             terminal.println(makeSystemTerminalMessage("Fatal error during registration"));
             disconnect();
+            return;
+        }
+
+        state.getMe().setNick(message.getClient());
+    }
+
+    private void handle(IRCMessage353 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        List<String> nicks = message.getNicks();
+        List<String> modes = message.getModes();
+        IRCClientState.IRCClientChannelState channel = state.getChannel(message.getChannel());
+        for (int i = 0; i < nicks.size(); i++) {
+            String nick = nicks.get(i);
+            IRCClientState.IRCUserState member = state.addMember(nick);
+            String mode = i < modes.size() ? modes.get(i) : "";
+            channel.addMember(member.getId(), mode);
         }
     }
 
@@ -281,6 +313,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandJoin c -> handle(c);
             case ClientCommandMsg c -> handle(c);
             case ClientCommandMsgCurrent c -> handle(c);
+            case ClientCommandNick c -> handle(c);
             case ClientCommandQuit c -> handle(c);
         }
         updateStatusAndPrompt();
@@ -309,7 +342,7 @@ public class IRCClientEngine implements Closeable {
 
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
             for (String target : command.getTargets()) {
-                terminal.println(new TerminalMessage(LocalTime.now(), f(state.getNick()), f(target), s(command.getText())));
+                terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe().getNick()), f(target), s(command.getText())));
             }
         }
     }
@@ -329,8 +362,12 @@ public class IRCClientEngine implements Closeable {
         send(new IRCMessagePRIVMSG(List.of(state.getCurrentChannel()), command.getText()));
 
         if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
-            terminal.println(new TerminalMessage(LocalTime.now(), f(state.getNick()), f(state.getCurrentChannel()), s(command.getText())));
+            terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe().getNick()), f(state.getCurrentChannel()), s(command.getText())));
         }
+    }
+
+    private void handle(ClientCommandNick command) {
+        send(new IRCMessageNICK(command.getNick()));
     }
 
     private void handle(ClientCommandQuit command) {
@@ -371,10 +408,26 @@ public class IRCClientEngine implements Closeable {
         if (ies == IRCClientEngineState.REGISTERED) {
             IRCClientState state = clientStateGuard.getState();
             if (state != null) {
-                prompt = s("[", f(state.getNick()), "@", f(properties.getHost().getHostName()), "]:");
+                prompt = s("[", f(state.getMe().getNick()), "@", f(properties.getHost().getHostName()), "]:");
                 if (state.getCurrentChannel() != null) {
-                    status = s("Chatting in ", f(state.getCurrentChannel()));
-                    prompt = s("[", f(state.getNick()), "@", f(properties.getHost().getHostName()), "/", f(state.getCurrentChannel()), "]:");
+                    String channel = state.getCurrentChannel();
+                    IRCClientState.IRCClientChannelState channelState = state.getChannel(channel);
+                    RichString[] members = channelState.getUsers().stream()
+                            .map(user -> {
+                                String nickname = user.getNick();
+                                String mode = channelState.getMemberMode(user.getId());
+                                String formattedMode = switch (mode) {
+                                    case "~" -> " (Founder)";
+                                    case "&" -> " (Protected)";
+                                    case "@" -> " (Operator)";
+                                    case "%" -> " (Halfop)";
+                                    case null, default -> "";
+                                };
+                                return s(f(nickname), s(formattedMode));
+                            })
+                            .toArray(RichString[]::new);
+                    status = s("Chatting in ", f(state.getCurrentChannel()), " with ", j(", ", members));
+                    prompt = s("[", f(state.getMe().getNick()), "@", f(properties.getHost().getHostName()), "/", f(state.getCurrentChannel()), "]:");
                 }
             }
         }
@@ -483,6 +536,10 @@ public class IRCClientEngine implements Closeable {
     // to use them as single-character functions
     private static RichString s(Object arg0, Object ... args) {
         return RichString.s(arg0, args);
+    }
+
+    private static RichString j(Object del, RichString ... args) {
+        return RichString.j(del, args);
     }
 
     private static RichString f(Object arg0) {

@@ -1,3 +1,4 @@
+import java.util.List;
 import java.util.SequencedMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ public class IRCMessageMarshaller {
             case IRCMessageUSER m -> marshal(m, this::marshalUser);
             case IRCMessageQUIT m -> marshal(m, this::marshalQuit);
             case IRCMessage001 m -> marshal(m, this::marshal001);
+            case IRCMessage353 m -> marshal(m, this::marshal353);
             case IRCMessageUnsupported m -> m.getRawMessage();
             case IRCMessageParseError m -> m.getRawMessage();
         };
@@ -205,5 +207,29 @@ public class IRCMessageMarshaller {
 
     private String marshal001(IRCMessage001 message) {
         return message.getClient() + " :" + message.getMessage();
+    }
+
+    private String marshal353(IRCMessage353 message) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(message.getClient());
+        sb.append(' ');
+        sb.append(message.getSymbol());
+        sb.append(' ');
+        sb.append(message.getChannel());
+        sb.append(' ');
+        sb.append(':');
+
+        List<String> nicks = message.getNicks();
+        List<String> modes = message.getModes();
+        for (int i = 0; i < nicks.size(); i++) {
+            String nick = nicks.get(i);
+            String mode = modes.size() > i ? modes.get(i) : "";
+            sb.append(mode);
+            sb.append(nick);
+            if (i < nicks.size() - 1) {
+                sb.append(' ');
+            }
+        }
+        return sb.toString();
     }
 }

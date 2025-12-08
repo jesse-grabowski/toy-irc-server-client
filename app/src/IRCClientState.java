@@ -2,56 +2,84 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
+/*
+ * I usually err more towards anemic domain models since they're easier
+ * to serialize, but since this is only ever going to be in-memory, might
+ * as well make it as easy to work with as possible
+ */
 public class IRCClientState {
-    private String nick;
+    private final IRCUserState me = new IRCUserState();
+    private final Map<UUID, IRCUserState> serverMembers = new HashMap<>();
+    private final Map<String, UUID> membersNickIndex = new HashMap<>();
+    private Map<String, IRCClientChannelState> channels = new HashMap<>();
+
     private Set<IRCCapability> claimedCapabilities = new HashSet<>();
     private Set<IRCCapability> serverCapabilities = new HashSet<>();
     private Deque<String> joinedChannels = new ArrayDeque<>();
-    private Map<String, IRCClientChannelState> channels = new HashMap<>();
     private String currentChannel;
 
-    public String getNick() {
-        return nick;
+    public IRCClientState() {
+        me.setId(UUID.randomUUID());
+        serverMembers.put(me.getId(), me);
     }
 
-    public void setNick(String nick) {
-        this.nick = nick;
+    public IRCUserState getMe() {
+        return me;
     }
+
+    public IRCUserState addMember(String nick) {
+        if (membersNickIndex.containsKey(nick)) {
+            return serverMembers.get(membersNickIndex.get(nick));
+        }
+
+        IRCUserState user = new IRCUserState();
+        user.setId(UUID.randomUUID());
+        serverMembers.put(user.getId(), user);
+        user.setNick(nick);
+        return user;
+    }
+
+    public void removeMember(String nick) {
+        if (membersNickIndex.containsKey(nick)) {
+            serverMembers.remove(membersNickIndex.get(nick));
+            membersNickIndex.remove(nick);
+        }
+    }
+
+    public IRCUserState renameMember(String oldNick, String newNick) {
+        if (membersNickIndex.containsKey(oldNick)) {
+            IRCUserState user = serverMembers.get(membersNickIndex.get(oldNick));
+            user.setNick(newNick);
+            return user;
+        }
+        return null;
+    }
+
+    public IRCClientChannelState getChannel(String channel) {
+        return channels.computeIfAbsent(channel, c -> new IRCClientChannelState());
+    }
+
 
     public Set<IRCCapability> getClaimedCapabilities() {
         return claimedCapabilities;
     }
 
-    public void setClaimedCapabilities(Set<IRCCapability> claimedCapabilities) {
-        this.claimedCapabilities = claimedCapabilities;
-    }
 
     public Set<IRCCapability> getServerCapabilities() {
         return serverCapabilities;
     }
 
-    public void setServerCapabilities(Set<IRCCapability> serverCapabilities) {
-        this.serverCapabilities = serverCapabilities;
-    }
 
     public Deque<String> getJoinedChannels() {
         return joinedChannels;
     }
 
-    public void setJoinedChannels(Deque<String> joinedChannels) {
-        this.joinedChannels = joinedChannels;
-    }
-
-    public Map<String, IRCClientChannelState> getChannels() {
-        return channels;
-    }
-
-    public void setChannels(Map<String, IRCClientChannelState> channels) {
-        this.channels = channels;
-    }
 
     public String getCurrentChannel() {
         return currentChannel;
@@ -61,15 +89,50 @@ public class IRCClientState {
         this.currentChannel = currentChannel;
     }
 
-    public static class IRCClientChannelState {
-        private Set<String> members = new HashSet<>();
+    public class IRCClientChannelState {
+        private Set<UUID> channelMembers = new HashSet<>();
+        private Map<UUID, String> memberModes = new HashMap<>();
 
-        public Set<String> getMembers() {
-            return members;
+        public void addMember(UUID member, String mode) {
+            channelMembers.add(member);
+            memberModes.put(member, mode);
         }
 
-        public void setMembers(Set<String> members) {
-            this.members = members;
+        public String getMemberMode(UUID member) {
+            return memberModes.get(member);
+        }
+
+        public List<IRCUserState> getUsers() {
+            return channelMembers.stream()
+                    .map(serverMembers::get)
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+    }
+
+    public class IRCUserState {
+        private UUID id;
+        private String nick;
+
+        public UUID getId() {
+            return id;
+        }
+
+        public void setId(UUID id) {
+            this.id = id;
+        }
+
+        public String getNick() {
+            return nick;
+        }
+
+        public void setNick(String nick) {
+            String previous = this.nick;
+            this.nick = nick;
+            if (previous != null) {
+                membersNickIndex.remove(previous);
+            }
+            membersNickIndex.put(nick, this.id);
         }
     }
 }

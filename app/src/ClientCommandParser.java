@@ -46,6 +46,11 @@ public class ClientCommandParser {
                 .addCommaSeparatedListPositional(0, ClientCommandMsg::setTargets, "nick or channel (may be mask, \"*\" = current channel)", true)
                         .addGreedyStringPositional(1, ClientCommandMsg::setText, "text to send", true)
                 .build());
+        parsers.put("/nick", ArgsParser.builder(ClientCommandNick::new, false, "change your nickname")
+                .addUsageExample("/nick <nickname>")
+                .addUsageExample("/nick taro")
+                .addStringPositional(0, ClientCommandNick::setNick, "nickname to use (rules vary by server)", true)
+                .build());
         parsers.put("/quit", ArgsParser.builder(ClientCommandQuit::new, false, "disconnect from the server")
                 .addUsageExample("/quit [<reason>]")
                 .addUsageExample("/quit")

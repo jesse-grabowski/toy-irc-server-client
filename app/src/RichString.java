@@ -2,6 +2,7 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -31,6 +32,21 @@ public sealed abstract class RichString permits RichString.TextRichString,
             }
         }
         return new CompositeRichString(children);
+    }
+
+    public static RichString j(Object del, RichString ... args) {
+        if (args.length == 0) {
+            return new TextRichString("");
+        }
+        RichString delimiter = del instanceof RichString r ? r : new TextRichString(del.toString());
+        RichString[] parts = new RichString[args.length + args.length - 1];
+        for (int i = 0; i < args.length; i++) {
+            parts[i * 2] = args[i];
+        }
+        for (int i = 1; i < parts.length; i+=2) {
+            parts[i] = delimiter;
+        }
+        return new CompositeRichString(parts);
     }
 
     public static RichString b(Object arg0) {

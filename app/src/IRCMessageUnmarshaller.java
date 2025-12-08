@@ -43,6 +43,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageUSER.COMMAND -> parseUser(message, tags, prefix, params);
                 case IRCMessageQUIT.COMMAND -> parseQuit(message, tags, prefix, params);
                 case IRCMessage001.COMMAND -> parse001(message, tags, prefix, params);
+                case IRCMessage353.COMMAND -> parse353(message, tags, prefix, params);
                 default ->
                         new IRCMessageUnsupported(command, message, tags, prefix.name(), prefix.user(), prefix.host());
             };
@@ -316,6 +317,32 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessage001 parse001(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
         return new IRCMessage001(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), safeGetLast(params));
+    }
+
+    private IRCMessage353 parse353(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        String nicksRaw = safeGetIndex(params, 3);
+        List<String> nicks = new ArrayList<>();
+        List<String> modes = new ArrayList<>();
+        if (nicksRaw != null) {
+            String[] splitNicks = nicksRaw.split("\\s+", -1);
+            for (String nick : splitNicks) {
+                if (nick.isBlank()) {
+                    continue;
+                }
+                switch (nick.charAt(0)) {
+                    case '~', '&', '@', '%', '+' -> {
+                        modes.add("" + nick.charAt(0));
+                        nicks.add(nick.substring(1));
+                    }
+                    default -> {
+                        modes.add("");
+                        nicks.add(nick);
+                    }
+                }
+            }
+        }
+        return new IRCMessage353(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0),
+                safeGetIndex(params, 1), safeGetIndex(params, 2), nicks, modes);
     }
 
     private String safeGetLast(List<String> params) {
