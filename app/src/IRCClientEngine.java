@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,8 +18,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class IRCClientEngine implements Closeable {
-
-    private static final DateTimeFormatter SERVER_TIME_FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
     private static final Logger LOG = Logger.getLogger(IRCClientEngine.class.getName());
     private static final IRCMessageUnmarshaller UNMARSHALLER = new IRCMessageUnmarshaller();
@@ -65,11 +64,9 @@ public class IRCClientEngine implements Closeable {
                 throw new IllegalStateException("inconsistent state while establishing IRC connection");
             }
 
-            IRCClientState state = new IRCClientState();
-            String nick = NicknameGenerator.generate(properties.getNickname());
-            state.getMe().setNick(nick);
-            clientStateGuard.setState(state);
+            clientStateGuard.setState(new IRCClientState());
 
+            String nick = NicknameGenerator.generate(properties.getNickname());
             send(new IRCMessageCAPLS(null, "302", false, new LinkedHashMap<>()));
             if (properties.getPassword() != null && !properties.getPassword().isBlank()) {
                 send(new IRCMessagePASS(properties.getPassword()));
@@ -175,7 +172,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessagePING m -> handle(m);
             case IRCMessagePONG m -> { /* ignore */ }
             case IRCMessagePRIVMSG m -> handle(m);
-            case IRCMessageQUIT m -> { /* ignore */ }
+            case IRCMessageQUIT m -> handle(m);
             case IRCMessageUSER m -> { /* ignore */ }
             case IRCMessage001 m -> handle(m);
             case IRCMessage353 m -> handle(m);
@@ -194,16 +191,16 @@ public class IRCClientEngine implements Closeable {
 
         for (Map.Entry<String, String> capability : message.getCapabilities().sequencedEntrySet()) {
             IRCCapability.forName(capability.getKey()).ifPresent(
-                    c -> state.getServerCapabilities().put(c, capability.getValue()));
+                    c -> state.getCapabilities().addServerCapability(c, capability.getValue()));
         }
 
         if (!message.isHasMore()) {
-            if (state.getServerCapabilities().isEmpty()) {
-                terminal.println(makeSystemTerminalMessage("Server does not support any known capabilities"));
+            if (state.getCapabilities().getServerCapabilities().isEmpty()) {
                 send(new IRCMessageCAPEND());
             } else {
-                terminal.println(makeSystemTerminalMessage("Server supports capabilities: " + state.getServerCapabilities()));
-                send(new IRCMessageCAPREQ(state.getServerCapabilities().keySet().stream().map(IRCCapability::getName).toList(), List.of()));
+                send(new IRCMessageCAPREQ(
+                        state.getCapabilities().getServerCapabilities().stream().map(IRCCapability::getName).toList(),
+                        List.of()));
             }
         }
     }
@@ -216,11 +213,9 @@ public class IRCClientEngine implements Closeable {
         }
 
         for (String capabilityString : message.getEnableCapabilities()) {
-            IRCCapability.forName(capabilityString).ifPresent(c -> state.getClaimedCapabilities().put(
-                    c, state.getServerCapabilities().getOrDefault(c, "")));
+            IRCCapability.forName(capabilityString).ifPresent(state.getCapabilities()::enableCapability);
         }
 
-        terminal.println(makeSystemTerminalMessage("Client enabled capabilities: " + state.getClaimedCapabilities()));
         send(new IRCMessageCAPEND());
     }
 
@@ -242,16 +237,12 @@ public class IRCClientEngine implements Closeable {
         }
 
         for (String channelName : message.getChannels()) {
-            if (Objects.equals(state.getMe().getNick(), message.getPrefixName())) {
-                state.getJoinedChannels().push(channelName);
-                state.setCurrentChannel(channelName);
-            } else {
-                terminal.println(new TerminalMessage(
-                        getMessageTime(message),
-                        f(message.getPrefixName()),
-                        f(channelName),
-                        s(f(message.getPrefixName()), " joined channel ", f(channelName), "!")));
-            }
+            state.addChannelMember(channelName, message.getPrefixName());
+            terminal.println(new TerminalMessage(
+                    getMessageTime(message),
+                    f(message.getPrefixName()),
+                    f(channelName),
+                    s(f(message.getPrefixName()), " joined channel ", f(channelName), "!")));
         }
     }
 
@@ -261,7 +252,7 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        state.renameMember(nick.getPrefixName(), nick.getNick());
+        state.changeNickname(nick.getPrefixName(), nick.getNick());
         terminal.println(new TerminalMessage(getMessageTime(nick), f(nick.getNick()), null,
                 s(f(nick.getPrefixName()), " changed their nick to ", f(nick.getNick()))));
     }
@@ -271,7 +262,8 @@ public class IRCClientEngine implements Closeable {
     }
 
     private void handle(IRCMessagePRIVMSG message) {
-        if (engineState.get() != IRCClientEngineState.REGISTERED) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
             return;
         }
 
@@ -279,6 +271,25 @@ public class IRCClientEngine implements Closeable {
         for (String target : message.getTargets()) {
             terminal.println(new TerminalMessage(time, f(message.getPrefixName()), f(target), s(message.getMessage())));
         }
+
+        state.touch(message.getPrefixName());
+    }
+
+    private void handle(IRCMessageQUIT message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        state.quit(message.getPrefixName());
+        terminal.println(new TerminalMessage(
+                getMessageTime(message),
+                f(message.getPrefixName()),
+                null,
+                s(f(message.getPrefixName()), f(Color.GRAY, s(" has left the server",
+                        message.getReason() != null && !message.getReason().isBlank()
+                                ? "(%s)".formatted(message.getReason())
+                                : "")))));
     }
 
     private void handle(IRCMessage001 message) {
@@ -289,7 +300,7 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        state.getMe().setNick(message.getClient());
+        state.setMe(message.getClient());
     }
 
     private void handle(IRCMessage353 message) {
@@ -300,12 +311,11 @@ public class IRCClientEngine implements Closeable {
 
         List<String> nicks = message.getNicks();
         List<String> modes = message.getModes();
-        IRCClientState.IRCClientChannelState channel = state.getChannel(message.getChannel());
         for (int i = 0; i < nicks.size(); i++) {
             String nick = nicks.get(i);
-            IRCClientState.IRCUserState member = state.addMember(nick);
-            String mode = i < modes.size() ? modes.get(i) : "";
-            channel.addMember(member.getId(), mode);
+            String prefix = i < modes.size() ? modes.get(i) : "";
+            IRCChannelMode[] mode = IRCChannelMode.getByPrefix(prefix).stream().toArray(IRCChannelMode[]::new);
+            state.addChannelMember(message.getChannel(), nick, mode);
         }
     }
 
@@ -344,9 +354,9 @@ public class IRCClientEngine implements Closeable {
 
         send(new IRCMessagePRIVMSG(command.getTargets(), command.getText()));
 
-        if (!state.getClaimedCapabilities().containsKey(IRCCapability.ECHO_MESSAGE)) {
+        if (!state.getCapabilities().isActive(IRCCapability.ECHO_MESSAGE)) {
             for (String target : command.getTargets()) {
-                terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe().getNick()), f(target), s(command.getText())));
+                terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe()), f(target), s(command.getText())));
             }
         }
     }
@@ -358,15 +368,16 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        if (state.getCurrentChannel() == null) {
-            terminal.println(makeSystemTerminalMessage("Failed to send message -- no channel selected"));
+        IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
+        if (channel == null) {
+            terminal.println(makeSystemTerminalMessage("Failed to send message -- no channel focused"));
             return;
         }
 
-        send(new IRCMessagePRIVMSG(List.of(state.getCurrentChannel()), command.getText()));
+        send(new IRCMessagePRIVMSG(List.of(channel.getName()), command.getText()));
 
-        if (!state.getClaimedCapabilities().containsKey(IRCCapability.ECHO_MESSAGE)) {
-            terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe().getNick()), f(state.getCurrentChannel()), s(command.getText())));
+        if (!state.getCapabilities().isActive(IRCCapability.ECHO_MESSAGE)) {
+            terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe()), f(channel.getName()), s(command.getText())));
         }
     }
 
@@ -412,26 +423,33 @@ public class IRCClientEngine implements Closeable {
         if (ies == IRCClientEngineState.REGISTERED) {
             IRCClientState state = clientStateGuard.getState();
             if (state != null) {
-                prompt = s("[", f(state.getMe().getNick()), "@", f(properties.getHost().getHostName()), "]:");
-                if (state.getCurrentChannel() != null) {
-                    String channel = state.getCurrentChannel();
-                    IRCClientState.IRCClientChannelState channelState = state.getChannel(channel);
-                    RichString[] members = channelState.getUsers().stream()
-                            .map(user -> {
-                                String nickname = user.getNick();
-                                String mode = channelState.getMemberMode(user.getId());
-                                String formattedMode = switch (mode) {
-                                    case "~" -> " (Founder)";
-                                    case "&" -> " (Protected)";
-                                    case "@" -> " (Operator)";
-                                    case "%" -> " (Halfop)";
-                                    case null, default -> "";
-                                };
-                                return s(f(nickname), s(formattedMode));
+                IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
+                prompt = s("[", f(state.getMe()), "@", f(properties.getHost().getHostName()), "]:");
+                if (channel != null) {
+                    RichString[] members = channel.getMemberships().entrySet().stream()
+                            .filter(e -> !Objects.equals(e.getKey().getNickname(), state.getMe()))
+                            .sorted(Comparator.comparing(e -> e.getKey().getNickname()))
+                            .map(entry -> {
+                                IRCClientState.User user = entry.getKey();
+                                IRCClientState.Membership membership = entry.getValue();
+                                Set<IRCChannelMode> modes = membership.getModes();
+                                if (modes.contains(IRCChannelMode.OWNER)) {
+                                    return s(f(user.getNickname()), " (Owner)");
+                                } else if (modes.contains(IRCChannelMode.ADMIN)) {
+                                    return s(f(user.getNickname()), " (Admin)");
+                                } else if (modes.contains(IRCChannelMode.OPERATOR)) {
+                                    return s(f(user.getNickname()), " (Operator)");
+                                } else {
+                                    return f(user.getNickname());
+                                }
                             })
                             .toArray(RichString[]::new);
-                    status = s("Chatting in ", f(state.getCurrentChannel()), " with ", j(", ", members));
-                    prompt = s("[", f(state.getMe().getNick()), "@", f(properties.getHost().getHostName()), "/", f(state.getCurrentChannel()), "]:");
+                    if (members.length > 0) {
+                        status = s("Chatting in ", f(channel.getName()), " with ", j(", ", members));
+                    } else {
+                        status = s("Chatting in ", f(channel.getName()), " all alone");
+                    }
+                    prompt = s("[", f(state.getMe()), "@", f(properties.getHost().getHostName()), "/", f(channel.getName()), "]:");
                 }
             }
         }
