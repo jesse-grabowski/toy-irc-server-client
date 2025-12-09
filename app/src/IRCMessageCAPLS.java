@@ -1,5 +1,6 @@
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 
 public final class IRCMessageCAPLS extends IRCMessage {
@@ -9,7 +10,7 @@ public final class IRCMessageCAPLS extends IRCMessage {
     private String nick;
     private String version;
     private boolean hasMore;
-    private List<String> capabilities;
+    private SequencedMap<String, String> capabilities;
 
     public IRCMessageCAPLS(String rawMessage,
                            SequencedMap<String, String> tags,
@@ -19,7 +20,7 @@ public final class IRCMessageCAPLS extends IRCMessage {
                            String nick,
                            String version,
                            boolean hasMore,
-                           List<String> capabilities) {
+                           SequencedMap<String, String> capabilities) {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.nick = nick;
         this.version = version;
@@ -27,7 +28,7 @@ public final class IRCMessageCAPLS extends IRCMessage {
         this.capabilities = capabilities;
     }
 
-    public IRCMessageCAPLS(String nick, String version, boolean hasMore, List<String> capabilities) {
+    public IRCMessageCAPLS(String nick, String version, boolean hasMore, SequencedMap<String, String> capabilities) {
         this(null, new LinkedHashMap<>(), null, null, null, nick, version, hasMore, capabilities);
     }
 
@@ -55,11 +56,11 @@ public final class IRCMessageCAPLS extends IRCMessage {
         this.hasMore = hasMore;
     }
 
-    public List<String> getCapabilities() {
+    public SequencedMap<String, String> getCapabilities() {
         return capabilities;
     }
 
-    public void setCapabilities(List<String> capabilities) {
+    public void setCapabilities(SequencedMap<String, String> capabilities) {
         this.capabilities = capabilities;
     }
 }

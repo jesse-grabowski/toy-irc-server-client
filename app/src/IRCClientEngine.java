@@ -6,7 +6,9 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -68,7 +70,7 @@ public class IRCClientEngine implements Closeable {
             state.getMe().setNick(nick);
             clientStateGuard.setState(state);
 
-            send(new IRCMessageCAPLS(null, "302", false, List.of()));
+            send(new IRCMessageCAPLS(null, "302", false, new LinkedHashMap<>()));
             if (properties.getPassword() != null && !properties.getPassword().isBlank()) {
                 send(new IRCMessagePASS(properties.getPassword()));
             }
@@ -190,8 +192,9 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        for (String capabilityString : message.getCapabilities()) {
-            IRCCapability.forName(capabilityString).ifPresent(state.getServerCapabilities()::add);
+        for (Map.Entry<String, String> capability : message.getCapabilities().sequencedEntrySet()) {
+            IRCCapability.forName(capability.getKey()).ifPresent(
+                    c -> state.getServerCapabilities().put(c, capability.getValue()));
         }
 
         if (!message.isHasMore()) {
@@ -200,7 +203,7 @@ public class IRCClientEngine implements Closeable {
                 send(new IRCMessageCAPEND());
             } else {
                 terminal.println(makeSystemTerminalMessage("Server supports capabilities: " + state.getServerCapabilities()));
-                send(new IRCMessageCAPREQ(state.getServerCapabilities().stream().map(IRCCapability::getName).toList(), List.of()));
+                send(new IRCMessageCAPREQ(state.getServerCapabilities().keySet().stream().map(IRCCapability::getName).toList(), List.of()));
             }
         }
     }
@@ -213,7 +216,8 @@ public class IRCClientEngine implements Closeable {
         }
 
         for (String capabilityString : message.getEnableCapabilities()) {
-            IRCCapability.forName(capabilityString).ifPresent(state.getClaimedCapabilities()::add);
+            IRCCapability.forName(capabilityString).ifPresent(c -> state.getClaimedCapabilities().put(
+                    c, state.getServerCapabilities().getOrDefault(c, "")));
         }
 
         terminal.println(makeSystemTerminalMessage("Client enabled capabilities: " + state.getClaimedCapabilities()));
@@ -340,7 +344,7 @@ public class IRCClientEngine implements Closeable {
 
         send(new IRCMessagePRIVMSG(command.getTargets(), command.getText()));
 
-        if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
+        if (!state.getClaimedCapabilities().containsKey(IRCCapability.ECHO_MESSAGE)) {
             for (String target : command.getTargets()) {
                 terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe().getNick()), f(target), s(command.getText())));
             }
@@ -361,7 +365,7 @@ public class IRCClientEngine implements Closeable {
 
         send(new IRCMessagePRIVMSG(List.of(state.getCurrentChannel()), command.getText()));
 
-        if (!state.getClaimedCapabilities().contains(IRCCapability.ECHO_MESSAGE)) {
+        if (!state.getClaimedCapabilities().containsKey(IRCCapability.ECHO_MESSAGE)) {
             terminal.println(new TerminalMessage(LocalTime.now(), f(state.getMe().getNick()), f(state.getCurrentChannel()), s(command.getText())));
         }
     }

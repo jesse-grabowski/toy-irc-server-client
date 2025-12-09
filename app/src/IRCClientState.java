@@ -2,9 +2,11 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,8 +21,8 @@ public class IRCClientState {
     private final Map<String, UUID> membersNickIndex = new HashMap<>();
     private Map<String, IRCClientChannelState> channels = new HashMap<>();
 
-    private Set<IRCCapability> claimedCapabilities = new HashSet<>();
-    private Set<IRCCapability> serverCapabilities = new HashSet<>();
+    private SequencedMap<IRCCapability, String> claimedCapabilities = new LinkedHashMap<>();
+    private SequencedMap<IRCCapability, String> serverCapabilities = new LinkedHashMap<>();
     private Deque<String> joinedChannels = new ArrayDeque<>();
     private String currentChannel;
 
@@ -66,12 +68,12 @@ public class IRCClientState {
     }
 
 
-    public Set<IRCCapability> getClaimedCapabilities() {
+    public SequencedMap<IRCCapability, String> getClaimedCapabilities() {
         return claimedCapabilities;
     }
 
 
-    public Set<IRCCapability> getServerCapabilities() {
+    public SequencedMap<IRCCapability, String> getServerCapabilities() {
         return serverCapabilities;
     }
 

@@ -1,4 +1,5 @@
 import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,7 +37,7 @@ public class IRCMessageMarshaller {
         StringBuilder messageBuilder = new StringBuilder();
         if (message.getTags() != null && !message.getTags().isEmpty()) {
             messageBuilder.append('@');
-            messageBuilder.append(marshalTags(message.getTags()));
+            messageBuilder.append(marshalMap(message.getTags(), ";", this::escapeTag));
             messageBuilder.append(' ');
         }
 
@@ -56,14 +57,6 @@ public class IRCMessageMarshaller {
         }
 
         return messageBuilder.toString();
-    }
-
-    private String marshalTags(SequencedMap<String, String> tags) {
-        return tags.sequencedEntrySet().stream()
-                .map(e -> e.getValue() == null || e.getValue().isEmpty()
-                        ? e.getKey()
-                        : e.getKey() + "=" + escapeTag(e.getValue()))
-                .collect(Collectors.joining(";"));
     }
 
     private String escapeTag(String value) {
@@ -131,11 +124,10 @@ public class IRCMessageMarshaller {
             }
         }
 
-        if (message.isHasMore()) {
-            return "%s LS * :%s".formatted(message.getNick(), String.join(" ", message.getCapabilities()));
-        } else {
-            return "%s LS :%s".formatted(message.getNick(), String.join(" ", message.getCapabilities()));
-        }
+        return "%s LS%s :%s".formatted(
+                message.getNick(),
+                message.isHasMore() ? " *" : "",
+                marshalMap(message.getCapabilities(), " ", Function.identity()));
     }
 
     private String marshalCapNAK(IRCMessageCAPNAK message) {
@@ -146,7 +138,7 @@ public class IRCMessageMarshaller {
     }
 
     private String marshalCapNEW(IRCMessageCAPNEW message) {
-        return message.getNick() + " NEW :" + String.join(" ", message.getCapabilities());
+        return message.getNick() + " NEW :" + marshalMap(message.getCapabilities(), " ", Function.identity());
     }
 
     private String marshalCapREQ(IRCMessageCAPREQ message) {
@@ -231,5 +223,16 @@ public class IRCMessageMarshaller {
             }
         }
         return sb.toString();
+    }
+
+    private <T> String marshalMap(SequencedMap<String, String> map, String delimiter, Function<String, String> mapper) {
+        if (map == null || map.isEmpty()) {
+            return "";
+        }
+        return map.sequencedEntrySet().stream()
+                .map(e -> e.getValue() == null || e.getValue().isEmpty()
+                        ? e.getKey()
+                        : e.getKey() + "=" + mapper.apply(e.getValue()))
+                .collect(Collectors.joining(delimiter));
     }
 }

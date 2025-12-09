@@ -1,5 +1,6 @@
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 
 public final class IRCMessageCAPNEW extends IRCMessage {
@@ -7,7 +8,7 @@ public final class IRCMessageCAPNEW extends IRCMessage {
     public static final String COMMAND = "CAP";
 
     private String nick;
-    private List<String> capabilities;
+    private SequencedMap<String, String> capabilities;
 
     public IRCMessageCAPNEW(String rawMessage,
                             SequencedMap<String, String> tags,
@@ -15,13 +16,13 @@ public final class IRCMessageCAPNEW extends IRCMessage {
                             String prefixUser,
                             String prefixHost,
                             String nick,
-                            List<String> capabilities) {
+                            SequencedMap<String, String> capabilities) {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.nick = nick;
         this.capabilities = capabilities;
     }
 
-    public IRCMessageCAPNEW(String nick, List<String> capabilities) {
+    public IRCMessageCAPNEW(String nick, SequencedMap<String, String> capabilities) {
         this(null, new LinkedHashMap<>(), null, null, null, nick, capabilities);
     }
 
@@ -33,11 +34,11 @@ public final class IRCMessageCAPNEW extends IRCMessage {
         this.nick = nick;
     }
 
-    public List<String> getCapabilities() {
+    public SequencedMap<String, String> getCapabilities() {
         return capabilities;
     }
 
-    public void setCapabilities(List<String> capabilities) {
+    public void setCapabilities(SequencedMap<String, String> capabilities) {
         this.capabilities = capabilities;
     }
 }
