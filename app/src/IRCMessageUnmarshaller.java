@@ -50,6 +50,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageUSER.COMMAND -> parseUser(message, tags, prefix, params);
                 case IRCMessageQUIT.COMMAND -> parseQuit(message, tags, prefix, params);
                 case IRCMessage001.COMMAND -> parse001(message, tags, prefix, params);
+                case IRCMessage005.COMMAND -> parse005(message, tags, prefix, params);
                 case IRCMessage353.COMMAND -> parse353(message, tags, prefix, params);
                 default ->
                         new IRCMessageUnsupported(command, message, tags, prefix.name(), prefix.user(), prefix.host());
@@ -318,6 +319,23 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessage001 parse001(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
         return new IRCMessage001(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), safeGetLast(params));
+    }
+
+    private IRCMessage005 parse005(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        if (params.size() < 3 || params.size() > 15) {
+            throw new IllegalArgumentException("005 must have between 3 and 15 parameters <client> <1-13 tokens> :are supported by this server");
+        }
+        SequencedMap<String, String> parameters = new LinkedHashMap<>();
+        for (int i = 1; i < params.size() - 1; i++) {
+            String parameter = params.get(i);
+            String[] parts = parameter.split("=", 2);
+            if (parts.length == 1) {
+                parameters.put(parts[0], "");
+            } else {
+                parameters.put(parts[0], parts[1]);
+            }
+        }
+        return new IRCMessage005(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0), parameters);
     }
 
     private IRCMessage353 parse353(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {

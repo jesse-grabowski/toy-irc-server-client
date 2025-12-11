@@ -13,6 +13,7 @@ import java.util.function.Predicate;
 public class IRCClientState {
 
     private final Capabilities capabilities = new Capabilities();
+    private final Parameters parameters = new Parameters();
 
     private final Map<String, User> users = new HashMap<>();
     private final Map<String, Channel> channels = new HashMap<>();
@@ -60,7 +61,7 @@ public class IRCClientState {
 
     public void addChannelMember(String channelName,
                                  String nickname,
-                                 IRCChannelMode... modes) {
+                                 IRCChannelMembershipMode... modes) {
         User user = getOrCreateUser(nickname);
         Channel channel = getOrCreateChannel(channelName);
 
@@ -72,7 +73,7 @@ public class IRCClientState {
 
     public void addChannelMemberModes(String channelName,
                                       String nickname,
-                                      IRCChannelMode... modes) {
+                                      IRCChannelMembershipMode... modes) {
         Channel channel = findChannel(channelName);
         if (channel == null) {
             return;
@@ -93,7 +94,7 @@ public class IRCClientState {
 
     public void deleteChannelMemberModes(String channelName,
                                          String nickname,
-                                         IRCChannelMode... modes) {
+                                         IRCChannelMembershipMode... modes) {
         Channel channel = findChannel(channelName);
         if (channel == null) {
             return;
@@ -109,7 +110,7 @@ public class IRCClientState {
             return;
         }
 
-        for (IRCChannelMode mode : modes) {
+        for (IRCChannelMembershipMode mode : modes) {
             membership.modes.remove(mode);
         }
     }
@@ -214,6 +215,10 @@ public class IRCClientState {
         return capabilities;
     }
 
+    public Parameters getParameters() {
+        return parameters;
+    }
+
     public static class Channel {
         private String name;
         private final Map<User, Membership> members = new HashMap<>();
@@ -240,9 +245,9 @@ public class IRCClientState {
     }
 
     public static class Membership {
-        private final Set<IRCChannelMode> modes = EnumSet.noneOf(IRCChannelMode.class);
+        private final Set<IRCChannelMembershipMode> modes = EnumSet.noneOf(IRCChannelMembershipMode.class);
 
-        public Set<IRCChannelMode> getModes() {
+        public Set<IRCChannelMembershipMode> getModes() {
             return Collections.unmodifiableSet(modes);
         }
     }
@@ -325,6 +330,252 @@ public class IRCClientState {
         public boolean isActive(IRCCapability capability, Predicate<String> valuePredicate) {
             return activeCapabilities.containsKey(capability) &&
                     valuePredicate.test(activeCapabilities.get(capability));
+        }
+    }
+
+    public static class Parameters {
+        private int awayLength = Integer.MAX_VALUE;
+        private IRCCaseMapping caseMapping = IRCCaseMapping.RFC1459;
+        private Map<Character, Integer> channelLimits = Map.of();
+        private Set<Character> typeAChannelModes = new HashSet<>();
+        private Set<Character> typeBChannelModes = new HashSet<>();
+        private Set<Character> typeCChannelModes = new HashSet<>();
+        private Set<Character> typeDChannelModes = new HashSet<>();
+        private int channelLength = Integer.MAX_VALUE;
+        private Set<Character> channelTypes = Set.of('#', '&');
+        private Character excepts;
+        private Character extendedBanPrefix;
+        private Set<Character> extendedBanModes = Set.of();
+        private int hostLength = Integer.MAX_VALUE;
+        private Character inviteExceptions;
+        private int kickLength = Integer.MAX_VALUE;
+        private Map<Character, Integer> maxList;
+        private int maxTargets = Integer.MAX_VALUE;
+        private int modes = Integer.MAX_VALUE;
+        private String network;
+        private int nickLength = Integer.MAX_VALUE;
+        private Map<Character, Character> prefixes;
+        private boolean safeList;
+        private int silence = Integer.MAX_VALUE;
+        private Set<Character> statusMessage;
+        private Map<String, Integer> targetMax;
+        private int topicLength = Integer.MAX_VALUE;
+        private int userLength = Integer.MAX_VALUE;
+
+        public int getAwayLength() {
+            return awayLength;
+        }
+
+        public void setAwayLength(int awayLength) {
+            this.awayLength = awayLength;
+        }
+
+        public IRCCaseMapping getCaseMapping() {
+            return caseMapping;
+        }
+
+        public void setCaseMapping(IRCCaseMapping caseMapping) {
+            this.caseMapping = caseMapping;
+        }
+
+        public Map<Character, Integer> getChannelLimits() {
+            return channelLimits;
+        }
+
+        public void setChannelLimits(Map<Character, Integer> channelLimits) {
+            this.channelLimits = channelLimits;
+        }
+
+        public Set<Character> getTypeAChannelModes() {
+            return typeAChannelModes;
+        }
+
+        public void setTypeAChannelModes(Set<Character> typeAChannelModes) {
+            this.typeAChannelModes = typeAChannelModes;
+        }
+
+        public Set<Character> getTypeBChannelModes() {
+            return typeBChannelModes;
+        }
+
+        public void setTypeBChannelModes(Set<Character> typeBChannelModes) {
+            this.typeBChannelModes = typeBChannelModes;
+        }
+
+        public Set<Character> getTypeCChannelModes() {
+            return typeCChannelModes;
+        }
+
+        public void setTypeCChannelModes(Set<Character> typeCChannelModes) {
+            this.typeCChannelModes = typeCChannelModes;
+        }
+
+        public Set<Character> getTypeDChannelModes() {
+            return typeDChannelModes;
+        }
+
+        public void setTypeDChannelModes(Set<Character> typeDChannelModes) {
+            this.typeDChannelModes = typeDChannelModes;
+        }
+
+        public int getChannelLength() {
+            return channelLength;
+        }
+
+        public void setChannelLength(int channelLength) {
+            this.channelLength = channelLength;
+        }
+
+        public Set<Character> getChannelTypes() {
+            return channelTypes;
+        }
+
+        public void setChannelTypes(Set<Character> channelTypes) {
+            this.channelTypes = channelTypes;
+        }
+
+        public Character getExcepts() {
+            return excepts;
+        }
+
+        public void setExcepts(Character excepts) {
+            this.excepts = excepts;
+        }
+
+        public Character getExtendedBanPrefix() {
+            return extendedBanPrefix;
+        }
+
+        public void setExtendedBanPrefix(Character extendedBanPrefix) {
+            this.extendedBanPrefix = extendedBanPrefix;
+        }
+
+        public Set<Character> getExtendedBanModes() {
+            return extendedBanModes;
+        }
+
+        public void setExtendedBanModes(Set<Character> extendedBanModes) {
+            this.extendedBanModes = extendedBanModes;
+        }
+
+        public Integer getHostLength() {
+            return hostLength;
+        }
+
+        public void setHostLength(Integer hostLength) {
+            this.hostLength = hostLength;
+        }
+
+        public Character getInviteExceptions() {
+            return inviteExceptions;
+        }
+
+        public void setInviteExceptions(Character inviteExceptions) {
+            this.inviteExceptions = inviteExceptions;
+        }
+
+        public Integer getKickLength() {
+            return kickLength;
+        }
+
+        public void setKickLength(Integer kickLength) {
+            this.kickLength = kickLength;
+        }
+
+        public Map<Character, Integer> getMaxList() {
+            return maxList;
+        }
+
+        public void setMaxList(Map<Character, Integer> maxList) {
+            this.maxList = maxList;
+        }
+
+        public Integer getMaxTargets() {
+            return maxTargets;
+        }
+
+        public void setMaxTargets(Integer maxTargets) {
+            this.maxTargets = maxTargets;
+        }
+
+        public Integer getModes() {
+            return modes;
+        }
+
+        public void setModes(Integer modes) {
+            this.modes = modes;
+        }
+
+        public String getNetwork() {
+            return network;
+        }
+
+        public void setNetwork(String network) {
+            this.network = network;
+        }
+
+        public Integer getNickLength() {
+            return nickLength;
+        }
+
+        public void setNickLength(Integer nickLength) {
+            this.nickLength = nickLength;
+        }
+
+        public Map<Character, Character> getPrefixes() {
+            return prefixes;
+        }
+
+        public void setPrefixes(Map<Character, Character> prefixes) {
+            this.prefixes = prefixes;
+        }
+
+        public boolean isSafeList() {
+            return safeList;
+        }
+
+        public void setSafeList(boolean safeList) {
+            this.safeList = safeList;
+        }
+
+        public Integer getSilence() {
+            return silence;
+        }
+
+        public void setSilence(Integer silence) {
+            this.silence = silence;
+        }
+
+        public Set<Character> getStatusMessage() {
+            return statusMessage;
+        }
+
+        public void setStatusMessage(Set<Character> statusMessage) {
+            this.statusMessage = statusMessage;
+        }
+
+        public Map<String, Integer> getTargetMax() {
+            return targetMax;
+        }
+
+        public void setTargetMax(Map<String, Integer> targetMax) {
+            this.targetMax = targetMax;
+        }
+
+        public Integer getTopicLength() {
+            return topicLength;
+        }
+
+        public void setTopicLength(Integer topicLength) {
+            this.topicLength = topicLength;
+        }
+
+        public Integer getUserLength() {
+            return userLength;
+        }
+
+        public void setUserLength(Integer userLength) {
+            this.userLength = userLength;
         }
     }
 }

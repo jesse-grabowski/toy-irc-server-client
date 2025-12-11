@@ -42,6 +42,14 @@ public class IRCMessageRoundTripTest {
                 Arguments.of("USER myuser 0 * :Real Name", "USER myuser 0 * :Real Name"),
                 Arguments.of("USER myuser x y :Real Name", "USER myuser 0 * :Real Name"),
                 Arguments.of("001 mynick :Welcome to IRC", "001 mynick :Welcome to IRC"),
+                Arguments.of(
+                        "005 mynick CHANTYPES=# PREFIX=(ov)@+ CASEMAPPING=rfc1459 CHANMODES=be,k,l,imnpst :are supported by this server",
+                        "005 mynick CHANTYPES=# PREFIX=(ov)@+ CASEMAPPING=rfc1459 CHANMODES=be,k,l,imnpst :are supported by this server"
+                ),
+                Arguments.of(
+                        "005 mynick EXCEPTS=e INVEX=I STATUSMSG=@%+ SAFELIST TARGMAX=PRIVMSG:4,NOTICE:3,JOIN:1 :skibidi",
+                        "005 mynick EXCEPTS=e INVEX=I STATUSMSG=@%+ SAFELIST TARGMAX=PRIVMSG:4,NOTICE:3,JOIN:1 :are supported by this server"
+                ),
                 Arguments.of("353 mynick = #chan :nick1", "353 mynick = #chan :nick1"),
                 Arguments.of("353 mynick = #chan :nick1 nick2", "353 mynick = #chan :nick1 nick2"),
                 Arguments.of("353 mynick = #chan :@nick1 +nick2 %nick3", "353 mynick = #chan :@nick1 +nick2 %nick3"),
@@ -108,6 +116,10 @@ public class IRCMessageRoundTripTest {
                 Arguments.of("PRIVMSG #chan :hi", IRCMessagePRIVMSG.class),
                 Arguments.of("USER myuser 0 * :Real Name", IRCMessageUSER.class),
                 Arguments.of("001 mynick :Welcome", IRCMessage001.class),
+                Arguments.of(
+                        "005 mynick CHANTYPES=# PREFIX=(ov)@+ CASEMAPPING=rfc1459 CHANMODES=be,k,l,imnpst :are supported by this server",
+                        IRCMessage005.class
+                ),
                 Arguments.of("353 mynick = #chan :@nick1 +nick2 %nick3", IRCMessage353.class),
                 Arguments.of("FOOCMD arg1 arg2", IRCMessageUnsupported.class),
 

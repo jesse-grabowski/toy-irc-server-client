@@ -217,6 +217,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageQUIT m -> handle(m);
             case IRCMessageUSER m -> { /* ignore */ }
             case IRCMessage001 m -> handle(m);
+            case IRCMessage005 m -> handle(m);
             case IRCMessage353 m -> handle(m);
             case IRCMessageUnsupported m -> terminal.println(makeSystemTerminalMessage("» " + m.getRawMessage()));
             case IRCMessageParseError m -> terminal.println(makeSystemTerminalMessage("(PARSE ERROR) » " + m.getRawMessage()));
@@ -494,6 +495,19 @@ public class IRCClientEngine implements Closeable {
         state.setMe(message.getClient());
     }
 
+    private void handle(IRCMessage005 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        IRCClientState.Parameters parameters = state.getParameters();
+
+        for (Map.Entry<String, String> entry : message.getParameters().sequencedEntrySet()) {
+            IRCParameterParser.parse(entry.getKey(), entry.getValue(), parameters);
+        }
+    }
+
     private void handle(IRCMessage353 message) {
         IRCClientState state = clientStateGuard.getState();
         if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
@@ -505,7 +519,7 @@ public class IRCClientEngine implements Closeable {
         for (int i = 0; i < nicks.size(); i++) {
             String nick = nicks.get(i);
             String prefix = i < modes.size() ? modes.get(i) : "";
-            IRCChannelMode[] mode = IRCChannelMode.getByPrefix(prefix).stream().toArray(IRCChannelMode[]::new);
+            IRCChannelMembershipMode[] mode = IRCChannelMembershipMode.getByPrefix(prefix).stream().toArray(IRCChannelMembershipMode[]::new);
             state.addChannelMember(message.getChannel(), nick, mode);
         }
     }
@@ -637,12 +651,12 @@ public class IRCClientEngine implements Closeable {
                             .map(entry -> {
                                 IRCClientState.User user = entry.getKey();
                                 IRCClientState.Membership membership = entry.getValue();
-                                Set<IRCChannelMode> modes = membership.getModes();
-                                if (modes.contains(IRCChannelMode.OWNER)) {
+                                Set<IRCChannelMembershipMode> modes = membership.getModes();
+                                if (modes.contains(IRCChannelMembershipMode.OWNER)) {
                                     return s(f(user.getNickname()), " (Owner)");
-                                } else if (modes.contains(IRCChannelMode.ADMIN)) {
+                                } else if (modes.contains(IRCChannelMembershipMode.ADMIN)) {
                                     return s(f(user.getNickname()), " (Admin)");
-                                } else if (modes.contains(IRCChannelMode.OPERATOR)) {
+                                } else if (modes.contains(IRCChannelMembershipMode.OPERATOR)) {
                                     return s(f(user.getNickname()), " (Operator)");
                                 } else {
                                     return f(user.getNickname());

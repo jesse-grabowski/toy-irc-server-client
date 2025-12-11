@@ -30,6 +30,7 @@ public class IRCMessageMarshaller {
             case IRCMessageUSER m -> marshal(m, this::marshalUser);
             case IRCMessageQUIT m -> marshal(m, this::marshalQuit);
             case IRCMessage001 m -> marshal(m, this::marshal001);
+            case IRCMessage005 m -> marshal(m, this::marshal005);
             case IRCMessage353 m -> marshal(m, this::marshal353);
             case IRCMessageUnsupported m -> m.getRawMessage();
             case IRCMessageParseError m -> m.getRawMessage();
@@ -215,6 +216,21 @@ public class IRCMessageMarshaller {
 
     private String marshal001(IRCMessage001 message) {
         return message.getClient() + " :" + message.getMessage();
+    }
+
+    private String marshal005(IRCMessage005 message) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(message.getClient());
+        for (Map.Entry<String, String> parameter : message.getParameters().entrySet()) {
+            sb.append(' ');
+            sb.append(parameter.getKey());
+            if (parameter.getValue() != null && !parameter.getValue().isEmpty()) {
+                sb.append('=');
+                sb.append(parameter.getValue());
+            }
+        }
+        sb.append(" :are supported by this server");
+        return sb.toString();
     }
 
     private String marshal353(IRCMessage353 message) {

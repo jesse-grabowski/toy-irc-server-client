@@ -1,45 +1,36 @@
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 public enum IRCChannelMode {
-    OWNER("q", "~"),
-    ADMIN("a", "&"),
-    OPERATOR("o", "@"),
-    HALFOP("h", "%"),
-    VOICE("v", "+");
+    BAN,
+    EXCEPTION,
+    CLIENT_LIMIT,
+    INVITE_ONLY,
+    INVITE_EXCEPTION,
+    KEY,
+    MODERATED,
+    SECRET,
+    PROTECTED,
+    NO_EXTERNAL_MESSAGES;
 
-    private static final Map<String, IRCChannelMode> MODES_BY_FLAG = new HashMap<>();
-    private static final Map<String, IRCChannelMode> MODES_BY_PREFIX = new HashMap<>();
-
-    static {
-        for (IRCChannelMode mode : IRCChannelMode.values()) {
-            MODES_BY_FLAG.put(mode.flag, mode);
-            MODES_BY_PREFIX.put(mode.prefix, mode);
-        }
-    }
-
-    private final String flag;
-    private final String prefix;
-
-    IRCChannelMode(String flag, String prefix) {
-        this.flag = flag;
-        this.prefix = prefix;
-    }
-
-    public static Optional<IRCChannelMode> getByFlag(String flag) {
-        return Optional.ofNullable(MODES_BY_FLAG.get(flag));
-    }
-
-    public static Optional<IRCChannelMode> getByPrefix(String prefix) {
-        return Optional.ofNullable(MODES_BY_PREFIX.get(prefix));
-    }
-
-    public String getFlag() {
-        return flag;
-    }
-
-    public String getPrefix() {
-        return prefix;
+    public static Optional<IRCChannelMode> forName(IRCClientState.Parameters parameters, char name) {
+        return switch (name) {
+            case 'b' -> Optional.of(BAN);
+            case 'l' -> Optional.of(CLIENT_LIMIT);
+            case 'i' -> Optional.of(INVITE_ONLY);
+            case 'k' -> Optional.of(KEY);
+            case 'm' -> Optional.of(MODERATED);
+            case 's' -> Optional.of(SECRET);
+            case 't' -> Optional.of(PROTECTED);
+            case 'n' -> Optional.of(NO_EXTERNAL_MESSAGES);
+            default -> {
+                if (parameters.getExcepts() == name) {
+                    yield Optional.of(EXCEPTION);
+                } else if (parameters.getInviteExceptions() == name) {
+                    yield Optional.of(INVITE_EXCEPTION);
+                } else {
+                    yield Optional.empty();
+                }
+            }
+        };
     }
 }
