@@ -1,8 +1,9 @@
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -136,6 +137,114 @@ public class IRCClientState {
         }
     }
 
+    public List<String> getChannelList(String channelName, Character mode) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return List.of();
+        }
+
+        return channel.getList(mode);
+    }
+
+    public void addToChannelList(String channelName, Character mode, String entry) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return;
+        }
+
+        channel.addToList(mode, entry);
+    }
+
+    public void removeFromChannelList(String channelName, Character mode, String entry) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return;
+        }
+
+        channel.removeFromList(mode, entry);
+    }
+
+    public String getChannelSetting(String channelName, Character mode) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return null;
+        }
+
+        return channel.getSetting(mode);
+    }
+
+    public void setChannelSetting(String channelName, Character mode, String setting) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return;
+        }
+
+        channel.setSetting(mode, setting);
+    }
+
+    public void removeChannelSetting(String channelName, Character mode) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return;
+        }
+
+        channel.removeSetting(mode);
+    }
+
+    public boolean checkChannelFlag(String channelName, Character mode) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return false;
+        }
+
+        return channel.checkFlag(mode);
+    }
+
+    public void setChannelFlag(String channelName, Character mode) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return;
+        }
+
+        channel.setFlag(mode);
+    }
+
+    public void clearChannelFlag(String channelName, Character mode) {
+        Channel channel = findChannel(channelName);
+        if (channel == null) {
+            return;
+        }
+
+        channel.clearFlag(mode);
+    }
+
+    public void setUserFlag(String nick, Character mode) {
+        User user = findUser(nick);
+        if (user == null) {
+            return;
+        }
+
+        user.setFlag(mode);
+    }
+
+    public void clearUserFlag(String nick, Character mode) {
+        User user = findUser(nick);
+        if (user == null) {
+            return;
+        }
+
+        user.clearFlag(mode);
+    }
+
+    public boolean checkUserFlag(String nick, Character mode) {
+        User user = findUser(nick);
+        if (user == null) {
+            return false;
+        }
+
+        return user.checkFlag(mode);
+    }
+
     public void changeNickname(String oldNickname, String newNickname) {
         if (Objects.equals(oldNickname, newNickname)) {
             return;
@@ -225,6 +334,9 @@ public class IRCClientState {
     public static class Channel {
         private String name;
         private final Map<User, Membership> members = new HashMap<>();
+        private final Map<Character, List<String>> lists = new HashMap<>();
+        private final Map<Character, String> settings = new HashMap<>();
+        private final Set<Character> flags = new HashSet<>();
 
         private Membership getOrCreateMembership(User user) {
             return members.computeIfAbsent(user, u -> new Membership());
@@ -245,6 +357,42 @@ public class IRCClientState {
         public Map<User, Membership> getMemberships() {
             return Collections.unmodifiableMap(members);
         }
+
+        private List<String> getList(Character mode) {
+            return Collections.unmodifiableList(lists.getOrDefault(mode, List.of()));
+        }
+
+        private void addToList(Character mode, String entry) {
+            lists.computeIfAbsent(mode, k -> new ArrayList<>()).add(entry);
+        }
+
+        private void removeFromList(Character mode, String entry) {
+            lists.getOrDefault(mode, new ArrayList<>()).remove(entry);
+        }
+
+        private String getSetting(Character mode) {
+            return settings.get(mode);
+        }
+
+        private void setSetting(Character mode, String setting) {
+            settings.put(mode, setting);
+        }
+
+        private void removeSetting(Character mode) {
+            settings.remove(mode);
+        }
+
+        private boolean checkFlag(Character mode) {
+            return flags.contains(mode);
+        }
+
+        private void setFlag(Character mode) {
+            flags.add(mode);
+        }
+
+        private void clearFlag(Character mode) {
+            flags.remove(mode);
+        }
     }
 
     public static class Membership {
@@ -259,9 +407,22 @@ public class IRCClientState {
         private String nickname;
         private long lastTouched = System.currentTimeMillis();
         private final SequencedSet<Channel> channels = new LinkedHashSet<>();
+        private final Set<Character> flags = new HashSet<>();
 
         public String getNickname() {
             return nickname;
+        }
+
+        private void setFlag(Character mode) {
+            flags.add(mode);
+        }
+
+        private void clearFlag(Character mode) {
+            flags.remove(mode);
+        }
+
+        private boolean checkFlag(Character mode) {
+            return flags.contains(mode);
         }
     }
 

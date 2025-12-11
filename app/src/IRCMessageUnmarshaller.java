@@ -41,6 +41,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageERROR.COMMAND -> parseError(message, tags, prefix, params);
                 case IRCMessageJOINNormal.COMMAND -> parseJoin(message, tags, prefix, params);
                 case IRCMessageKICK.COMMAND -> parseKick(message, tags, prefix, params);
+                case IRCMessageMODE.COMMAND -> parseMode(message, tags, prefix, params);
                 case IRCMessageNICK.COMMAND -> parseNick(message, tags, prefix, params);
                 case IRCMessagePART.COMMAND -> parsePart(message, tags, prefix, params);
                 case IRCMessagePASS.COMMAND -> parsePass(message, tags, prefix, params);
@@ -270,6 +271,14 @@ public class IRCMessageUnmarshaller {
             throw new IllegalArgumentException("KICK must have at least 2 parameters <channel> <nick>");
         }
         return new IRCMessageKICK(raw, tags, prefix.name(), prefix.user(), prefix.host(), params.getFirst(), params.get(1), safeGetIndex(params, 2));
+    }
+
+    private IRCMessageMODE parseMode(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        if (params.isEmpty()) {
+            throw new IllegalArgumentException("MODE must have at least 1 parameter <target>");
+        }
+        List<String> modeArguments = params.size() > 2 ? params.subList(2, params.size()) : List.of();
+        return new IRCMessageMODE(safeGetIndex(params, 0), safeGetIndex(params, 1), modeArguments);
     }
 
     private IRCMessageNICK parseNick(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {

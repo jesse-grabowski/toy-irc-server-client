@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -210,6 +211,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
             case IRCMessageKICK m -> handle(m);
+            case IRCMessageMODE m -> handle(m);
             case IRCMessageNICK m -> handle(m);
             case IRCMessagePART m -> handle(m);
             case IRCMessagePASS m -> { /* ignore */ }
@@ -417,6 +419,96 @@ public class IRCClientEngine implements Closeable {
                                 : ""))));
     }
 
+    // IRC specification for MODE is genuinely unhinged
+    private void handle(IRCMessageMODE mode) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        IRCClientState.Parameters parameters = state.getParameters();
+
+        Boolean adding = null; // we don't know yet
+        Iterator<String> argumentIterator = mode.getModeArguments().iterator();
+        for (char c : mode.getModeString().toCharArray()) {
+            switch (c) {
+                case '+' -> adding = true;
+                case '-' -> adding = false;
+                default -> {
+                    if (adding == null) {
+                        LOG.warning("Received malformed MODE command: " + mode.getRawMessage());
+                        return;
+                    }
+
+                    if (isChannel(state, mode.getTarget())) { // channel modes
+                        if (parameters.getPrefixes().containsKey(c)) { // user prefix mode
+                            if (argumentIterator.hasNext()) {
+                                String nick = argumentIterator.next();
+                                if (adding) {
+                                    state.addChannelMemberModes(mode.getTarget(), nick, c);
+                                } else {
+                                    state.deleteChannelMemberModes(mode.getTarget(), nick, c);
+                                }
+                            } else {
+                                LOG.warning("Mode '" + c + "' missing required argument: " + mode.getRawMessage());
+                            }
+                        } else if (parameters.getTypeAChannelModes().contains(c)) { // list values (e.g. bans)
+                            if (argumentIterator.hasNext()) {
+                                String value = argumentIterator.next();
+                                if (adding) {
+                                    state.addToChannelList(mode.getTarget(), c, value);
+                                } else {
+                                    state.removeFromChannelList(mode.getTarget(), c, value);
+                                }
+                            } else {
+                                LOG.warning("Mode '" + c + "' missing required argument: " + mode.getRawMessage());
+                            }
+                        } else if (parameters.getTypeBChannelModes().contains(c)) { // settings that always need value (e.g. password)
+                            if (argumentIterator.hasNext()) {
+                                String value = argumentIterator.next();
+                                if (adding) {
+                                    state.setChannelSetting(mode.getTarget(), c, value);
+                                } else {
+                                    state.removeChannelSetting(mode.getTarget(), c);
+                                }
+                            } else {
+                                LOG.warning("Mode '" + c + "' missing required argument: " + mode.getRawMessage());
+                                if (!adding) {
+                                    state.removeChannelSetting(mode.getTarget(), c);
+                                }
+                            }
+                        } else if (parameters.getTypeCChannelModes().contains(c)) { // settings that only consume a value on set
+                            if (adding) {
+                                if (argumentIterator.hasNext()) {
+                                    String value = argumentIterator.next();
+                                    state.setChannelSetting(mode.getTarget(), c, value);
+                                } else {
+                                    LOG.warning("Mode '+" + c + "' missing required argument: " + mode.getRawMessage());
+                                }
+                            } else {
+                                state.removeChannelSetting(mode.getTarget(), c);
+                            }
+                        } else if (parameters.getTypeDChannelModes().contains(c)) { // flags
+                            if (adding) {
+                                state.setChannelFlag(mode.getTarget(), c);
+                            } else {
+                                state.clearChannelFlag(mode.getTarget(), c);
+                            }
+                        } else {
+                            LOG.warning("Received unknown mode '" + c + "': " + mode.getRawMessage());
+                        }
+                    } else { // user modes
+                        if (adding) {
+                            state.setUserFlag(mode.getTarget(), c);
+                        } else {
+                            state.clearUserFlag(mode.getTarget(), c);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void handle(IRCMessageNICK nick) {
         IRCClientState state = clientStateGuard.getState();
         if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
@@ -544,6 +636,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandHelp c -> { /* handled externally */ }
             case ClientCommandJoin c -> handle(c);
             case ClientCommandKick c -> handle(c);
+            case ClientCommandMode c -> handle(c);
             case ClientCommandMsg c -> handle(c);
             case ClientCommandMsgCurrent c -> handle(c);
             case ClientCommandNick c -> handle(c);
@@ -567,6 +660,10 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandKick command) {
         send(new IRCMessageKICK(command.getChannel(), command.getNick(), command.getReason()));
+    }
+
+    private void handle(ClientCommandMode command) {
+        send(new IRCMessageMODE(command.getTarget(), command.getModeString(), command.getModeArguments()));
     }
 
     private void handle(ClientCommandMsg command) {
@@ -615,6 +712,11 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandQuit command) {
         send(new IRCMessageQUIT(command.getReason()));
+    }
+
+    private boolean isChannel(IRCClientState state, String target) {
+        IRCClientState.Parameters parameters = state.getParameters();
+        return parameters.getChannelTypes().contains(target.charAt(0));
     }
 
     private LocalTime getMessageTime(IRCMessage message) {

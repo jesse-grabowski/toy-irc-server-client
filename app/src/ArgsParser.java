@@ -34,6 +34,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     private final boolean registerHelpFlag;
     private final String description;
 
+    private boolean flagParsingEnabled = true;
     private boolean built = false;
 
     private ArgsParser(Supplier<T> propertiesFactory, boolean registerHelpFlag, String description) {
@@ -105,6 +106,12 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     }
 
     @Override
+    public ArgsParserBuilder<T> setFlagParsingEnabled(boolean value) {
+        this.flagParsingEnabled = value;
+        return this;
+    }
+
+    @Override
     public ArgsParser<T> build() {
         if (built) {
             throw new IllegalStateException("ArgsParser already built");
@@ -116,6 +123,9 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             if (spec.getTokenConsumption() != TokenConsumption.SELF && spec.getPosition() != positionalSpecs.size() - 1) {
                 throw new IllegalStateException("Greedy positional arguments may only be at the final position");
             }
+        }
+        if (!flagParsingEnabled && !flagSpecs.isEmpty()) {
+            throw new IllegalStateException("Flag parsing is disabled but flag specs are defined");
         }
         built = true;
         return this;
@@ -200,7 +210,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             }
 
             Matcher flagMatcher = TOKEN_FLAGS.matcher(token.token());
-            if (flagMatcher.matches()) {
+            if (flagParsingEnabled && flagMatcher.matches()) {
                 String flags = flagMatcher.group("flag");
                 if (flags.length() == 1) {
                     FlagSpec<?> spec = findByShortKey(flags.charAt(0));
@@ -222,7 +232,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             }
 
             flagMatcher = TOKEN_FLAGS_LONG.matcher(token.token());
-            if (flagMatcher.matches()) {
+            if (flagParsingEnabled && flagMatcher.matches()) {
                 String flag = flagMatcher.group("flag");
                 FlagSpec<?> flagSpec = findByLongKey(flag);
                 usedSpecs.add(flagSpec);
@@ -242,7 +252,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
                 break;
             }
 
-            if (token.token().startsWith("-")) {
+            if (flagParsingEnabled && token.token().startsWith("-")) {
                 // catch accidental single-hyphen long names and similar
                 throw new IllegalArgumentException("Unrecognized option: '%s'".formatted(token.token()));
             }

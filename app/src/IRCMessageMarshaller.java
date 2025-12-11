@@ -21,6 +21,7 @@ public class IRCMessageMarshaller {
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
             case IRCMessageKICK m -> marshal(m, this::marshalKick);
+            case IRCMessageMODE m -> marshal(m, this::marshalMode);
             case IRCMessageNICK m -> marshal(m, this::marshalNick);
             case IRCMessagePART m -> marshal(m, this::marshalPart);
             case IRCMessagePASS m -> marshal(m, this::marshalPass);
@@ -173,6 +174,25 @@ public class IRCMessageMarshaller {
     private String marshalKick(IRCMessageKICK message) {
         return "%s %s%s".formatted(message.getChannel(), message.getNick(),
                 message.getReason() != null ? " :" + message.getReason() : "");
+    }
+
+    private String marshalMode(IRCMessageMODE message) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(message.getTarget());
+        if (message.getModeString() != null) {
+            sb.append(' ');
+            sb.append(message.getModeString());
+            for (int i = 0; i < message.getModeArguments().size() - 1; i++) {
+                sb.append(' ');
+                sb.append(message.getModeArguments().get(i));
+            }
+            if (!message.getModeArguments().isEmpty()) {
+                sb.append(' ');
+                sb.append(':');
+                sb.append(message.getModeArguments().getLast());
+            }
+        }
+        return sb.toString();
     }
 
     private String marshalNick(IRCMessageNICK message) {

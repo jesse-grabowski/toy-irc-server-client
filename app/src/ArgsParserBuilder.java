@@ -13,5 +13,6 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
     ArgsParserBuilder<T> addCommaSeparatedListPositional(int position, BiConsumer<T, List<String>> propertiesSetter, String description, boolean required);
     ArgsParserBuilder<T> addGreedyStringPositional(int position, BiConsumer<T, String> propertiesSetter, String description, boolean required);
     ArgsParserBuilder<T> addGreedyListPositional(int position, Function<T, List<String>> propertiesGetter, BiConsumer<T, List<String>> propertiesSetter, String description, boolean required);
+    ArgsParserBuilder<T> setFlagParsingEnabled(boolean value);
     ArgsParser<T> build();
 }

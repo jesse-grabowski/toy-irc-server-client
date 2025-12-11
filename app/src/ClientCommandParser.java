@@ -48,6 +48,16 @@ public class ClientCommandParser {
                 .addStringPositional(1, ClientCommandKick::setNick, "nick to kick", true)
                 .addGreedyStringPositional(2, ClientCommandKick::setReason, "reason for kick", false)
                 .build());
+        parsers.put("/mode", ArgsParser.builder(ClientCommandMode::new, false, "update modes on a user or channel (advanced)")
+                .setFlagParsingEnabled(false)
+                .addUsageExample("/mode <target> [<modestring> [<modeargs>...]]")
+                .addUsageExample("/mode #channel")
+                .addUsageExample("/mode #channel +o nick")
+                .addUsageExample("/mode #channel +o-v nick1 nick2")
+                .addStringPositional(0, ClientCommandMode::setTarget, "target user or channel", true)
+                .addStringPositional(1, ClientCommandMode::setModeString, "+<modes to add>-<modes to remove>", false)
+                .addGreedyListPositional(2, ClientCommandMode::getModeArguments, ClientCommandMode::setModeArguments, "arguments for certain channel modes", false)
+                .build());
         parsers.put("/msg", ArgsParser.builder(ClientCommandMsg::new, false, "send message to a nick or channel")
                         .addUsageExample("/msg <target>[,<target>...] <text>")
                         .addUsageExample("/msg #channel hello there")

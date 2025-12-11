@@ -1,6 +1,5 @@
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -525,7 +524,6 @@ class ArgsParserTest {
                 .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
                 .addGreedyStringPositional(1, (p, v) -> p.message = v, "message text", true);
 
-        // Simulates: /msg -server irc.example.org nick hello there world
         TestProps props = parse(parser,
                 "-s", "irc.example.org",
                 "nick",
@@ -545,7 +543,6 @@ class ArgsParserTest {
                 .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
                 .addGreedyStringPositional(1, (p, v) -> p.message = v, "message text", true);
 
-        // Simulates: /msg -server irc.example.org nick hello there world
         TestProps props = parse(parser,
                 "-s", "irc.example.org",
                 "nick",
@@ -568,7 +565,6 @@ class ArgsParserTest {
                         (p, v) -> p.extraArgs = v,
                         "channel names", true);
 
-        // Simulates: /part -quiet irc.example.org #weechat #random #offtopic
         TestProps props = parse(parser,
                 "-q",
                 "irc.example.org",
@@ -592,11 +588,77 @@ class ArgsParserTest {
                         true
                 );
 
-        // Simulates: /join #weechat,#random,#offtopic
         TestProps props = parse(parser, "#weechat,#random,#offtopic");
 
         assertNotNull(props.extraArgs, "extraArgs should be initialized");
         assertEquals(List.of("#weechat", "#random", "#offtopic"), props.extraArgs);
+    }
+
+    @Test
+    void flagParsingDisabledTreatsHyphenTokensAsPositionals() throws ArgsParserHelpRequestedException {
+        ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "test parser")
+                .addUsageExample("MODE <target> <modes> [args...]")
+                .setFlagParsingEnabled(false)
+                .addStringPositional(0, (p, v) -> p.input = v, "command name", true)
+                .addGreedyListPositional(
+                        1,
+                        p -> p.extraArgs,
+                        (p, v) -> p.extraArgs = v,
+                        "command arguments",
+                        false
+                );
+
+        TestProps props = parse(parser,
+                "MODE",
+                "-ov",
+                "nick1",
+                "nick2"
+        );
+
+        assertEquals("MODE", props.input, "first positional should be the command name");
+        assertNotNull(props.extraArgs, "extraArgs should be initialized");
+        assertEquals(List.of("-ov", "nick1", "nick2"), props.extraArgs,
+                "all remaining tokens, including those starting with '-', should be positional");
+    }
+
+    @Test
+    void buildFailsWhenFlagParsingDisabledButFlagsAreDefined() {
+        ArgsParserBuilder<TestProps> builder = newParser()
+                .addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "verbose", false)
+                .setFlagParsingEnabled(false);
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                builder::build
+        );
+
+        assertTrue(ex.getMessage().contains("Flag parsing is disabled but flag specs are defined"));
+    }
+
+    @Test
+    void helpFlagStillWorksWhenFlagParsingDisabled_long() {
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
+                .addUsageExample("cmd [args]")
+                .setFlagParsingEnabled(false)
+                .addGreedyStringPositional(0, (p, v) -> p.input = v, "rest", false);
+
+        assertThrows(
+                ArgsParserHelpRequestedException.class,
+                () -> parse(builder, "--help")
+        );
+    }
+
+    @Test
+    void helpFlagStillWorksWhenFlagParsingDisabled_short() {
+        ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
+                .addUsageExample("cmd [args]")
+                .setFlagParsingEnabled(false)
+                .addGreedyStringPositional(0, (p, v) -> p.input = v, "rest", false);
+
+        assertThrows(
+                ArgsParserHelpRequestedException.class,
+                () -> parse(builder, "-h")
+        );
     }
 
     private static class TestProps implements ArgsProperties {
