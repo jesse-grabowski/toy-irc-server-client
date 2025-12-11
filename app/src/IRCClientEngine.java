@@ -207,6 +207,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
             case IRCMessageNICK m -> handle(m);
+            case IRCMessagePART m -> handle(m);
             case IRCMessagePASS m -> { /* ignore */ }
             case IRCMessagePING m -> handle(m);
             case IRCMessagePONG m -> { /* ignore */ }
@@ -380,7 +381,7 @@ public class IRCClientEngine implements Closeable {
                     getMessageTime(message),
                     f(message.getPrefixName()),
                     f(channelName),
-                    s(f(message.getPrefixName()), " joined channel ", f(channelName), "!")));
+                    s(f(message.getPrefixName()), f(Color.GREEN, " joined channel "), f(channelName), f(Color.GREEN, "!"))));
         }
     }
 
@@ -393,6 +394,29 @@ public class IRCClientEngine implements Closeable {
         state.changeNickname(nick.getPrefixName(), nick.getNick());
         terminal.println(new TerminalMessage(getMessageTime(nick), f(nick.getNick()), null,
                 s(f(nick.getPrefixName()), " changed their nick to ", f(nick.getNick()))));
+    }
+
+    private void handle(IRCMessagePART message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        for (String channelName : message.getChannels()) {
+            state.deleteChannelMember(channelName, message.getPrefixName());
+            terminal.println(new TerminalMessage(
+                    getMessageTime(message),
+                    f(message.getPrefixName()),
+                    f(channelName),
+                    s(
+                            f(message.getPrefixName()),
+                            f(Color.RED, " left channel "),
+                            f(channelName),
+                            f(Color.RED, "!"),
+                            s(message.getReason() != null && !message.getReason().isBlank()
+                                    ? f(Color.GRAY, s(" (", message.getReason(), ")"))
+                                    : ""))));
+        }
     }
 
     private void handle(IRCMessagePING ping) {
@@ -466,6 +490,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandMsg c -> handle(c);
             case ClientCommandMsgCurrent c -> handle(c);
             case ClientCommandNick c -> handle(c);
+            case ClientCommandPart c -> handle(c);
             case ClientCommandQuit c -> handle(c);
         }
         updateStatusAndPrompt();
@@ -521,6 +546,10 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandNick command) {
         send(new IRCMessageNICK(command.getNick()));
+    }
+
+    private void handle(ClientCommandPart command) {
+        send(new IRCMessagePART(command.getChannels(), command.getReason()));
     }
 
     private void handle(ClientCommandQuit command) {

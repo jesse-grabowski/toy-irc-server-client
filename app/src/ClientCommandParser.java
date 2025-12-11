@@ -51,6 +51,14 @@ public class ClientCommandParser {
                 .addUsageExample("/nick taro")
                 .addStringPositional(0, ClientCommandNick::setNick, "nickname to use (rules vary by server)", true)
                 .build());
+        parsers.put("/part", ArgsParser.builder(ClientCommandPart::new, false, "leave a channel")
+                .addUsageExample("/part <channel>[,<channel>...] [<reason>]")
+                .addUsageExample("/part #channel")
+                .addUsageExample("/part #channel1,#channel2")
+                .addUsageExample("/part #channel dinner time")
+                .addCommaSeparatedListPositional(0, ClientCommandPart::setChannels, "channels to leave", true)
+                .addStringPositional(1, ClientCommandPart::setReason, "reason for leaving", false)
+                .build());
         parsers.put("/quit", ArgsParser.builder(ClientCommandQuit::new, false, "disconnect from the server")
                 .addUsageExample("/quit [<reason>]")
                 .addUsageExample("/quit")
