@@ -1,18 +1,19 @@
 import java.awt.Color;
 import java.io.Closeable;
 import java.nio.charset.Charset;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,24 +26,53 @@ public class IRCClientEngine implements Closeable {
 
     private final AtomicReference<IRCConnection> connectionHolder = new AtomicReference<>();
     private final AtomicReference<IRCClientEngineState> engineState = new AtomicReference<>(IRCClientEngineState.NEW);
-    private final BlockingQueue<IRCClientEngineWork> workQueue = new PriorityBlockingQueue<>(11, Comparator.comparing(IRCClientEngineWork::priority));
-
     private final StateGuard<IRCClientState> clientStateGuard = new StateGuard<>();
 
+    private final ScheduledExecutorService executor;
     private final IRCClientProperties properties;
     private final TerminalUI terminal;
-    private final Thread thread;
 
+    // there's a lot going on here but I'll try to call out the important bits
     public IRCClientEngine(IRCClientProperties properties, TerminalUI terminal) {
         this.properties = properties;
         this.terminal = terminal;
-        this.thread = new Thread(this::run, "irc-client-engine");
+
+        // using a single-threaded executor for engine tasks greatly simplifies our state management without
+        // any real loss of performance (as the IRCConnection class handles additional threads for server
+        // communication)
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1,
+                Thread.ofPlatform().name("irc-client-executor") // name the thread so it shows up nicely in our logs
+                        .daemon(false) // we don't want the JVM to terminate until this thread dies so daemon = false
+                        .uncaughtExceptionHandler((t, e) -> LOG.log(Level.SEVERE, "Error executing task", e))
+                        .factory(),
+                // the more important bit is that we're overriding the default exception behavior, the logging
+                // just makes it a bit easier for us to spot stray messages during shutdown (which are harmless)
+                (task, exec) -> LOG.log(exec.isShutdown() ? Level.FINE : Level.SEVERE, "Task {0} rejected from {1}", new Object[] {task, exec}));
+        executor.execute(spy(() -> {
+            // bind the state guard to the current (executor) thread
+            // any access from other threads will raise an exception
+            clientStateGuard.bindToCurrentThread();
+            // finally, start the garbage collection process to clean up
+            // users that we no longer have visibility for. This is nested
+            // to avoid a (very unlikely) state-guard-related race condition
+            executor.scheduleWithFixedDelay(spy(() -> {
+                IRCClientState state = clientStateGuard.getState();
+                if (state != null) {
+                    LOG.info("Garbage collecting IRC client state unused users / channels");
+                    state.gc(System.currentTimeMillis() - Duration.ofMinutes(5).toMillis());
+                }
+            }), 0, 5, TimeUnit.MINUTES);
+        }));
+        this.executor = executor;
     }
 
     private void connect() {
         if (!engineState.compareAndSet(IRCClientEngineState.DISCONNECTED, IRCClientEngineState.CONNECTING)) {
             IRCClientEngineState current = engineState.get();
-            terminal.println(makeSystemTerminalMessage("Cannot create connection from state " + current));
+            LOG.warning("Cannot create connection from state " + current);
+            if (current == IRCClientEngineState.CONNECTED || current == IRCClientEngineState.REGISTERED) {
+                terminal.println(makeSystemTerminalMessage("You are already connected to the server and must `/quit` before reconnecting"));
+            }
             return;
         }
         connectionHolder.set(null);
@@ -86,7 +116,8 @@ public class IRCClientEngine implements Closeable {
                     // do nothing
                 }
             }
-            if (!engineState.compareAndSet(IRCClientEngineState.CONNECTING, IRCClientEngineState.DISCONNECTED)) {
+            if (!engineState.compareAndSet(IRCClientEngineState.CONNECTING, IRCClientEngineState.DISCONNECTED)
+                && engineState.get() != IRCClientEngineState.CLOSED) {
                 LOG.log(Level.SEVERE, "inconsistent state while establishing IRC connection");
                 terminal.println(makeSystemTerminalMessage("Fatal error during connection establishment"));
                 close();
@@ -112,7 +143,10 @@ public class IRCClientEngine implements Closeable {
 
     // called by IRC connection as it closes
     private void afterDisconnect() {
-        workQueue.add(new IRCClientEngineWork(() -> {
+        if (engineState.get() == IRCClientEngineState.CLOSED) {
+            return;
+        }
+        executor.execute(() -> {
             IRCClientEngineState s = engineState.get();
             if (s == IRCClientEngineState.CLOSED) {
                 return;
@@ -124,11 +158,13 @@ public class IRCClientEngine implements Closeable {
                 }
             }
             updateStatusAndPrompt();
-        }, Integer.MIN_VALUE));
+        });
     }
 
     public void accept(ClientCommand command) {
-        workQueue.add(new IRCClientEngineWork(() -> handle(command), -1));
+        if (engineState.get() != IRCClientEngineState.CLOSED) {
+            executor.execute(spy(() -> handle(command)));
+        }
     }
 
     private boolean send(String message) {
@@ -148,7 +184,9 @@ public class IRCClientEngine implements Closeable {
     }
 
     private void receive(IRCMessage message) {
-        workQueue.add(new IRCClientEngineWork(() -> handle(message), 0));
+        if (engineState.get() != IRCClientEngineState.CLOSED) {
+            executor.execute(spy(() -> handle(message)));
+        }
     }
 
     // note that I'm using sealed classes + switch expressions
@@ -288,7 +326,7 @@ public class IRCClientEngine implements Closeable {
                 null,
                 s(f(message.getPrefixName()), f(Color.GRAY, s(" has left the server",
                         message.getReason() != null && !message.getReason().isBlank()
-                                ? "(%s)".formatted(message.getReason())
+                                ? " (%s)".formatted(message.getReason())
                                 : "")))));
     }
 
@@ -403,7 +441,7 @@ public class IRCClientEngine implements Closeable {
     }
 
     private TerminalMessage makeSystemTerminalMessage(String message) {
-        return new TerminalMessage(LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, s(message));
+        return new TerminalMessage(LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.GRAY, message));
     }
 
     private void updateStatusAndPrompt() {
@@ -457,38 +495,20 @@ public class IRCClientEngine implements Closeable {
         terminal.setPrompt(prompt);
     }
 
-    private void run() {
-        try {
-            while (engineState.get() != IRCClientEngineState.CLOSED && !Thread.currentThread().isInterrupted()) {
-                IRCClientEngineWork work = workQueue.take();
-                try {
-                    work.task().run();
-                } catch (Exception e) {
-                    LOG.log(Level.WARNING, "error running task", e);
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } finally {
-            close();
-        }
-    }
-
     public void start() {
         if (!engineState.compareAndSet(IRCClientEngineState.NEW, IRCClientEngineState.INITIALIZING)) {
             throw new IllegalStateException("IRCClientEngine has already been started");
         }
 
         try {
-            thread.start();
-
             if (!engineState.compareAndSet(IRCClientEngineState.INITIALIZING, IRCClientEngineState.DISCONNECTED)) {
                 throw new IllegalStateException("inconsistent state in initialization");
             }
 
             LOG.info("IRCClientEngine started");
 
-            workQueue.add(new IRCClientEngineWork(this::connect));
+            // automatically connect
+            accept(new ClientCommandConnect());
         } catch (RuntimeException e) {
             LOG.log(Level.WARNING, "failed to initialize IRCClientEngine", e);
             close();
@@ -503,10 +523,6 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        if (Thread.currentThread() != thread) {
-            thread.interrupt();
-        }
-
         IRCConnection connection = connectionHolder.getAndSet(null);
         if (connection != null) {
             try {
@@ -515,16 +531,14 @@ public class IRCClientEngine implements Closeable {
                 // do nothing
             }
         }
+
+        executor.shutdownNow();
     }
 
-    private record IRCClientEngineWork(Runnable task, int priority) {
+    private static final class StateGuard<T> {
 
-        public IRCClientEngineWork(Runnable task) {
-            this(task, 0);
-        }
-    }
+        private volatile Thread thread;
 
-    private class StateGuard<T> {
         private T state;
 
         public T getState() {
@@ -537,11 +551,29 @@ public class IRCClientEngine implements Closeable {
             this.state = state;
         }
 
+        public void bindToCurrentThread() {
+            if (this.thread != null && this.thread != Thread.currentThread()) {
+                throw new IllegalStateException("state has already been bound to a different thread");
+            }
+            this.thread = Thread.currentThread();
+        }
+
         private void assertEngineThread() {
-            if (Thread.currentThread() != thread) {
+            if (thread != Thread.currentThread()) {
                 throw new IllegalStateException("state can only be accessed from the engine thread");
             }
         }
+    }
+
+    private Runnable spy(Runnable runnable) {
+        return () -> {
+            try {
+                runnable.run();
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "Error executing task", e);
+                throw e;
+            }
+        };
     }
 
     private enum IRCClientEngineState {

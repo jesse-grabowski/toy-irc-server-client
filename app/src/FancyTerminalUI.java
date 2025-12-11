@@ -270,13 +270,14 @@ public class FancyTerminalUI extends TerminalUI {
 
     private String formatMetadata(TerminalMessage message) {
         StringBuilder metadataBuilder = new StringBuilder();
-        metadataBuilder.append(message.time() != null ? METADATA_TIMESTAMP.format(message.time()) : "XX:XX:XX");
+        metadataBuilder.append(toString(RichString.f(Color.GRAY,
+                message.time() != null ? METADATA_TIMESTAMP.format(message.time()) : "XX:XX:XX")));
         metadataBuilder.append(' ');
         if (message.receiver() == null) {
             metadataBuilder.append(toString(formatExactLength(message.sender(), METADATA_SENDER_WIDTH + 3 + METADATA_RECEIVER_WIDTH, false)));
         } else {
-            metadataBuilder.append(toString(formatExactLength(message.sender(), METADATA_SENDER_WIDTH, true)));
-            metadataBuilder.append(" » ");
+            metadataBuilder.append(toString(formatExactLength(message.sender(), METADATA_SENDER_WIDTH, false)));
+            metadataBuilder.append(toString(RichString.f(Color.GRAY, " → ")));
             metadataBuilder.append(toString(formatExactLength(message.receiver(), METADATA_RECEIVER_WIDTH, false)));
         }
         return metadataBuilder.toString();
