@@ -213,6 +213,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageKICK m -> handle(m);
             case IRCMessageMODE m -> handle(m);
             case IRCMessageNICK m -> handle(m);
+            case IRCMessageNOTICE m -> handle(m);
             case IRCMessagePART m -> handle(m);
             case IRCMessagePASS m -> { /* ignore */ }
             case IRCMessagePING m -> handle(m);
@@ -520,6 +521,21 @@ public class IRCClientEngine implements Closeable {
                 s(f(nick.getPrefixName()), " changed their nick to ", f(nick.getNick()))));
     }
 
+    private void handle(IRCMessageNOTICE message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        LocalTime time = getMessageTime(message);
+        for (String target : message.getTargets()) {
+            terminal.println(new TerminalMessage(time, f(message.getPrefixName()), f(target),
+                    B(f(new Color(204, 187, 68), message.getMessage()))));
+        }
+
+        state.touch(message.getPrefixName());
+    }
+
     private void handle(IRCMessagePART message) {
         IRCClientState state = clientStateGuard.getState();
         if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
@@ -638,6 +654,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandKick c -> handle(c);
             case ClientCommandMode c -> handle(c);
             case ClientCommandMsg c -> handle(c);
+            case ClientCommandNotice c -> handle(c);
             case ClientCommandMsgCurrent c -> handle(c);
             case ClientCommandNick c -> handle(c);
             case ClientCommandPart c -> handle(c);
@@ -704,6 +721,16 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandNick command) {
         send(new IRCMessageNICK(command.getNick()));
+    }
+
+    private void handle(ClientCommandNotice command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemTerminalMessage("Could not send message -- connection not yet registered"));
+            return;
+        }
+
+        send(new IRCMessageNOTICE(command.getTargets(), command.getText()));
     }
 
     private void handle(ClientCommandPart command) {
@@ -893,5 +920,9 @@ public class IRCClientEngine implements Closeable {
 
     private static RichString f(Color color, Object arg0) {
         return RichString.f(color, arg0);
+    }
+
+    private static RichString B(Object arg0) {
+        return RichString.B(arg0);
     }
 }

@@ -1,3 +1,3 @@
 public sealed interface ClientCommand extends ArgsProperties permits ClientCommandConnect,
         ClientCommandExit, ClientCommandHelp, ClientCommandJoin, ClientCommandKick, ClientCommandMode, ClientCommandMsg, ClientCommandMsgCurrent,
-        ClientCommandNick, ClientCommandPart, ClientCommandQuit {}
+        ClientCommandNick, ClientCommandNotice, ClientCommandPart, ClientCommandQuit {}

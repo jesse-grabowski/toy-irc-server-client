@@ -69,6 +69,12 @@ public class ClientCommandParser {
                 .addUsageExample("/nick taro")
                 .addStringPositional(0, ClientCommandNick::setNick, "nickname to use (rules vary by server)", true)
                 .build());
+        parsers.put("/notice", ArgsParser.builder(ClientCommandNotice::new, false, "send a notice to a nick or channel")
+                .addUsageExample("/notice <target>[,<target>...] <text>")
+                .addUsageExample("/notice #channel sink's on fire")
+                .addCommaSeparatedListPositional(0, ClientCommandNotice::setTargets, "nick or channel (may be mask, \"*\" = current channel)", true)
+                .addGreedyStringPositional(1, ClientCommandNotice::setText, "text to send", true)
+                .build());
         parsers.put("/part", ArgsParser.builder(ClientCommandPart::new, false, "leave a channel")
                 .addUsageExample("/part <channel>[,<channel>...] [<reason>]")
                 .addUsageExample("/part #channel")

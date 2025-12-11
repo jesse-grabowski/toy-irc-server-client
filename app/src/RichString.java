@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  */
 public sealed abstract class RichString permits RichString.TextRichString,
         RichString.CompositeRichString, RichString.BackgroundColorRichString,
-        RichString.ForegroundColorRichString {
+        RichString.ForegroundColorRichString, RichString.BoldRichString {
 
     public static RichString s(Object arg0, Object ... args) {
         RichString r0 = arg0 instanceof RichString r
@@ -67,6 +67,11 @@ public sealed abstract class RichString permits RichString.TextRichString,
     public static RichString f(Color color, Object arg0) {
         RichString child = arg0 instanceof RichString r ? r : new TextRichString(arg0.toString());
         return new ForegroundColorRichString(color, false, child);
+    }
+
+    public static RichString B(Object arg0) {
+        RichString child = arg0 instanceof RichString r ? r : new TextRichString(arg0.toString());
+        return new BoldRichString(child);
     }
 
     public abstract int length();
@@ -210,6 +215,46 @@ public sealed abstract class RichString permits RichString.TextRichString,
         @Override
         public RichString substring(int start, int end) {
             return new ForegroundColorRichString(color, auto, child.substring(start, end));
+        }
+
+        @Override
+        public String toString() {
+            return child.toString();
+        }
+    }
+
+    public static final class BoldRichString extends RichString {
+
+        private final RichString child;
+
+        BoldRichString(RichString child) {
+            this.child = child;
+        }
+
+        public RichString getChild() {
+            return child;
+        }
+
+        @Override
+        public int length() {
+            return child.length();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return length() == 0;
+        }
+
+        @Override
+        public RichString[] split(String regex, int limit) {
+            return Arrays.stream(child.split(regex, limit))
+                    .map(BoldRichString::new)
+                    .toArray(RichString[]::new);
+        }
+
+        @Override
+        public RichString substring(int start, int end) {
+            return new BoldRichString(child.substring(start, end));
         }
 
         @Override

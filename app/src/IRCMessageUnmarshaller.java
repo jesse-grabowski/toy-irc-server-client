@@ -43,6 +43,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageKICK.COMMAND -> parseKick(message, tags, prefix, params);
                 case IRCMessageMODE.COMMAND -> parseMode(message, tags, prefix, params);
                 case IRCMessageNICK.COMMAND -> parseNick(message, tags, prefix, params);
+                case IRCMessageNOTICE.COMMAND -> parseNotice(message, tags, prefix, params);
                 case IRCMessagePART.COMMAND -> parsePart(message, tags, prefix, params);
                 case IRCMessagePASS.COMMAND -> parsePass(message, tags, prefix, params);
                 case IRCMessagePING.COMMAND -> parsePing(message, tags, prefix, params);
@@ -283,6 +284,13 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageNICK parseNick(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
         return new IRCMessageNICK(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0));
+    }
+
+    private IRCMessageNOTICE parseNotice(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        if (params.size() < 2) {
+            throw new IllegalArgumentException("NOTICE must have at least 2 parameters <targets> :<message>");
+        }
+        return new IRCMessageNOTICE(raw, tags, prefix.name(), prefix.user(), prefix.host(), Arrays.asList(params.getFirst().split(",")), safeGetLast(params));
     }
 
     private IRCMessagePART parsePart(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {

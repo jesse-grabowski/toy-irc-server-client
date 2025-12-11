@@ -367,6 +367,7 @@ public class FancyTerminalUI extends TerminalUI {
                 }
                 yield sb.toString();
             }
+            case RichString.BoldRichString s -> bold(s);
         };
     }
 
@@ -390,6 +391,10 @@ public class FancyTerminalUI extends TerminalUI {
         }
 
         return "\u001b[48;5;" + toANSI256(color) + "m" + text + "\u001b[49m";
+    }
+
+    private String bold(RichString.BoldRichString string) {
+        return "\u001b[1m" + toString(string.getChild()) + "\u001b[22m";
     }
 
     private Color getColor(String text) {
