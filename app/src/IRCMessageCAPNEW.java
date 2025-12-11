@@ -30,15 +30,7 @@ public final class IRCMessageCAPNEW extends IRCMessage {
         return nick;
     }
 
-    public void setNick(String nick) {
-        this.nick = nick;
-    }
-
     public SequencedMap<String, String> getCapabilities() {
         return capabilities;
-    }
-
-    public void setCapabilities(SequencedMap<String, String> capabilities) {
-        this.capabilities = capabilities;
     }
 }

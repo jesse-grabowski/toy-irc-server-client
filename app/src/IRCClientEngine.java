@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,12 +197,12 @@ public class IRCClientEngine implements Closeable {
     private void handle(IRCMessage message) {
         switch (message) {
             case IRCMessageCAPACK m -> handle(m);
-            case IRCMessageCAPDEL m -> { /* ignore */ }
+            case IRCMessageCAPDEL m -> handle(m);
             case IRCMessageCAPEND m -> { /* ignore */ }
-            case IRCMessageCAPLIST m -> { /* ignore */ }
+            case IRCMessageCAPLIST m -> handle(m);
             case IRCMessageCAPLS m -> handle(m);
             case IRCMessageCAPNAK m -> handle(m);
-            case IRCMessageCAPNEW m -> { /* ignore */ }
+            case IRCMessageCAPNEW m -> handle(m);
             case IRCMessageCAPREQ m -> { /* ignore */ }
             case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
@@ -222,22 +223,33 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(IRCMessageCAPLS message) {
         IRCClientState state = clientStateGuard.getState();
-        if (state == null || engineState.get() != IRCClientEngineState.CONNECTED) {
-            LOG.warning("Unexpected CAP LS message after registration");
+        IRCClientEngineState engineState = this.engineState.get();
+        if (state == null || (engineState != IRCClientEngineState.CONNECTED && engineState != IRCClientEngineState.REGISTERED)) {
+            LOG.warning("Unexpected CAP LS message in state " + engineState);
             return;
+        }
+
+        IRCClientState.Capabilities capabilities = state.getCapabilities();
+
+        if (!capabilities.isReceivingCapabilities()) {
+            capabilities.clearServerCapabilities();
+            capabilities.startReceivingCapabilities();
         }
 
         for (Map.Entry<String, String> capability : message.getCapabilities().sequencedEntrySet()) {
             IRCCapability.forName(capability.getKey()).ifPresent(
-                    c -> state.getCapabilities().addServerCapability(c, capability.getValue()));
+                    c -> capabilities.addServerCapability(c, capability.getValue()));
         }
 
         if (!message.isHasMore()) {
-            if (state.getCapabilities().getServerCapabilities().isEmpty()) {
+            capabilities.stopReceivingCapabilities();
+            if (capabilities.getServerCapabilities().isEmpty() && engineState == IRCClientEngineState.CONNECTED) {
                 send(new IRCMessageCAPEND());
             } else {
+                Set<IRCCapability> requestedCapabilities = capabilities.getServerCapabilities();
+                requestedCapabilities.forEach(capabilities::addRequestedCapability);
                 send(new IRCMessageCAPREQ(
-                        state.getCapabilities().getServerCapabilities().stream().map(IRCCapability::getName).toList(),
+                        requestedCapabilities.stream().map(IRCCapability::getName).toList(),
                         List.of()));
             }
         }
@@ -245,27 +257,115 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(IRCMessageCAPACK message) {
         IRCClientState state = clientStateGuard.getState();
-        if (state == null || engineState.get() != IRCClientEngineState.CONNECTED) {
-            LOG.warning("Unexpected CAP ACK message after registration");
+        IRCClientEngineState engineState = this.engineState.get();
+        if (state == null || (engineState != IRCClientEngineState.CONNECTED && engineState != IRCClientEngineState.REGISTERED)) {
+            LOG.warning("Unexpected CAP ACK message in state " + engineState);
             return;
         }
 
+        IRCClientState.Capabilities capabilities = state.getCapabilities();
+
         for (String capabilityString : message.getEnableCapabilities()) {
-            IRCCapability.forName(capabilityString).ifPresent(state.getCapabilities()::enableCapability);
+            IRCCapability.forName(capabilityString).ifPresent(cap -> {
+                capabilities.removeRequestedCapability(cap);
+                capabilities.enableCapability(cap);
+            });
         }
 
-        send(new IRCMessageCAPEND());
+        LOG.info(() -> "Server acknowledged capabilities: " + message.getEnableCapabilities());
+
+        if (engineState == IRCClientEngineState.CONNECTED && capabilities.getRequestedCapabilities().isEmpty()) {
+            send(new IRCMessageCAPEND());
+        }
+    }
+
+    private void handle(IRCMessageCAPDEL message) {
+        IRCClientState state = clientStateGuard.getState();
+        IRCClientEngineState engineState = this.engineState.get();
+        if (state == null || engineState != IRCClientEngineState.REGISTERED) {
+            LOG.warning("Unexpected CAP DEL message in state " + engineState);
+            return;
+        }
+
+        IRCClientState.Capabilities capabilities = state.getCapabilities();
+
+        for (String capabilityString : message.getCapabilities()) {
+            IRCCapability.forName(capabilityString).ifPresent(capabilities::removeServerCapability);
+        }
+
+        LOG.info(() -> "Server deleted capabilities: " + message.getCapabilities());
+    }
+
+    private void handle(IRCMessageCAPLIST message) {
+        IRCClientState state = clientStateGuard.getState();
+        IRCClientEngineState engineState = this.engineState.get();
+        if (state == null || engineState != IRCClientEngineState.REGISTERED) {
+            LOG.warning("Unexpected CAP LIST message in state " + engineState);
+            return;
+        }
+
+        IRCClientState.Capabilities capabilities = state.getCapabilities();
+
+        if (!capabilities.isReceivingCapabilities()) {
+            capabilities.clearActiveCapabilities();
+            capabilities.startReceivingCapabilities();
+        }
+
+        for (String capabilityString : message.getCapabilities()) {
+            IRCCapability.forName(capabilityString).ifPresent(capabilities::enableCapability);
+        }
+
+        LOG.info(() -> "Server listed active capabilities: " + message.getCapabilities());
+
+        if (!message.isHasMore()) {
+            capabilities.stopReceivingCapabilities();
+        }
     }
 
     private void handle(IRCMessageCAPNAK message) {
         IRCClientState state = clientStateGuard.getState();
-        if (state == null || engineState.get() != IRCClientEngineState.CONNECTED) {
-            LOG.warning("Unexpected CAP NAK message after registration");
+        IRCClientEngineState engineState = this.engineState.get();
+        if (state == null || (engineState != IRCClientEngineState.CONNECTED && engineState != IRCClientEngineState.REGISTERED)) {
+            LOG.warning("Unexpected CAP NAK message in state " + engineState);
             return;
         }
 
-        terminal.println(makeSystemTerminalMessage("Server rejected capabilities: " + message.getEnableCapabilities()));
-        send(new IRCMessageCAPEND());
+        IRCClientState.Capabilities capabilities = state.getCapabilities();
+
+        for (String capabilityString : message.getEnableCapabilities()) {
+            IRCCapability.forName(capabilityString).ifPresent(capabilities::removeRequestedCapability);
+        }
+
+        LOG.info(() -> "Server rejected capabilities: " + message.getEnableCapabilities());
+
+        if (engineState == IRCClientEngineState.CONNECTED && capabilities.getRequestedCapabilities().isEmpty()) {
+            send(new IRCMessageCAPEND());
+        }
+    }
+
+    private void handle(IRCMessageCAPNEW message) {
+        IRCClientState state = clientStateGuard.getState();
+        IRCClientEngineState engineState = this.engineState.get();
+        if (state == null || engineState != IRCClientEngineState.REGISTERED) {
+            LOG.warning("Unexpected CAP NEW message in state " + engineState);
+            return;
+        }
+
+        IRCClientState.Capabilities capabilities = state.getCapabilities();
+        Set<IRCCapability> newCapabilities = new HashSet<>();
+        for (Map.Entry<String, String> capability : message.getCapabilities().sequencedEntrySet()) {
+            IRCCapability.forName(capability.getKey()).ifPresent(cap -> {
+                capabilities.addServerCapability(cap, capability.getValue());
+                newCapabilities.add(cap);
+            });
+        }
+
+        if (!newCapabilities.stream().allMatch(capabilities::isActive)) {
+            newCapabilities.forEach(capabilities::addRequestedCapability);
+            send(new IRCMessageCAPREQ(
+                    newCapabilities.stream().map(IRCCapability::getName).toList(),
+                    List.of()));
+        }
     }
 
     private void handle(IRCMessageJOINNormal message) {

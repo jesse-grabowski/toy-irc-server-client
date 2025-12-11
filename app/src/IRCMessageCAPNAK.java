@@ -32,23 +32,11 @@ public final class IRCMessageCAPNAK extends IRCMessage {
         return nick;
     }
 
-    public void setNick(String nick) {
-        this.nick = nick;
-    }
-
     public List<String> getEnableCapabilities() {
         return enableCapabilities;
     }
 
-    public void setEnableCapabilities(List<String> enableCapabilities) {
-        this.enableCapabilities = enableCapabilities;
-    }
-
     public List<String> getDisableCapabilities() {
         return disableCapabilities;
-    }
-
-    public void setDisableCapabilities(List<String> disableCapabilities) {
-        this.disableCapabilities = disableCapabilities;
     }
 }

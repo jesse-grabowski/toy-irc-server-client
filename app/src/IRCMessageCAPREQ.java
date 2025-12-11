@@ -29,15 +29,7 @@ public final class IRCMessageCAPREQ extends IRCMessage {
         return enableCapabilities;
     }
 
-    public void setEnableCapabilities(List<String> enableCapabilities) {
-        this.enableCapabilities = enableCapabilities;
-    }
-
     public List<String> getDisableCapabilities() {
         return disableCapabilities;
-    }
-
-    public void setDisableCapabilities(List<String> disableCapabilities) {
-        this.disableCapabilities = disableCapabilities;
     }
 }

@@ -36,31 +36,15 @@ public final class IRCMessageCAPLS extends IRCMessage {
         return nick;
     }
 
-    public void setNick(String nick) {
-        this.nick = nick;
-    }
-
     public String getVersion() {
         return version;
-    }
-
-    public void setVersion(String version) {
-        this.version = version;
     }
 
     public boolean isHasMore() {
         return hasMore;
     }
 
-    public void setHasMore(boolean hasMore) {
-        this.hasMore = hasMore;
-    }
-
     public SequencedMap<String, String> getCapabilities() {
         return capabilities;
-    }
-
-    public void setCapabilities(SequencedMap<String, String> capabilities) {
-        this.capabilities = capabilities;
     }
 }

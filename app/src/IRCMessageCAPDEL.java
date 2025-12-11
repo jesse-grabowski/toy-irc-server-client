@@ -29,15 +29,7 @@ public final class IRCMessageCAPDEL extends IRCMessage {
         return nick;
     }
 
-    public void setNick(String nick) {
-        this.nick = nick;
-    }
-
     public List<String> getCapabilities() {
         return capabilities;
-    }
-
-    public void setCapabilities(List<String> capabilities) {
-        this.capabilities = capabilities;
     }
 }

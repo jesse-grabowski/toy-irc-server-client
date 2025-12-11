@@ -1,6 +1,7 @@
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -259,6 +260,31 @@ public class IRCClientState {
     public static class Capabilities {
         private final Map<IRCCapability, String> serverCapabilities = new HashMap<>();
         private final Map<IRCCapability, String> activeCapabilities = new HashMap<>();
+        private final Set<IRCCapability> requestedCapabilities = new HashSet<>();
+        private boolean receivingCapabilities = false; // in the middle of multiline response
+
+        public void clearActiveCapabilities() {
+            activeCapabilities.clear();
+            requestedCapabilities.clear();
+        }
+
+        public void clearServerCapabilities() {
+            serverCapabilities.clear();
+            activeCapabilities.clear();
+            requestedCapabilities.clear();
+        }
+
+        public boolean isReceivingCapabilities() {
+            return receivingCapabilities;
+        }
+
+        public void startReceivingCapabilities() {
+            this.receivingCapabilities = true;
+        }
+
+        public void stopReceivingCapabilities() {
+            this.receivingCapabilities = false;
+        }
 
         public void addServerCapability(IRCCapability capability, String value) {
             serverCapabilities.put(capability, value);
@@ -266,6 +292,7 @@ public class IRCClientState {
 
         public void removeServerCapability(IRCCapability capability) {
             serverCapabilities.remove(capability);
+            requestedCapabilities.remove(capability);
             activeCapabilities.remove(capability);
         }
 
@@ -273,14 +300,22 @@ public class IRCClientState {
             return Collections.unmodifiableSet(serverCapabilities.keySet());
         }
 
+        public void addRequestedCapability(IRCCapability capability) {
+            requestedCapabilities.add(capability);
+        }
+
+        public void removeRequestedCapability(IRCCapability capability) {
+            requestedCapabilities.remove(capability);
+        }
+
+        public Set<IRCCapability> getRequestedCapabilities() {
+            return Collections.unmodifiableSet(requestedCapabilities);
+        }
+
         public void enableCapability(IRCCapability capability) {
             if (serverCapabilities.containsKey(capability)) {
                 activeCapabilities.put(capability, serverCapabilities.get(capability));
             }
-        }
-
-        public void disableCapability(IRCCapability capability) {
-            activeCapabilities.remove(capability);
         }
 
         public boolean isActive(IRCCapability capability) {
