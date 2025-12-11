@@ -9,7 +9,7 @@ public final class IRCMessage353 extends IRCMessage {
     private final String symbol;
     private final String channel;
     private final List<String> nicks;
-    private final List<String> modes;
+    private final List<Character> modes;
 
     public IRCMessage353(String rawMessage,
                          SequencedMap<String, String> tags,
@@ -20,7 +20,7 @@ public final class IRCMessage353 extends IRCMessage {
                          String symbol,
                          String channel,
                          List<String> nicks,
-                         List<String> modes) {
+                         List<Character> modes) {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.client = client;
         this.symbol = symbol;
@@ -45,7 +45,7 @@ public final class IRCMessage353 extends IRCMessage {
         return nicks;
     }
 
-    public List<String> getModes() {
+    public List<Character> getModes() {
         return modes;
     }
 }

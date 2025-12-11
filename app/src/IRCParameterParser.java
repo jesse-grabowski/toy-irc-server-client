@@ -1,6 +1,8 @@
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -169,11 +171,11 @@ public final class IRCParameterParser {
 
     private static void parsePrefix(boolean disable, String value, IRCClientState.Parameters parameters) {
         if (disable) {
-            parameters.setPrefixes(Map.of());
+            parameters.setPrefixes(new LinkedHashMap<>());
         } else {
             Matcher matcher = PREFIX_PATTERN.matcher(value);
             if (!matcher.matches()) {
-                parameters.setPrefixes(Map.of());
+                parameters.setPrefixes(new LinkedHashMap<>());
                 return;
             }
             String modes = matcher.group("modes");
@@ -181,8 +183,9 @@ public final class IRCParameterParser {
             if (modes.length() != prefixes.length()) {
                 throw new IllegalArgumentException("PREFIX modes and prefixes must be the same length");
             }
-            Map<Character,Character> p = new HashMap<>();
+            SequencedMap<Character,Character> p = new LinkedHashMap<>();
             for (int i = 0; i < modes.length(); i++) {
+                LOG.info("Parsed prefix " + modes.charAt(i) + " -> " + prefixes.charAt(i));
                 p.put(modes.charAt(i), prefixes.charAt(i));
             }
             parameters.setPrefixes(p);

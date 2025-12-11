@@ -6,11 +6,13 @@ import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -515,12 +517,23 @@ public class IRCClientEngine implements Closeable {
         }
 
         List<String> nicks = message.getNicks();
-        List<String> modes = message.getModes();
+        List<Character> modes = message.getModes();
+        String channel = message.getChannel();
+
+        Map<Character,Character> prefixToMode = new HashMap<>();
+        for (Map.Entry<Character,Character> e : state.getParameters().getPrefixes().entrySet()) {
+            prefixToMode.put(e.getValue(), e.getKey());
+        }
+
         for (int i = 0; i < nicks.size(); i++) {
             String nick = nicks.get(i);
-            String prefix = i < modes.size() ? modes.get(i) : "";
-            IRCChannelMembershipMode[] mode = IRCChannelMembershipMode.getByPrefix(prefix).stream().toArray(IRCChannelMembershipMode[]::new);
-            state.addChannelMember(message.getChannel(), nick, mode);
+            Character prefix = i < modes.size() ? modes.get(i) : null;
+            Character mode = prefix != null ? prefixToMode.get(prefix) : null;
+            if (mode != null) {
+                state.addChannelMember(channel, nick, mode);
+            } else {
+                state.addChannelMember(channel, nick);
+            }
         }
     }
 
@@ -651,16 +664,11 @@ public class IRCClientEngine implements Closeable {
                             .map(entry -> {
                                 IRCClientState.User user = entry.getKey();
                                 IRCClientState.Membership membership = entry.getValue();
-                                Set<IRCChannelMembershipMode> modes = membership.getModes();
-                                if (modes.contains(IRCChannelMembershipMode.OWNER)) {
-                                    return s(f(user.getNickname()), " (Owner)");
-                                } else if (modes.contains(IRCChannelMembershipMode.ADMIN)) {
-                                    return s(f(user.getNickname()), " (Admin)");
-                                } else if (modes.contains(IRCChannelMembershipMode.OPERATOR)) {
-                                    return s(f(user.getNickname()), " (Operator)");
-                                } else {
-                                    return f(user.getNickname());
-                                }
+                                return state.getParameters().getPrefixes().entrySet().stream()
+                                        .filter(e -> membership.getModes().contains(e.getKey()))
+                                        .findFirst()
+                                        .map(e -> s(f(Color.YELLOW, e.getValue()), f(user.getNickname())))
+                                        .orElse(f(user.getNickname()));
                             })
                             .toArray(RichString[]::new);
                     if (members.length > 0) {

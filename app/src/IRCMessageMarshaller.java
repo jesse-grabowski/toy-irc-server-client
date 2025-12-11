@@ -244,12 +244,10 @@ public class IRCMessageMarshaller {
         sb.append(':');
 
         List<String> nicks = message.getNicks();
-        List<String> modes = message.getModes();
+        List<Character> modes = message.getModes();
         for (int i = 0; i < nicks.size(); i++) {
-            String nick = nicks.get(i);
-            String mode = modes.size() > i ? modes.get(i) : "";
-            sb.append(mode);
-            sb.append(nick);
+            sb.append(modes.size() > i && modes.get(i) != null ? modes.get(i) : "");
+            sb.append(nicks.get(i));
             if (i < nicks.size() - 1) {
                 sb.append(' ');
             }

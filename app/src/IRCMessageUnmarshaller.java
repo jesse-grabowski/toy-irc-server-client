@@ -341,7 +341,7 @@ public class IRCMessageUnmarshaller {
     private IRCMessage353 parse353(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
         String nicksRaw = safeGetIndex(params, 3);
         List<String> nicks = new ArrayList<>();
-        List<String> modes = new ArrayList<>();
+        List<Character> modes = new ArrayList<>();
         if (nicksRaw != null) {
             String[] splitNicks = nicksRaw.split("\\s+", -1);
             for (String nick : splitNicks) {
@@ -350,11 +350,11 @@ public class IRCMessageUnmarshaller {
                 }
                 switch (nick.charAt(0)) {
                     case '~', '&', '@', '%', '+' -> {
-                        modes.add("" + nick.charAt(0));
+                        modes.add(nick.charAt(0));
                         nicks.add(nick.substring(1));
                     }
                     default -> {
-                        modes.add("");
+                        modes.add(null);
                         nicks.add(nick);
                     }
                 }

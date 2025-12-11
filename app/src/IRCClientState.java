@@ -6,6 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.SequencedSet;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -61,19 +62,21 @@ public class IRCClientState {
 
     public void addChannelMember(String channelName,
                                  String nickname,
-                                 IRCChannelMembershipMode... modes) {
+                                 char... modes) {
         User user = getOrCreateUser(nickname);
         Channel channel = getOrCreateChannel(channelName);
 
         Membership membership = channel.getOrCreateMembership(user);
-        Collections.addAll(membership.modes, modes);
+        for (char mode : modes) {
+            membership.modes.add(mode);
+        }
 
         user.channels.add(channel);
     }
 
     public void addChannelMemberModes(String channelName,
                                       String nickname,
-                                      IRCChannelMembershipMode... modes) {
+                                      Character... modes) {
         Channel channel = findChannel(channelName);
         if (channel == null) {
             return;
@@ -94,7 +97,7 @@ public class IRCClientState {
 
     public void deleteChannelMemberModes(String channelName,
                                          String nickname,
-                                         IRCChannelMembershipMode... modes) {
+                                         char... modes) {
         Channel channel = findChannel(channelName);
         if (channel == null) {
             return;
@@ -110,7 +113,7 @@ public class IRCClientState {
             return;
         }
 
-        for (IRCChannelMembershipMode mode : modes) {
+        for (Character mode : modes) {
             membership.modes.remove(mode);
         }
     }
@@ -245,9 +248,9 @@ public class IRCClientState {
     }
 
     public static class Membership {
-        private final Set<IRCChannelMembershipMode> modes = EnumSet.noneOf(IRCChannelMembershipMode.class);
+        private final Set<Character> modes = new HashSet<>();
 
-        public Set<IRCChannelMembershipMode> getModes() {
+        public Set<Character> getModes() {
             return Collections.unmodifiableSet(modes);
         }
     }
@@ -354,7 +357,7 @@ public class IRCClientState {
         private int modes = Integer.MAX_VALUE;
         private String network;
         private int nickLength = Integer.MAX_VALUE;
-        private Map<Character, Character> prefixes;
+        private SequencedMap<Character, Character> prefixes;
         private boolean safeList;
         private int silence = Integer.MAX_VALUE;
         private Set<Character> statusMessage;
@@ -526,7 +529,7 @@ public class IRCClientState {
             return prefixes;
         }
 
-        public void setPrefixes(Map<Character, Character> prefixes) {
+        public void setPrefixes(SequencedMap<Character, Character> prefixes) {
             this.prefixes = prefixes;
         }
 
