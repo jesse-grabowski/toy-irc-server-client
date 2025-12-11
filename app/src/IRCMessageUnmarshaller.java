@@ -38,6 +38,7 @@ public class IRCMessageUnmarshaller {
         try {
             return switch (command) {
                 case IRCMessageCAPLS.COMMAND -> parseCap(message, tags, prefix, params);
+                case IRCMessageERROR.COMMAND -> parseError(message, tags, prefix, params);
                 case IRCMessageJOINNormal.COMMAND -> parseJoin(message, tags, prefix, params);
                 case IRCMessageNICK.COMMAND -> parseNick(message, tags, prefix, params);
                 case IRCMessagePART.COMMAND -> parsePart(message, tags, prefix, params);
@@ -236,6 +237,10 @@ public class IRCMessageUnmarshaller {
                 case null, default -> throw new IllegalArgumentException("Unsupported subcommand: " + subcommand);
             };
         }
+    }
+
+    private IRCMessageERROR parseError(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        return new IRCMessageERROR(raw, tags, prefix.name(), prefix.user(), prefix.host(), safeGetIndex(params, 0));
     }
 
     private IRCMessage parseJoin(String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {

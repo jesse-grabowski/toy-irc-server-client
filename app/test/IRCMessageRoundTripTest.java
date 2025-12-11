@@ -26,6 +26,7 @@ public class IRCMessageRoundTripTest {
                 Arguments.of("PING :12345", "PING :12345"),
                 Arguments.of("PONG :12345", "PONG :12345"),
                 Arguments.of("PONG irc.example.com :12345", "PONG irc.example.com :12345"),
+                Arguments.of("ERROR :Closing Link: 10.0.0.1 (Ping timeout)", "ERROR :Closing Link: 10.0.0.1 (Ping timeout)"),
                 Arguments.of("JOIN 0", "JOIN 0"),
                 Arguments.of("JOIN #chan", "JOIN #chan"),
                 Arguments.of("JOIN #chan1,#chan2", "JOIN #chan1,#chan2"),
@@ -92,6 +93,7 @@ public class IRCMessageRoundTripTest {
                 // Basic messages
                 Arguments.of("PING :12345", IRCMessagePING.class),
                 Arguments.of("PONG :12345", IRCMessagePONG.class),
+                Arguments.of("ERROR :Closing Link: 10.0.0.1 (Ping timeout)", IRCMessageERROR.class),
                 Arguments.of("JOIN 0", IRCMessageJOIN0.class),
                 Arguments.of("JOIN #chan", IRCMessageJOINNormal.class),
                 Arguments.of("JOIN #chan1,#chan2 key1,key2", IRCMessageJOINNormal.class),

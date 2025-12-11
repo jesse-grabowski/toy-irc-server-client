@@ -17,6 +17,7 @@ public class IRCMessageMarshaller {
             case IRCMessageCAPNAK m -> marshal(m, this::marshalCapNAK);
             case IRCMessageCAPNEW m -> marshal(m, this::marshalCapNEW);
             case IRCMessageCAPREQ m -> marshal(m, this::marshalCapREQ);
+            case IRCMessageERROR m -> marshal(m, this::marshalError);
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
             case IRCMessageNICK m -> marshal(m, this::marshalNick);
@@ -147,6 +148,10 @@ public class IRCMessageMarshaller {
                 message.getEnableCapabilities().stream(),
                 message.getDisableCapabilities().stream().map(s -> "-" + s)
         ).collect(Collectors.joining(" "));
+    }
+
+    private String marshalError(IRCMessageERROR message) {
+        return ":" + message.getReason();
     }
 
     private String marshalJoin0(IRCMessageJOIN0 message) {

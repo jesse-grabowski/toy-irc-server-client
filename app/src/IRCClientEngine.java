@@ -204,6 +204,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageCAPNAK m -> handle(m);
             case IRCMessageCAPNEW m -> handle(m);
             case IRCMessageCAPREQ m -> { /* ignore */ }
+            case IRCMessageERROR m -> handle(m);
             case IRCMessageJOIN0 m -> { /* ignore */ }
             case IRCMessageJOINNormal m -> handle(m);
             case IRCMessageNICK m -> handle(m);
@@ -367,6 +368,10 @@ public class IRCClientEngine implements Closeable {
                     newCapabilities.stream().map(IRCCapability::getName).toList(),
                     List.of()));
         }
+    }
+
+    private void handle(IRCMessageERROR message) {
+        terminal.println(makeSystemErrorMessage(message.getReason()));
     }
 
     private void handle(IRCMessageJOINNormal message) {
@@ -571,6 +576,10 @@ public class IRCClientEngine implements Closeable {
 
     private TerminalMessage makeSystemTerminalMessage(String message) {
         return new TerminalMessage(LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.GRAY, message));
+    }
+
+    private TerminalMessage makeSystemErrorMessage(String message) {
+        return new TerminalMessage(LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.RED, message));
     }
 
     private void updateStatusAndPrompt() {
