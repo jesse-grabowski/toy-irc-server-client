@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class IRCParameterParserTest {
 
     private IRCClientState.Parameters newParameters() {
-        return new IRCClientState.Parameters();
+        return new IRCClientState().getParameters();
     }
 
     @Test

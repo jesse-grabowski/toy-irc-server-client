@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,30 +23,38 @@ public class IRCClientState {
 
     private String me;
 
-    private Channel getOrCreateChannel(String channelName) {
-        return channels.computeIfAbsent(channelName, name -> {
+    private String canonicalizeChannel(String channelName) {
+        return parameters.getCaseMapping().normalizeChannel(channelName);
+    }
+
+    private String canonicalizeNickname(String nickname) {
+        return parameters.getCaseMapping().normalizeNickname(nickname);
+    }
+
+    private Channel getOrCreateChannel(String rawChannelName) {
+        return channels.computeIfAbsent(canonicalizeChannel(rawChannelName), unused -> {
             Channel channel = new Channel();
-            channel.name = name;
+            channel.name = rawChannelName;
             return channel;
         });
     }
 
-    private Channel findChannel(String channelName) {
-        return channels.get(channelName);
+    private Channel findChannel(String rawChannelName) {
+        return channels.get(canonicalizeChannel(rawChannelName));
     }
 
-    private User getOrCreateUser(String nickname) {
-        User user = users.computeIfAbsent(nickname, nick -> {
+    private User getOrCreateUser(String rawNickname) {
+        User user = users.computeIfAbsent(canonicalizeNickname(rawNickname), unused -> {
             User u = new User();
-            u.nickname = nick;
+            u.nickname = rawNickname;
             return u;
         });
         user.lastTouched = System.currentTimeMillis();
         return user;
     }
 
-    private User findUser(String nickname) {
-        User user = users.get(nickname);
+    private User findUser(String rawNickname) {
+        User user = users.get(canonicalizeNickname(rawNickname));
         if (user != null) {
             user.lastTouched = System.currentTimeMillis();
         }
@@ -77,7 +86,7 @@ public class IRCClientState {
 
     public void addChannelMemberModes(String channelName,
                                       String nickname,
-                                      Character... modes) {
+                                      char... modes) {
         Channel channel = findChannel(channelName);
         if (channel == null) {
             return;
@@ -93,7 +102,9 @@ public class IRCClientState {
             return;
         }
 
-        Collections.addAll(membership.modes, modes);
+        for (char mode : modes) {
+            membership.modes.add(mode);
+        }
     }
 
     public void deleteChannelMemberModes(String channelName,
@@ -133,7 +144,7 @@ public class IRCClientState {
         channel.removeMembership(user);
         user.channels.remove(channel);
         if (channel.members.isEmpty()) {
-            channels.remove(channelName);
+            channels.remove(canonicalizeChannel(channelName));
         }
     }
 
@@ -246,20 +257,24 @@ public class IRCClientState {
     }
 
     public void changeNickname(String oldNickname, String newNickname) {
+        String oldKey = canonicalizeNickname(oldNickname);
+        String newKey = canonicalizeNickname(newNickname);
+        // check non-canonicalized nicknames, since we want to update
+        // the display value if they're different
         if (Objects.equals(oldNickname, newNickname)) {
             return;
         }
 
-        User user = users.remove(oldNickname);
+        User user = users.remove(oldKey);
         if (user == null) {
             return;
         }
 
         user.nickname = newNickname;
         user.lastTouched = System.currentTimeMillis();
-        users.put(newNickname, user);
+        users.put(newKey, user);
 
-        if (Objects.equals(me, oldNickname)) {
+        if (me != null && Objects.equals(canonicalizeNickname(me), oldKey)) {
             me = newNickname;
         }
     }
@@ -276,9 +291,10 @@ public class IRCClientState {
     }
 
     public void quit(String nickname) {
+        String canonicalNickname = canonicalizeNickname(nickname);
         // if this is my own quit, I'll refresh
         // the state on reconnect so this shouldn't matter
-        if (Objects.equals(me, nickname)) {
+        if (Objects.equals(canonicalizeNickname(me), canonicalNickname)) {
             return;
         }
         User user = findUser(nickname);
@@ -288,11 +304,11 @@ public class IRCClientState {
         for (Channel channel : user.channels) {
             channel.removeMembership(user);
             if (channel.members.isEmpty()) {
-                channels.remove(channel.name);
+                channels.remove(canonicalizeChannel(channel.name));
             }
         }
         user.channels.clear();
-        users.remove(nickname);
+        users.remove(canonicalNickname);
     }
 
     public Optional<Channel> getFocusedChannel() {
@@ -331,12 +347,14 @@ public class IRCClientState {
         return parameters;
     }
 
-    public static class Channel {
+    public static final class Channel {
         private String name;
         private final Map<User, Membership> members = new HashMap<>();
         private final Map<Character, List<String>> lists = new HashMap<>();
         private final Map<Character, String> settings = new HashMap<>();
         private final Set<Character> flags = new HashSet<>();
+
+        private Channel() {}
 
         private Membership getOrCreateMembership(User user) {
             return members.computeIfAbsent(user, u -> new Membership());
@@ -367,7 +385,13 @@ public class IRCClientState {
         }
 
         private void removeFromList(Character mode, String entry) {
-            lists.getOrDefault(mode, new ArrayList<>()).remove(entry);
+            List<String> list = lists.get(mode);
+            if (list != null) {
+                list.remove(entry);
+                if (list.isEmpty()) {
+                    lists.remove(mode);
+                }
+            }
         }
 
         private String getSetting(Character mode) {
@@ -395,19 +419,24 @@ public class IRCClientState {
         }
     }
 
-    public static class Membership {
+    public static final class Membership {
         private final Set<Character> modes = new HashSet<>();
+
+        private Membership() {}
 
         public Set<Character> getModes() {
             return Collections.unmodifiableSet(modes);
         }
     }
 
-    public static class User {
+    public static final class User {
+
         private String nickname;
         private long lastTouched = System.currentTimeMillis();
         private final SequencedSet<Channel> channels = new LinkedHashSet<>();
         private final Set<Character> flags = new HashSet<>();
+
+        private User() {}
 
         public String getNickname() {
             return nickname;
@@ -426,11 +455,14 @@ public class IRCClientState {
         }
     }
 
-    public static class Capabilities {
+    public static final class Capabilities {
         private final Map<IRCCapability, String> serverCapabilities = new HashMap<>();
         private final Map<IRCCapability, String> activeCapabilities = new HashMap<>();
         private final Set<IRCCapability> requestedCapabilities = new HashSet<>();
+
         private boolean receivingCapabilities = false; // in the middle of multiline response
+
+        private Capabilities() {}
 
         public void clearActiveCapabilities() {
             activeCapabilities.clear();
@@ -497,9 +529,10 @@ public class IRCClientState {
         }
     }
 
-    public static class Parameters {
+    public static final class Parameters {
+
         private int awayLength = Integer.MAX_VALUE;
-        private IRCCaseMapping caseMapping = IRCCaseMapping.RFC1459;
+        private IRCCaseMapping caseMapping = null; // start out undefined
         private Map<Character, Integer> channelLimits = Map.of();
         private Set<Character> typeAChannelModes = new HashSet<>();
         private Set<Character> typeBChannelModes = new HashSet<>();
@@ -513,18 +546,20 @@ public class IRCClientState {
         private int hostLength = Integer.MAX_VALUE;
         private Character inviteExceptions;
         private int kickLength = Integer.MAX_VALUE;
-        private Map<Character, Integer> maxList;
+        private Map<Character, Integer> maxList = Map.of();
         private int maxTargets = Integer.MAX_VALUE;
         private int modes = Integer.MAX_VALUE;
         private String network;
         private int nickLength = Integer.MAX_VALUE;
-        private SequencedMap<Character, Character> prefixes;
+        private SequencedMap<Character, Character> prefixes = new LinkedHashMap<>();
         private boolean safeList;
         private int silence = Integer.MAX_VALUE;
-        private Set<Character> statusMessage;
-        private Map<String, Integer> targetMax;
+        private Set<Character> statusMessage = Set.of();
+        private Map<String, Integer> targetMax = Map.of();
         private int topicLength = Integer.MAX_VALUE;
         private int userLength = Integer.MAX_VALUE;
+
+        private Parameters() {}
 
         public int getAwayLength() {
             return awayLength;
@@ -534,52 +569,59 @@ public class IRCClientState {
             this.awayLength = awayLength;
         }
 
+        // casemapping is a bit tricky, we need to assume RFC1459 until the server
+        // tells us otherwise, then refuse any new values even if the server changes
+        // mid-session to avoid unstable casefolding errors
         public IRCCaseMapping getCaseMapping() {
-            return caseMapping;
+            return Objects.requireNonNullElse(caseMapping, IRCCaseMapping.RFC1459);
         }
 
         public void setCaseMapping(IRCCaseMapping caseMapping) {
-            this.caseMapping = caseMapping;
+            if (this.caseMapping == null) {
+                this.caseMapping = caseMapping;
+            } else {
+                throw new IllegalStateException("Case mapping can only be set once");
+            }
         }
 
         public Map<Character, Integer> getChannelLimits() {
-            return channelLimits;
+            return Collections.unmodifiableMap(channelLimits);
         }
 
         public void setChannelLimits(Map<Character, Integer> channelLimits) {
-            this.channelLimits = channelLimits;
+            this.channelLimits = new HashMap<>(channelLimits);
         }
 
         public Set<Character> getTypeAChannelModes() {
-            return typeAChannelModes;
+            return Collections.unmodifiableSet(typeAChannelModes);
         }
 
         public void setTypeAChannelModes(Set<Character> typeAChannelModes) {
-            this.typeAChannelModes = typeAChannelModes;
+            this.typeAChannelModes = new HashSet<>(typeAChannelModes);
         }
 
         public Set<Character> getTypeBChannelModes() {
-            return typeBChannelModes;
+            return Collections.unmodifiableSet(typeBChannelModes);
         }
 
         public void setTypeBChannelModes(Set<Character> typeBChannelModes) {
-            this.typeBChannelModes = typeBChannelModes;
+            this.typeBChannelModes = new HashSet<>(typeBChannelModes);
         }
 
         public Set<Character> getTypeCChannelModes() {
-            return typeCChannelModes;
+            return Collections.unmodifiableSet(typeCChannelModes);
         }
 
         public void setTypeCChannelModes(Set<Character> typeCChannelModes) {
-            this.typeCChannelModes = typeCChannelModes;
+            this.typeCChannelModes = new HashSet<>(typeCChannelModes);
         }
 
         public Set<Character> getTypeDChannelModes() {
-            return typeDChannelModes;
+            return Collections.unmodifiableSet(typeDChannelModes);
         }
 
         public void setTypeDChannelModes(Set<Character> typeDChannelModes) {
-            this.typeDChannelModes = typeDChannelModes;
+            this.typeDChannelModes = new HashSet<>(typeDChannelModes);
         }
 
         public int getChannelLength() {
@@ -591,11 +633,11 @@ public class IRCClientState {
         }
 
         public Set<Character> getChannelTypes() {
-            return channelTypes;
+            return Collections.unmodifiableSet(channelTypes);
         }
 
         public void setChannelTypes(Set<Character> channelTypes) {
-            this.channelTypes = channelTypes;
+            this.channelTypes = new HashSet<>(channelTypes);
         }
 
         public Character getExcepts() {
@@ -615,18 +657,18 @@ public class IRCClientState {
         }
 
         public Set<Character> getExtendedBanModes() {
-            return extendedBanModes;
+            return Collections.unmodifiableSet(extendedBanModes);
         }
 
         public void setExtendedBanModes(Set<Character> extendedBanModes) {
-            this.extendedBanModes = extendedBanModes;
+            this.extendedBanModes = new HashSet<>(extendedBanModes);
         }
 
-        public Integer getHostLength() {
+        public int getHostLength() {
             return hostLength;
         }
 
-        public void setHostLength(Integer hostLength) {
+        public void setHostLength(int hostLength) {
             this.hostLength = hostLength;
         }
 
@@ -638,35 +680,35 @@ public class IRCClientState {
             this.inviteExceptions = inviteExceptions;
         }
 
-        public Integer getKickLength() {
+        public int getKickLength() {
             return kickLength;
         }
 
-        public void setKickLength(Integer kickLength) {
+        public void setKickLength(int kickLength) {
             this.kickLength = kickLength;
         }
 
         public Map<Character, Integer> getMaxList() {
-            return maxList;
+            return Collections.unmodifiableMap(maxList);
         }
 
         public void setMaxList(Map<Character, Integer> maxList) {
-            this.maxList = maxList;
+            this.maxList = new HashMap<>(maxList);
         }
 
-        public Integer getMaxTargets() {
+        public int getMaxTargets() {
             return maxTargets;
         }
 
-        public void setMaxTargets(Integer maxTargets) {
+        public void setMaxTargets(int maxTargets) {
             this.maxTargets = maxTargets;
         }
 
-        public Integer getModes() {
+        public int getModes() {
             return modes;
         }
 
-        public void setModes(Integer modes) {
+        public void setModes(int modes) {
             this.modes = modes;
         }
 
@@ -678,20 +720,20 @@ public class IRCClientState {
             this.network = network;
         }
 
-        public Integer getNickLength() {
+        public int getNickLength() {
             return nickLength;
         }
 
-        public void setNickLength(Integer nickLength) {
+        public void setNickLength(int nickLength) {
             this.nickLength = nickLength;
         }
 
         public Map<Character, Character> getPrefixes() {
-            return prefixes;
+            return Collections.unmodifiableMap(prefixes);
         }
 
         public void setPrefixes(SequencedMap<Character, Character> prefixes) {
-            this.prefixes = prefixes;
+            this.prefixes = new LinkedHashMap<>(prefixes);
         }
 
         public boolean isSafeList() {
@@ -702,43 +744,43 @@ public class IRCClientState {
             this.safeList = safeList;
         }
 
-        public Integer getSilence() {
+        public int getSilence() {
             return silence;
         }
 
-        public void setSilence(Integer silence) {
+        public void setSilence(int silence) {
             this.silence = silence;
         }
 
         public Set<Character> getStatusMessage() {
-            return statusMessage;
+            return Collections.unmodifiableSet(statusMessage);
         }
 
         public void setStatusMessage(Set<Character> statusMessage) {
-            this.statusMessage = statusMessage;
+            this.statusMessage = new HashSet<>(statusMessage);
         }
 
         public Map<String, Integer> getTargetMax() {
-            return targetMax;
+            return Collections.unmodifiableMap(targetMax);
         }
 
         public void setTargetMax(Map<String, Integer> targetMax) {
-            this.targetMax = targetMax;
+            this.targetMax = new HashMap<>(targetMax);
         }
 
-        public Integer getTopicLength() {
+        public int getTopicLength() {
             return topicLength;
         }
 
-        public void setTopicLength(Integer topicLength) {
+        public void setTopicLength(int topicLength) {
             this.topicLength = topicLength;
         }
 
-        public Integer getUserLength() {
+        public int getUserLength() {
             return userLength;
         }
 
-        public void setUserLength(Integer userLength) {
+        public void setUserLength(int userLength) {
             this.userLength = userLength;
         }
     }
