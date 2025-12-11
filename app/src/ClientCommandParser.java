@@ -40,6 +40,14 @@ public class ClientCommandParser {
                         .addCommaSeparatedListPositional(0, ClientCommandJoin::setChannels, "channel name(s)", true)
                         .addCommaSeparatedListPositional(1, ClientCommandJoin::setKeys, "key to join channels (channels with a key must be the first in list)", false)
                 .build());
+        parsers.put("/kick", ArgsParser.builder(ClientCommandKick::new, false, "kick a user from a channel")
+                .addUsageExample("/kick <channel> <nick> [<reason>]")
+                .addUsageExample("/kick #channel taro")
+                .addUsageExample("/kick #channel taro Kicked for speaking english")
+                .addStringPositional(0, ClientCommandKick::setChannel, "channel name", true)
+                .addStringPositional(1, ClientCommandKick::setNick, "nick to kick", true)
+                .addGreedyStringPositional(2, ClientCommandKick::setReason, "reason for kick", false)
+                .build());
         parsers.put("/msg", ArgsParser.builder(ClientCommandMsg::new, false, "send message to a nick or channel")
                         .addUsageExample("/msg <target>[,<target>...] <text>")
                         .addUsageExample("/msg #channel hello there")

@@ -7,10 +7,10 @@ public final class IRCMessageCAPLS extends IRCMessage {
 
     public static final String COMMAND = "CAP";
 
-    private String nick;
-    private String version;
-    private boolean hasMore;
-    private SequencedMap<String, String> capabilities;
+    private final String nick;
+    private final String version;
+    private final boolean hasMore;
+    private final SequencedMap<String, String> capabilities;
 
     public IRCMessageCAPLS(String rawMessage,
                            SequencedMap<String, String> tags,

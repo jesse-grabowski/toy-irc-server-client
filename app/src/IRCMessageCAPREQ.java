@@ -6,8 +6,8 @@ public final class IRCMessageCAPREQ extends IRCMessage {
 
     public static final String COMMAND = "CAP";
 
-    private List<String> enableCapabilities;
-    private List<String> disableCapabilities;
+    private final List<String> enableCapabilities;
+    private final List<String> disableCapabilities;
 
     public IRCMessageCAPREQ(String rawMessage,
                             SequencedMap<String, String> tags,

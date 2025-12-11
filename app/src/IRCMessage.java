@@ -5,7 +5,7 @@ public sealed abstract class IRCMessage permits
         IRCMessageCAPACK, IRCMessageCAPDEL, IRCMessageCAPEND, IRCMessageCAPLIST, IRCMessageCAPLS, IRCMessageCAPNAK,
         IRCMessageCAPNEW, IRCMessageCAPREQ,
         // standard messages
-        IRCMessageERROR, IRCMessageJOIN0, IRCMessageJOINNormal, IRCMessageNICK, IRCMessagePART, IRCMessagePASS, IRCMessagePING, IRCMessagePONG,
+        IRCMessageERROR, IRCMessageJOIN0, IRCMessageJOINNormal, IRCMessageKICK, IRCMessageNICK, IRCMessagePART, IRCMessagePASS, IRCMessagePING, IRCMessagePONG,
         IRCMessagePRIVMSG, IRCMessageUSER, IRCMessageQUIT,
         // numerics
         IRCMessage001, IRCMessage353,

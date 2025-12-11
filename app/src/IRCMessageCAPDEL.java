@@ -6,8 +6,8 @@ public final class IRCMessageCAPDEL extends IRCMessage {
 
     public static final String COMMAND = "CAP";
 
-    private String nick;
-    private List<String> capabilities;
+    private final String nick;
+    private final List<String> capabilities;
 
     public IRCMessageCAPDEL(String rawMessage,
                             SequencedMap<String, String> tags,

@@ -6,9 +6,9 @@ public final class IRCMessageCAPACK extends IRCMessage {
 
     public static final String COMMAND = "CAP";
 
-    private String nick;
-    private List<String> enableCapabilities;
-    private List<String> disableCapabilities;
+    private final String nick;
+    private final List<String> enableCapabilities;
+    private final List<String> disableCapabilities;
 
     public IRCMessageCAPACK(String rawMessage,
                             SequencedMap<String, String> tags,

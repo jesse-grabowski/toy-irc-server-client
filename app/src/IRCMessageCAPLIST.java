@@ -6,9 +6,9 @@ public final class IRCMessageCAPLIST extends IRCMessage {
 
     public static final String COMMAND = "CAP";
 
-    private String nick;
-    private boolean hasMore;
-    private List<String> capabilities;
+    private final String nick;
+    private final boolean hasMore;
+    private final List<String> capabilities;
 
     public IRCMessageCAPLIST(String rawMessage,
                              SequencedMap<String, String> tags,

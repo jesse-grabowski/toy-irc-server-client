@@ -7,8 +7,8 @@ public final class IRCMessageCAPNEW extends IRCMessage {
 
     public static final String COMMAND = "CAP";
 
-    private String nick;
-    private SequencedMap<String, String> capabilities;
+    private final String nick;
+    private final SequencedMap<String, String> capabilities;
 
     public IRCMessageCAPNEW(String rawMessage,
                             SequencedMap<String, String> tags,

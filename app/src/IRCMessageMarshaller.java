@@ -20,6 +20,7 @@ public class IRCMessageMarshaller {
             case IRCMessageERROR m -> marshal(m, this::marshalError);
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
+            case IRCMessageKICK m -> marshal(m, this::marshalKick);
             case IRCMessageNICK m -> marshal(m, this::marshalNick);
             case IRCMessagePART m -> marshal(m, this::marshalPart);
             case IRCMessagePASS m -> marshal(m, this::marshalPass);
@@ -166,6 +167,11 @@ public class IRCMessageMarshaller {
             result.append(String.join(",", message.getKeys()));
         }
         return result.toString();
+    }
+
+    private String marshalKick(IRCMessageKICK message) {
+        return "%s %s%s".formatted(message.getChannel(), message.getNick(),
+                message.getReason() != null ? " :" + message.getReason() : "");
     }
 
     private String marshalNick(IRCMessageNICK message) {
