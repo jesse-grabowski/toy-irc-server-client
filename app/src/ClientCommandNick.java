@@ -1,15 +1,15 @@
 public final class ClientCommandNick implements ClientCommand {
 
-    private String nick;
+  private String nick;
 
-    @Override
-    public void validate() {}
+  @Override
+  public void validate() {}
 
-    public String getNick() {
-        return nick;
-    }
+  public String getNick() {
+    return nick;
+  }
 
-    public void setNick(String nick) {
-        this.nick = nick;
-    }
+  public void setNick(String nick) {
+    this.nick = nick;
+  }
 }

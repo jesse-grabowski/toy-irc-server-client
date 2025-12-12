@@ -1,4 +1,4 @@
 public final class ClientCommandConnect implements ClientCommand {
-    @Override
-    public void validate() {}
+  @Override
+  public void validate() {}
 }

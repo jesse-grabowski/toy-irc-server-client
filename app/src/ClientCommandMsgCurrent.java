@@ -1,15 +1,15 @@
 public final class ClientCommandMsgCurrent implements ClientCommand {
 
-    private String text;
+  private String text;
 
-    @Override
-    public void validate() {}
+  @Override
+  public void validate() {}
 
-    public String getText() {
-        return text;
-    }
+  public String getText() {
+    return text;
+  }
 
-    public void setText(String text) {
-        this.text = text;
-    }
+  public void setText(String text) {
+    this.text = text;
+  }
 }

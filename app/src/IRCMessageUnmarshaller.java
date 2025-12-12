@@ -1,14 +1,11 @@
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -82,7 +79,7 @@ public class IRCMessageUnmarshaller {
     private String unescapeTag(String tag) {
         StringBuilder result = new StringBuilder();
         boolean escaped = false;
-        for (char c: tag.toCharArray()) {
+        for (char c : tag.toCharArray()) {
             if (escaped) {
                 escaped = false;
                 result.append(switch (c) {
@@ -152,8 +149,10 @@ public class IRCMessageUnmarshaller {
         if (CAP_KNOWN_SUBCOMMANDS.contains(nickOrSubcommand)) { // client -> server
             return switch (nickOrSubcommand) {
                 case "END" -> new IRCMessageCAPEND(raw, tags, prefix.name(), prefix.user(), prefix.host());
-                case "LS" -> new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), null, safeGetIndex(params, 1), false, new LinkedHashMap<>());
-                case "LIST" -> new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), null, false, List.of());
+                case "LS" ->
+                        new IRCMessageCAPLS(raw, tags, prefix.name(), prefix.user(), prefix.host(), null, safeGetIndex(params, 1), false, new LinkedHashMap<>());
+                case "LIST" ->
+                        new IRCMessageCAPLIST(raw, tags, prefix.name(), prefix.user(), prefix.host(), null, false, List.of());
                 case "REQ" -> {
                     String rawCapabilities = safeGetIndex(params, 1);
                     if (rawCapabilities == null) {
@@ -237,7 +236,8 @@ public class IRCMessageUnmarshaller {
                     yield new IRCMessageCAPNAK(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, enabledCapabilities, disabledCapabilities);
                 }
 
-                case "NEW" -> new IRCMessageCAPNEW(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, safeParseMap(safeGetLast(params), "\\s+"));
+                case "NEW" ->
+                        new IRCMessageCAPNEW(raw, tags, prefix.name(), prefix.user(), prefix.host(), nickOrSubcommand, safeParseMap(safeGetLast(params), "\\s+"));
                 case null, default -> throw new IllegalArgumentException("Unsupported subcommand: " + subcommand);
             };
         }

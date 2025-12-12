@@ -1,15 +1,15 @@
 public final class ClientCommandHelp implements ClientCommand {
 
-    private String command;
+  private String command;
 
-    @Override
-    public void validate() {}
+  @Override
+  public void validate() {}
 
-    public String getCommand() {
-        return command;
-    }
+  public String getCommand() {
+    return command;
+  }
 
-    public void setCommand(String command) {
-        this.command = command;
-    }
+  public void setCommand(String command) {
+    this.command = command;
+  }
 }

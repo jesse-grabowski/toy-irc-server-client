@@ -6,129 +6,131 @@ import java.util.logging.Level;
 // oh lombok how my heart yearns for thee
 public class IRCClientProperties implements ArgsProperties {
 
-    private InetAddress host;
-    private int port = 6667;
-    private int connectTimeout = 10000;
-    private int readTimeout = 10 * 60 * 1000;
-    private String charset = "UTF-8";
-    private boolean useSimpleTerminal = false;
-    private String nickname = "auto";
-    private String realName = "Unknown";
-    private String password;
-    private String logFile = "irc-client.log";
-    private String logLevel = Level.INFO.getName();
+  private InetAddress host;
+  private int port = 6667;
+  private int connectTimeout = 10000;
+  private int readTimeout = 10 * 60 * 1000;
+  private String charset = "UTF-8";
+  private boolean useSimpleTerminal = false;
+  private String nickname = "auto";
+  private String realName = "Unknown";
+  private String password;
+  private String logFile = "irc-client.log";
+  private String logLevel = Level.INFO.getName();
 
-    @Override
-    public void validate() {
-        if (port < 0 || port > 65535) {
-            throw new IllegalArgumentException("port must be between 0 and 65535");
-        }
-        if (connectTimeout < 0) {
-            throw new IllegalArgumentException("connectTimeout must be greater than 0");
-        }
-        if (readTimeout < 0) {
-            throw new IllegalArgumentException("readTimeout must be greater than 0");
-        }
-        if (!Charset.isSupported(charset)) {
-            throw new IllegalArgumentException("charset must be one of " + Charset.availableCharsets().keySet());
-        }
-        try {
-            Paths.get(logFile);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("log file path must be a valid path");
-        }
-        try {
-            Level.parse(logLevel);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("invalid log level '%s': expected integer or valid jul level name".formatted(logLevel));
-        }
+  @Override
+  public void validate() {
+    if (port < 0 || port > 65535) {
+      throw new IllegalArgumentException("port must be between 0 and 65535");
     }
+    if (connectTimeout < 0) {
+      throw new IllegalArgumentException("connectTimeout must be greater than 0");
+    }
+    if (readTimeout < 0) {
+      throw new IllegalArgumentException("readTimeout must be greater than 0");
+    }
+    if (!Charset.isSupported(charset)) {
+      throw new IllegalArgumentException(
+          "charset must be one of " + Charset.availableCharsets().keySet());
+    }
+    try {
+      Paths.get(logFile);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("log file path must be a valid path");
+    }
+    try {
+      Level.parse(logLevel);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          "invalid log level '%s': expected integer or valid jul level name".formatted(logLevel));
+    }
+  }
 
-    public InetAddress getHost() {
-        return host;
-    }
+  public InetAddress getHost() {
+    return host;
+  }
 
-    public void setHost(InetAddress host) {
-        this.host = host;
-    }
+  public void setHost(InetAddress host) {
+    this.host = host;
+  }
 
-    public int getPort() {
-        return port;
-    }
+  public int getPort() {
+    return port;
+  }
 
-    public void setPort(int port) {
-        this.port = port;
-    }
+  public void setPort(int port) {
+    this.port = port;
+  }
 
-    public int getConnectTimeout() {
-        return connectTimeout;
-    }
+  public int getConnectTimeout() {
+    return connectTimeout;
+  }
 
-    public void setConnectTimeout(int connectTimeout) {
-        this.connectTimeout = connectTimeout;
-    }
+  public void setConnectTimeout(int connectTimeout) {
+    this.connectTimeout = connectTimeout;
+  }
 
-    public int getReadTimeout() {
-        return readTimeout;
-    }
+  public int getReadTimeout() {
+    return readTimeout;
+  }
 
-    public void setReadTimeout(int readTimeout) {
-        this.readTimeout = readTimeout;
-    }
+  public void setReadTimeout(int readTimeout) {
+    this.readTimeout = readTimeout;
+  }
 
-    public String getCharset() {
-        return charset;
-    }
+  public String getCharset() {
+    return charset;
+  }
 
-    public void setCharset(String charset) {
-        this.charset = charset;
-    }
+  public void setCharset(String charset) {
+    this.charset = charset;
+  }
 
-    public boolean isUseSimpleTerminal() {
-        return useSimpleTerminal;
-    }
+  public boolean isUseSimpleTerminal() {
+    return useSimpleTerminal;
+  }
 
-    public void setUseSimpleTerminal(boolean useSimpleTerminal) {
-        this.useSimpleTerminal = useSimpleTerminal;
-    }
+  public void setUseSimpleTerminal(boolean useSimpleTerminal) {
+    this.useSimpleTerminal = useSimpleTerminal;
+  }
 
-    public String getNickname() {
-        return nickname;
-    }
+  public String getNickname() {
+    return nickname;
+  }
 
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
+  public void setNickname(String nickname) {
+    this.nickname = nickname;
+  }
 
-    public String getRealName() {
-        return realName;
-    }
+  public String getRealName() {
+    return realName;
+  }
 
-    public void setRealName(String realName) {
-        this.realName = realName;
-    }
+  public void setRealName(String realName) {
+    this.realName = realName;
+  }
 
-    public String getPassword() {
-        return password;
-    }
+  public String getPassword() {
+    return password;
+  }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
+  public void setPassword(String password) {
+    this.password = password;
+  }
 
-    public String getLogFile() {
-        return logFile;
-    }
+  public String getLogFile() {
+    return logFile;
+  }
 
-    public void setLogFile(String logFile) {
-        this.logFile = logFile;
-    }
+  public void setLogFile(String logFile) {
+    this.logFile = logFile;
+  }
 
-    public String getLogLevel() {
-        return logLevel;
-    }
+  public String getLogLevel() {
+    return logLevel;
+  }
 
-    public void setLogLevel(String logLevel) {
-        this.logLevel = logLevel;
-    }
+  public void setLogLevel(String logLevel) {
+    this.logLevel = logLevel;
+  }
 }

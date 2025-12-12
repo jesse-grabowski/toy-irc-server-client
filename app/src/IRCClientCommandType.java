@@ -1,2 +1,1 @@
-public enum IRCClientCommandType {
-}
+public enum IRCClientCommandType {}

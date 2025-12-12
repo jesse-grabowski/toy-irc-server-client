@@ -1,5 +1,5 @@
 public class ArgsParserHelpRequestedException extends Exception {
-    public ArgsParserHelpRequestedException() {
-        super();
-    }
+  public ArgsParserHelpRequestedException() {
+    super();
+  }
 }

@@ -1,15 +1,15 @@
 public final class ClientCommandQuit implements ClientCommand {
 
-    private String reason;
+  private String reason;
 
-    @Override
-    public void validate() {}
+  @Override
+  public void validate() {}
 
-    public String getReason() {
-        return reason;
-    }
+  public String getReason() {
+    return reason;
+  }
 
-    public void setReason(String reason) {
-        this.reason = reason;
-    }
+  public void setReason(String reason) {
+    this.reason = reason;
+  }
 }
