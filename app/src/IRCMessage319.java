@@ -5,8 +5,8 @@ public final class IRCMessage319 extends IRCMessage {
   public static final String COMMAND = "319";
   private final String client;
   private final String nick;
-  private final List<String> prefixes;
   private final List<String> channels;
+  private final List<Character> prefixes;
 
   public IRCMessage319(
       String rawMessage,
@@ -16,13 +16,13 @@ public final class IRCMessage319 extends IRCMessage {
       String prefixHost,
       String client,
       String nick,
-      List<String> prefixes,
-      List<String> channels) {
+      List<String> channels,
+      List<Character> prefixes) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
     this.nick = nick;
-    this.prefixes = prefixes;
     this.channels = channels;
+    this.prefixes = prefixes;
   }
 
   public String getClient() {
@@ -33,11 +33,11 @@ public final class IRCMessage319 extends IRCMessage {
     return nick;
   }
 
-  public List<String> getPrefixes() {
-    return prefixes;
-  }
-
   public List<String> getChannels() {
     return channels;
+  }
+
+  public List<Character> getPrefixes() {
+    return prefixes;
   }
 }

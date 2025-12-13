@@ -53,7 +53,7 @@ public class IRCClientEngine implements Closeable {
                 .name("irc-client-executor") // name the thread so it shows up nicely in our logs
                 .daemon(
                     false) // we don't want the JVM to terminate until this thread dies so daemon =
-                           // false
+                // false
                 .uncaughtExceptionHandler(
                     (t, e) -> LOG.log(Level.SEVERE, "Error executing task", e))
                 .factory(),
@@ -263,8 +263,359 @@ public class IRCClientEngine implements Closeable {
         /* ignore */
       }
       case IRCMessage001 m -> handle(m);
+      case IRCMessage002 m -> {
+        /* ignore */
+      }
+      case IRCMessage003 m -> {
+        /* ignore */
+      }
+      case IRCMessage004 m -> {
+        /* ignore */
+      }
       case IRCMessage005 m -> handle(m);
+      case IRCMessage010 m -> {
+        /* ignore */
+      }
+      case IRCMessage212 m -> {
+        /* ignore */
+      }
+      case IRCMessage219 m -> {
+        /* ignore */
+      }
+      case IRCMessage221 m -> {
+        /* ignore */
+      }
+      case IRCMessage242 m -> {
+        /* ignore */
+      }
+      case IRCMessage251 m -> {
+        /* ignore */
+      }
+      case IRCMessage252 m -> {
+        /* ignore */
+      }
+      case IRCMessage253 m -> {
+        /* ignore */
+      }
+      case IRCMessage254 m -> {
+        /* ignore */
+      }
+      case IRCMessage255 m -> {
+        /* ignore */
+      }
+      case IRCMessage256 m -> {
+        /* ignore */
+      }
+      case IRCMessage257 m -> {
+        /* ignore */
+      }
+      case IRCMessage258 m -> {
+        /* ignore */
+      }
+      case IRCMessage259 m -> {
+        /* ignore */
+      }
+      case IRCMessage263 m -> {
+        /* ignore */
+      }
+      case IRCMessage265 m -> {
+        /* ignore */
+      }
+      case IRCMessage266 m -> {
+        /* ignore */
+      }
+      case IRCMessage276 m -> {
+        /* ignore */
+      }
+      case IRCMessage301 m -> {
+        /* ignore */
+      }
+      case IRCMessage302 m -> {
+        /* ignore */
+      }
+      case IRCMessage305 m -> {
+        /* ignore */
+      }
+      case IRCMessage306 m -> {
+        /* ignore */
+      }
+      case IRCMessage307 m -> {
+        /* ignore */
+      }
+      case IRCMessage311 m -> {
+        /* ignore */
+      }
+      case IRCMessage312 m -> {
+        /* ignore */
+      }
+      case IRCMessage313 m -> {
+        /* ignore */
+      }
+      case IRCMessage314 m -> {
+        /* ignore */
+      }
+      case IRCMessage315 m -> {
+        /* ignore */
+      }
+      case IRCMessage317 m -> {
+        /* ignore */
+      }
+      case IRCMessage318 m -> {
+        /* ignore */
+      }
+      case IRCMessage319 m -> {
+        /* ignore */
+      }
+      case IRCMessage320 m -> {
+        /* ignore */
+      }
+      case IRCMessage321 m -> {
+        /* ignore */
+      }
+      case IRCMessage322 m -> {
+        /* ignore */
+      }
+      case IRCMessage323 m -> {
+        /* ignore */
+      }
+      case IRCMessage324 m -> {
+        /* ignore */
+      }
+      case IRCMessage329 m -> {
+        /* ignore */
+      }
+      case IRCMessage330 m -> {
+        /* ignore */
+      }
+      case IRCMessage331 m -> {
+        /* ignore */
+      }
+      case IRCMessage332 m -> {
+        /* ignore */
+      }
+      case IRCMessage333 m -> {
+        /* ignore */
+      }
+      case IRCMessage336 m -> {
+        /* ignore */
+      }
+      case IRCMessage337 m -> {
+        /* ignore */
+      }
+      case IRCMessage338 m -> {
+        /* ignore */
+      }
+      case IRCMessage341 m -> {
+        /* ignore */
+      }
+      case IRCMessage346 m -> {
+        /* ignore */
+      }
+      case IRCMessage347 m -> {
+        /* ignore */
+      }
+      case IRCMessage348 m -> {
+        /* ignore */
+      }
+      case IRCMessage349 m -> {
+        /* ignore */
+      }
+      case IRCMessage351 m -> {
+        /* ignore */
+      }
+      case IRCMessage352 m -> {
+        /* ignore */
+      }
       case IRCMessage353 m -> handle(m);
+      case IRCMessage364 m -> {
+        /* ignore */
+      }
+      case IRCMessage365 m -> {
+        /* ignore */
+      }
+      case IRCMessage366 m -> {
+        /* ignore */
+      }
+      case IRCMessage367 m -> {
+        /* ignore */
+      }
+      case IRCMessage368 m -> {
+        /* ignore */
+      }
+      case IRCMessage369 m -> {
+        /* ignore */
+      }
+      case IRCMessage371 m -> {
+        /* ignore */
+      }
+      case IRCMessage372 m -> {
+        /* ignore */
+      }
+      case IRCMessage374 m -> {
+        /* ignore */
+      }
+      case IRCMessage375 m -> {
+        /* ignore */
+      }
+      case IRCMessage376 m -> {
+        /* ignore */
+      }
+      case IRCMessage378 m -> {
+        /* ignore */
+      }
+      case IRCMessage379 m -> {
+        /* ignore */
+      }
+      case IRCMessage381 m -> {
+        /* ignore */
+      }
+      case IRCMessage382 m -> {
+        /* ignore */
+      }
+      case IRCMessage391 m -> {
+        /* ignore */
+      }
+      case IRCMessage400 m -> {
+        /* ignore */
+      }
+      case IRCMessage401 m -> {
+        /* ignore */
+      }
+      case IRCMessage402 m -> {
+        /* ignore */
+      }
+      case IRCMessage403 m -> {
+        /* ignore */
+      }
+      case IRCMessage404 m -> {
+        /* ignore */
+      }
+      case IRCMessage405 m -> {
+        /* ignore */
+      }
+      case IRCMessage406 m -> {
+        /* ignore */
+      }
+      case IRCMessage409 m -> {
+        /* ignore */
+      }
+      case IRCMessage411 m -> {
+        /* ignore */
+      }
+      case IRCMessage412 m -> {
+        /* ignore */
+      }
+      case IRCMessage417 m -> {
+        /* ignore */
+      }
+      case IRCMessage421 m -> {
+        /* ignore */
+      }
+      case IRCMessage422 m -> {
+        /* ignore */
+      }
+      case IRCMessage431 m -> {
+        /* ignore */
+      }
+      case IRCMessage432 m -> {
+        /* ignore */
+      }
+      case IRCMessage433 m -> {
+        /* ignore */
+      }
+      case IRCMessage436 m -> {
+        /* ignore */
+      }
+      case IRCMessage441 m -> {
+        /* ignore */
+      }
+      case IRCMessage442 m -> {
+        /* ignore */
+      }
+      case IRCMessage443 m -> {
+        /* ignore */
+      }
+      case IRCMessage451 m -> {
+        /* ignore */
+      }
+      case IRCMessage461 m -> {
+        /* ignore */
+      }
+      case IRCMessage462 m -> {
+        /* ignore */
+      }
+      case IRCMessage464 m -> {
+        /* ignore */
+      }
+      case IRCMessage465 m -> {
+        /* ignore */
+      }
+      case IRCMessage471 m -> {
+        /* ignore */
+      }
+      case IRCMessage472 m -> {
+        /* ignore */
+      }
+      case IRCMessage473 m -> {
+        /* ignore */
+      }
+      case IRCMessage474 m -> {
+        /* ignore */
+      }
+      case IRCMessage475 m -> {
+        /* ignore */
+      }
+      case IRCMessage476 m -> {
+        /* ignore */
+      }
+      case IRCMessage481 m -> {
+        /* ignore */
+      }
+      case IRCMessage482 m -> {
+        /* ignore */
+      }
+      case IRCMessage483 m -> {
+        /* ignore */
+      }
+      case IRCMessage491 m -> {
+        /* ignore */
+      }
+      case IRCMessage501 m -> {
+        /* ignore */
+      }
+      case IRCMessage502 m -> {
+        /* ignore */
+      }
+      case IRCMessage524 m -> {
+        /* ignore */
+      }
+      case IRCMessage525 m -> {
+        /* ignore */
+      }
+      case IRCMessage670 m -> {
+        /* ignore */
+      }
+      case IRCMessage671 m -> {
+        /* ignore */
+      }
+      case IRCMessage691 m -> {
+        /* ignore */
+      }
+      case IRCMessage696 m -> {
+        /* ignore */
+      }
+      case IRCMessage704 m -> {
+        /* ignore */
+      }
+      case IRCMessage705 m -> {
+        /* ignore */
+      }
+      case IRCMessage706 m -> {
+        /* ignore */
+      }
+      case IRCMessage723 m -> {
+        /* ignore */
+      }
       case IRCMessageUnsupported m ->
           terminal.println(makeSystemTerminalMessage("» " + m.getRawMessage()));
       case IRCMessageParseError m ->

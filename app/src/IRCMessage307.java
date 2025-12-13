@@ -4,7 +4,6 @@ public final class IRCMessage307 extends IRCMessage {
   public static final String COMMAND = "307";
   private final String client;
   private final String nick;
-  private final String text;
 
   public IRCMessage307(
       String rawMessage,
@@ -13,12 +12,10 @@ public final class IRCMessage307 extends IRCMessage {
       String prefixUser,
       String prefixHost,
       String client,
-      String nick,
-      String text) {
+      String nick) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
     this.nick = nick;
-    this.text = text;
   }
 
   public String getClient() {
@@ -27,9 +24,5 @@ public final class IRCMessage307 extends IRCMessage {
 
   public String getNick() {
     return nick;
-  }
-
-  public String getText() {
-    return text;
   }
 }

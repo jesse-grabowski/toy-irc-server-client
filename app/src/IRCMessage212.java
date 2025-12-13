@@ -4,9 +4,9 @@ public final class IRCMessage212 extends IRCMessage {
   public static final String COMMAND = "212";
   private final String client;
   private final String targetCommand;
-  private final String count;
-  private final String byteCount;
-  private final String remoteCount;
+  private final Integer count;
+  private final Integer byteCount;
+  private final Integer remoteCount;
 
   public IRCMessage212(
       String rawMessage,
@@ -16,9 +16,9 @@ public final class IRCMessage212 extends IRCMessage {
       String prefixHost,
       String client,
       String targetCommand,
-      String count,
-      String byteCount,
-      String remoteCount) {
+      Integer count,
+      Integer byteCount,
+      Integer remoteCount) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
     this.targetCommand = targetCommand;
@@ -35,15 +35,15 @@ public final class IRCMessage212 extends IRCMessage {
     return targetCommand;
   }
 
-  public String getCount() {
+  public Integer getCount() {
     return count;
   }
 
-  public String getByteCount() {
+  public Integer getByteCount() {
     return byteCount;
   }
 
-  public String getRemoteCount() {
+  public Integer getRemoteCount() {
     return remoteCount;
   }
 }

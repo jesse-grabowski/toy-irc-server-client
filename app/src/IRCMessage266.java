@@ -3,8 +3,8 @@ import java.util.SequencedMap;
 public final class IRCMessage266 extends IRCMessage {
   public static final String COMMAND = "266";
   private final String client;
-  private final String globalUsers;
-  private final String maxGlobalUsers;
+  private final Integer globalUsers;
+  private final Integer maxGlobalUsers;
   private final String text;
 
   public IRCMessage266(
@@ -14,8 +14,8 @@ public final class IRCMessage266 extends IRCMessage {
       String prefixUser,
       String prefixHost,
       String client,
-      String globalUsers,
-      String maxGlobalUsers,
+      Integer globalUsers,
+      Integer maxGlobalUsers,
       String text) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
@@ -28,11 +28,11 @@ public final class IRCMessage266 extends IRCMessage {
     return client;
   }
 
-  public String getGlobalUsers() {
+  public Integer getGlobalUsers() {
     return globalUsers;
   }
 
-  public String getMaxGlobalUsers() {
+  public Integer getMaxGlobalUsers() {
     return maxGlobalUsers;
   }
 

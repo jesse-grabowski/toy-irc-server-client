@@ -3,8 +3,8 @@ import java.util.SequencedMap;
 public final class IRCMessage265 extends IRCMessage {
   public static final String COMMAND = "265";
   private final String client;
-  private final String localUsers;
-  private final String maxLocalUsers;
+  private final Integer localUsers;
+  private final Integer maxLocalUsers;
   private final String text;
 
   public IRCMessage265(
@@ -14,8 +14,8 @@ public final class IRCMessage265 extends IRCMessage {
       String prefixUser,
       String prefixHost,
       String client,
-      String localUsers,
-      String maxLocalUsers,
+      Integer localUsers,
+      Integer maxLocalUsers,
       String text) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
@@ -28,11 +28,11 @@ public final class IRCMessage265 extends IRCMessage {
     return client;
   }
 
-  public String getLocalUsers() {
+  public Integer getLocalUsers() {
     return localUsers;
   }
 
-  public String getMaxLocalUsers() {
+  public Integer getMaxLocalUsers() {
     return maxLocalUsers;
   }
 

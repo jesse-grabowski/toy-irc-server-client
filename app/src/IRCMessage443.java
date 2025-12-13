@@ -5,7 +5,6 @@ public final class IRCMessage443 extends IRCMessage {
   private final String client;
   private final String nick;
   private final String channel;
-  private final String text;
 
   public IRCMessage443(
       String rawMessage,
@@ -15,13 +14,11 @@ public final class IRCMessage443 extends IRCMessage {
       String prefixHost,
       String client,
       String nick,
-      String channel,
-      String text) {
+      String channel) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
     this.nick = nick;
     this.channel = channel;
-    this.text = text;
   }
 
   public String getClient() {
@@ -34,9 +31,5 @@ public final class IRCMessage443 extends IRCMessage {
 
   public String getChannel() {
     return channel;
-  }
-
-  public String getText() {
-    return text;
   }
 }

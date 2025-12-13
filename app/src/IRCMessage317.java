@@ -5,7 +5,7 @@ public final class IRCMessage317 extends IRCMessage {
   private final String client;
   private final String nick;
   private final String secondsIdle;
-  private final String signOnTime;
+  private final Long signOnTime;
 
   public IRCMessage317(
       String rawMessage,
@@ -16,7 +16,7 @@ public final class IRCMessage317 extends IRCMessage {
       String client,
       String nick,
       String secondsIdle,
-      String signOnTime) {
+      Long signOnTime) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
     this.nick = nick;
@@ -36,7 +36,7 @@ public final class IRCMessage317 extends IRCMessage {
     return secondsIdle;
   }
 
-  public String getSignOnTime() {
+  public Long getSignOnTime() {
     return signOnTime;
   }
 }

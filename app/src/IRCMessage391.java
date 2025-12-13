@@ -4,7 +4,7 @@ public final class IRCMessage391 extends IRCMessage {
   public static final String COMMAND = "391";
   private final String client;
   private final String server;
-  private final String timestamp;
+  private final Long timestamp;
   private final String tsOffset;
   private final String timeString;
 
@@ -16,7 +16,7 @@ public final class IRCMessage391 extends IRCMessage {
       String prefixHost,
       String client,
       String server,
-      String timestamp,
+      Long timestamp,
       String tsOffset,
       String timeString) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
@@ -35,7 +35,7 @@ public final class IRCMessage391 extends IRCMessage {
     return server;
   }
 
-  public String getTimestamp() {
+  public Long getTimestamp() {
     return timestamp;
   }
 

@@ -4,7 +4,7 @@ public final class IRCMessage010 extends IRCMessage {
   public static final String COMMAND = "010";
   private final String client;
   private final String hostname;
-  private final String port;
+  private final Integer port;
   private final String info;
 
   public IRCMessage010(
@@ -15,7 +15,7 @@ public final class IRCMessage010 extends IRCMessage {
       String prefixHost,
       String client,
       String hostname,
-      String port,
+      Integer port,
       String info) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
@@ -32,7 +32,7 @@ public final class IRCMessage010 extends IRCMessage {
     return hostname;
   }
 
-  public String getPort() {
+  public Integer getPort() {
     return port;
   }
 
