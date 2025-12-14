@@ -42,6 +42,8 @@ public class IRCMessageSerializationTest {
                 Arguments.of("PART #chan :bye", "PART #chan :bye"),
                 Arguments.of("NICK newnick", "NICK newnick"),
                 Arguments.of("NOTICE #chan :hello world", "NOTICE #chan :hello world"),
+                Arguments.of("TOPIC #chan :hello world", "TOPIC #chan :hello world"),
+                Arguments.of("TOPIC #chan", "TOPIC #chan"),
                 Arguments.of("PASS whatever", "PASS whatever"),
                 Arguments.of("PRIVMSG #chan :hello world", "PRIVMSG #chan :hello world"),
                 Arguments.of("USER myuser 0 * :Real Name", "USER myuser 0 * :Real Name"),

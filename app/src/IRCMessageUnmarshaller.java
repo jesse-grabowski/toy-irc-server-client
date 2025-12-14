@@ -95,6 +95,7 @@ public class IRCMessageUnmarshaller {
         case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(parameters);
         case IRCMessageUSER.COMMAND -> parseUser(parameters);
         case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
+        case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
         case IRCMessage001.COMMAND ->
             parseExact(parameters, "client", "message", IRCMessage001::new);
         case IRCMessage002.COMMAND ->
@@ -571,6 +572,10 @@ public class IRCMessageUnmarshaller {
 
   private IRCMessageQUIT parseQuit(Parameters parameters) throws Exception {
     return parameters.inject(optional("reason"), IRCMessageQUIT::new);
+  }
+
+  private IRCMessageTOPIC parseTopic(Parameters parameters) throws Exception {
+    return parameters.inject(required("channel"), optional("topic"), IRCMessageTOPIC::new);
   }
 
   private IRCMessage004 parse004(Parameters parameters) throws Exception {

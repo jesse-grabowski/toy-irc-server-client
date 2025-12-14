@@ -28,6 +28,7 @@ public abstract sealed class IRCMessage
         IRCMessagePRIVMSG,
         IRCMessageUSER,
         IRCMessageQUIT,
+        IRCMessageTOPIC,
         // numerics
         IRCMessage001,
         IRCMessage002,

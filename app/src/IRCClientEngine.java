@@ -276,6 +276,7 @@ public class IRCClientEngine implements Closeable {
       }
       case IRCMessagePRIVMSG m -> handle(m);
       case IRCMessageQUIT m -> handle(m);
+      case IRCMessageTOPIC m -> handle(m);
       case IRCMessageUSER m -> {
         /* ignore */
       }
@@ -1034,6 +1035,15 @@ public class IRCClientEngine implements Closeable {
                             : "")))));
   }
 
+  private void handle(IRCMessageTOPIC message) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null) {
+      return;
+    }
+
+    state.setChannelTopic(message.getChannel(), message.getTopic());
+  }
+
   private void handle(IRCMessage001 message) {
     IRCClientState state = clientStateGuard.getState();
     if (state == null
@@ -1046,7 +1056,8 @@ public class IRCClientEngine implements Closeable {
 
     state.setMe(message.getClient());
 
-    terminal.println(makeSystemTerminalMessage(s("You are now registered as ", f(message.getClient()), "!")));
+    terminal.println(
+        makeSystemTerminalMessage(s("You are now registered as ", f(message.getClient()), "!")));
   }
 
   private void handle(IRCMessage005 message) {
@@ -1239,12 +1250,12 @@ public class IRCClientEngine implements Closeable {
 
   private TerminalMessage makeSystemTerminalMessage(RichString message) {
     return new TerminalMessage(
-            LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.GRAY, message));
+        LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.GRAY, message));
   }
 
   private TerminalMessage makeSystemMessageOfTheDay(String message) {
     return new TerminalMessage(
-            LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.ORANGE, message));
+        LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.ORANGE, message));
   }
 
   private TerminalMessage makeSystemErrorMessage(String message) {
@@ -1297,7 +1308,14 @@ public class IRCClientEngine implements Closeable {
                       })
                   .toArray(RichString[]::new);
           if (members.length > 0) {
-            status = s("Chatting in ", f(channel.getName()), " with ", j(", ", members), " ", formattedTopic);
+            status =
+                s(
+                    "Chatting in ",
+                    f(channel.getName()),
+                    " with ",
+                    j(", ", members),
+                    " ",
+                    formattedTopic);
           } else {
             status = s("Chatting in ", f(channel.getName()), " all alone ", formattedTopic);
           }
