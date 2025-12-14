@@ -226,6 +226,24 @@ public class IRCClientState {
     channel.clearFlag(mode);
   }
 
+  public String getChannelTopic(String channelName) {
+    Channel channel = findChannel(channelName);
+    if (channel == null) {
+      return null;
+    }
+
+    return channel.getTopic();
+  }
+
+  public void setChannelTopic(String channelName, String topic) {
+    Channel channel = findChannel(channelName);
+    if (channel == null) {
+      return;
+    }
+
+    channel.setTopic(topic);
+  }
+
   public void setUserFlag(String nick, Character mode) {
     User user = findUser(nick);
     if (user == null) {
@@ -349,6 +367,7 @@ public class IRCClientState {
 
   public static final class Channel {
     private String name;
+    private String topic;
     private final Map<User, Membership> members = new HashMap<>();
     private final Map<Character, List<String>> lists = new HashMap<>();
     private final Map<Character, String> settings = new HashMap<>();
@@ -416,6 +435,14 @@ public class IRCClientState {
 
     private void clearFlag(Character mode) {
       flags.remove(mode);
+    }
+
+    private String getTopic() {
+      return topic;
+    }
+
+    private void setTopic(String topic) {
+      this.topic = topic;
     }
   }
 

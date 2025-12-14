@@ -280,12 +280,8 @@ public class IRCClientEngine implements Closeable {
         /* ignore */
       }
       case IRCMessage001 m -> handle(m);
-      case IRCMessage002 m -> {
-        /* ignore */
-      }
-      case IRCMessage003 m -> {
-        /* ignore */
-      }
+      case IRCMessage002 m -> terminal.println(makeSystemTerminalMessage(m.getMessage()));
+      case IRCMessage003 m -> terminal.println(makeSystemTerminalMessage(m.getMessage()));
       case IRCMessage004 m -> {
         /* ignore */
       }
@@ -404,12 +400,8 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage330 m -> {
         /* ignore */
       }
-      case IRCMessage331 m -> {
-        /* ignore */
-      }
-      case IRCMessage332 m -> {
-        /* ignore */
-      }
+      case IRCMessage331 m -> handle(m);
+      case IRCMessage332 m -> handle(m);
       case IRCMessage333 m -> {
         /* ignore */
       }
@@ -465,15 +457,11 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage371 m -> {
         /* ignore */
       }
-      case IRCMessage372 m -> {
-        /* ignore */
-      }
+      case IRCMessage372 m -> terminal.println(makeSystemMessageOfTheDay(m.getText()));
       case IRCMessage374 m -> {
         /* ignore */
       }
-      case IRCMessage375 m -> {
-        /* ignore */
-      }
+      case IRCMessage375 m -> terminal.println(makeSystemMessageOfTheDay(m.getText()));
       case IRCMessage376 m -> {
         /* ignore */
       }
@@ -528,9 +516,7 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage421 m -> {
         /* ignore */
       }
-      case IRCMessage422 m -> {
-        /* ignore */
-      }
+      case IRCMessage422 m -> makeSystemMessageOfTheDay("There is no Message of the Day");
       case IRCMessage431 m -> {
         /* ignore */
       }
@@ -634,9 +620,9 @@ public class IRCClientEngine implements Closeable {
         /* ignore */
       }
       case IRCMessageUnsupported m ->
-          terminal.println(makeSystemTerminalMessage("» " + m.getRawMessage()));
+          terminal.println(makeSystemErrorMessage("» " + m.getRawMessage()));
       case IRCMessageParseError m ->
-          terminal.println(makeSystemTerminalMessage("(PARSE ERROR) » " + m.getRawMessage()));
+          terminal.println(makeSystemErrorMessage("(PARSE ERROR) » " + m.getRawMessage()));
     }
     updateStatusAndPrompt();
   }
@@ -1059,6 +1045,8 @@ public class IRCClientEngine implements Closeable {
     }
 
     state.setMe(message.getClient());
+
+    terminal.println(makeSystemTerminalMessage(s("You are now registered as ", f(message.getClient()), "!")));
   }
 
   private void handle(IRCMessage005 message) {
@@ -1072,6 +1060,24 @@ public class IRCClientEngine implements Closeable {
     for (Map.Entry<String, String> entry : message.getParameters().sequencedEntrySet()) {
       IRCServerParametersUnmarshaller.parse(entry.getKey(), entry.getValue(), parameters);
     }
+  }
+
+  private void handle(IRCMessage331 message) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null) {
+      return;
+    }
+
+    state.setChannelTopic(message.getChannel(), null);
+  }
+
+  private void handle(IRCMessage332 message) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null) {
+      return;
+    }
+
+    state.setChannelTopic(message.getChannel(), message.getTopic());
   }
 
   private void handle(IRCMessage353 message) {
@@ -1231,6 +1237,16 @@ public class IRCClientEngine implements Closeable {
         LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.GRAY, message));
   }
 
+  private TerminalMessage makeSystemTerminalMessage(RichString message) {
+    return new TerminalMessage(
+            LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.GRAY, message));
+  }
+
+  private TerminalMessage makeSystemMessageOfTheDay(String message) {
+    return new TerminalMessage(
+            LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.ORANGE, message));
+  }
+
   private TerminalMessage makeSystemErrorMessage(String message) {
     return new TerminalMessage(
         LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.RED, message));
@@ -1263,6 +1279,8 @@ public class IRCClientEngine implements Closeable {
         IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
         prompt = s("[", f(state.getMe()), "@", f(properties.getHost().getHostName()), "]:");
         if (channel != null) {
+          String topic = state.getChannelTopic(channel.getName());
+          RichString formattedTopic = topic == null ? s("(no topic)") : s("(", topic, ")");
           RichString[] members =
               channel.getMemberships().entrySet().stream()
                   .filter(e -> !Objects.equals(e.getKey().getNickname(), state.getMe()))
@@ -1279,9 +1297,9 @@ public class IRCClientEngine implements Closeable {
                       })
                   .toArray(RichString[]::new);
           if (members.length > 0) {
-            status = s("Chatting in ", f(channel.getName()), " with ", j(", ", members));
+            status = s("Chatting in ", f(channel.getName()), " with ", j(", ", members), " ", formattedTopic);
           } else {
-            status = s("Chatting in ", f(channel.getName()), " all alone");
+            status = s("Chatting in ", f(channel.getName()), " all alone ", formattedTopic);
           }
           prompt =
               s(
