@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class IRCMessageRoundTripTest {
+public class IRCMessageSerializationTest {
 
     private final IRCMessageMarshaller marshaller = new IRCMessageMarshaller();
     private final IRCMessageUnmarshaller unmarshaller = new IRCMessageUnmarshaller();

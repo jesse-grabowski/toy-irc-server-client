@@ -66,133 +66,196 @@ public class IRCMessageUnmarshaller {
         case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(parameters);
         case IRCMessageUSER.COMMAND -> parseUser(parameters);
         case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
-        case IRCMessage001.COMMAND -> parse001(parameters);
-        case IRCMessage002.COMMAND -> parse002(parameters);
-        case IRCMessage003.COMMAND -> parse003(parameters);
+        case IRCMessage001.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage001::new);
+        case IRCMessage002.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage002::new);
+        case IRCMessage003.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage003::new);
         case IRCMessage004.COMMAND -> parse004(parameters);
         case IRCMessage005.COMMAND -> parse005(parameters);
         case IRCMessage010.COMMAND -> parse010(parameters);
         case IRCMessage212.COMMAND -> parse212(parameters);
-        case IRCMessage219.COMMAND -> parse219(parameters);
-        case IRCMessage221.COMMAND -> parse221(parameters);
-        case IRCMessage242.COMMAND -> parse242(parameters);
-        case IRCMessage251.COMMAND -> parse251(parameters);
+        case IRCMessage219.COMMAND ->
+            parseExact(parameters, "client", "stats letter", IRCMessage219::new);
+        case IRCMessage221.COMMAND ->
+            parseExact(parameters, "client", "user modes", IRCMessage221::new);
+        case IRCMessage242.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage242::new);
+        case IRCMessage251.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage251::new);
         case IRCMessage252.COMMAND -> parse252(parameters);
         case IRCMessage253.COMMAND -> parse253(parameters);
         case IRCMessage254.COMMAND -> parse254(parameters);
-        case IRCMessage255.COMMAND -> parse255(parameters);
+        case IRCMessage255.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage255::new);
         case IRCMessage256.COMMAND -> parse256(parameters);
-        case IRCMessage257.COMMAND -> parse257(parameters);
-        case IRCMessage258.COMMAND -> parse258(parameters);
-        case IRCMessage259.COMMAND -> parse259(parameters);
-        case IRCMessage263.COMMAND -> parse263(parameters);
+        case IRCMessage257.COMMAND -> parseExact(parameters, "client", "info", IRCMessage257::new);
+        case IRCMessage258.COMMAND -> parseExact(parameters, "client", "info", IRCMessage258::new);
+        case IRCMessage259.COMMAND -> parseExact(parameters, "client", "info", IRCMessage259::new);
+        case IRCMessage263.COMMAND ->
+            parseExact(parameters, "client", "command", "message", IRCMessage263::new);
         case IRCMessage265.COMMAND -> parse265(parameters);
         case IRCMessage266.COMMAND -> parse266(parameters);
-        case IRCMessage276.COMMAND -> parse276(parameters);
-        case IRCMessage301.COMMAND -> parse301(parameters);
+        case IRCMessage276.COMMAND ->
+            parseExact(parameters, "client", "nick", "message", IRCMessage276::new);
+        case IRCMessage301.COMMAND ->
+            parseExact(parameters, "client", "nick", "message", IRCMessage301::new);
         case IRCMessage302.COMMAND -> parse302(parameters);
-        case IRCMessage305.COMMAND -> parse305(parameters);
-        case IRCMessage306.COMMAND -> parse306(parameters);
-        case IRCMessage307.COMMAND -> parse307(parameters);
+        case IRCMessage305.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage305::new);
+        case IRCMessage306.COMMAND ->
+            parseExact(parameters, "client", "message", IRCMessage306::new);
+        case IRCMessage307.COMMAND -> parseExact(parameters, "client", "nick", IRCMessage307::new);
         case IRCMessage311.COMMAND -> parse311(parameters);
-        case IRCMessage312.COMMAND -> parse312(parameters);
-        case IRCMessage313.COMMAND -> parse313(parameters);
+        case IRCMessage312.COMMAND ->
+            parseExact(parameters, "client", "nick", "server", "server info", IRCMessage312::new);
+        case IRCMessage313.COMMAND ->
+            parseExact(parameters, "client", "nick", "message", IRCMessage313::new);
         case IRCMessage314.COMMAND -> parse314(parameters);
-        case IRCMessage315.COMMAND -> parse315(parameters);
+        case IRCMessage315.COMMAND -> parseExact(parameters, "client", "mask", IRCMessage315::new);
         case IRCMessage317.COMMAND -> parse317(parameters);
-        case IRCMessage318.COMMAND -> parse318(parameters);
+        case IRCMessage318.COMMAND -> parseExact(parameters, "client", "nick", IRCMessage318::new);
         case IRCMessage319.COMMAND -> parse319(parameters);
-        case IRCMessage320.COMMAND -> parse320(parameters);
-        case IRCMessage321.COMMAND -> parse321(parameters);
+        case IRCMessage320.COMMAND ->
+            parseExact(parameters, "client", "nick", "message", IRCMessage320::new);
+        case IRCMessage321.COMMAND -> parseExact(parameters, "client", IRCMessage321::new);
         case IRCMessage322.COMMAND -> parse322(parameters);
-        case IRCMessage323.COMMAND -> parse323(parameters);
+        case IRCMessage323.COMMAND -> parseExact(parameters, "client", IRCMessage323::new);
         case IRCMessage324.COMMAND -> parse324(parameters);
         case IRCMessage329.COMMAND -> parse329(parameters);
-        case IRCMessage330.COMMAND -> parse330(parameters);
-        case IRCMessage331.COMMAND -> parse331(parameters);
-        case IRCMessage332.COMMAND -> parse332(parameters);
+        case IRCMessage330.COMMAND ->
+            parseExact(parameters, "client", "nick", "account", IRCMessage330::new);
+        case IRCMessage331.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage331::new);
+        case IRCMessage332.COMMAND ->
+            parseExact(parameters, "client", "channel", "topic", IRCMessage332::new);
         case IRCMessage333.COMMAND -> parse333(parameters);
-        case IRCMessage336.COMMAND -> parse336(parameters);
-        case IRCMessage337.COMMAND -> parse337(parameters);
+        case IRCMessage336.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage336::new);
+        case IRCMessage337.COMMAND -> parseExact(parameters, "client", IRCMessage337::new);
         case IRCMessage338.COMMAND -> parse338(parameters);
-        case IRCMessage341.COMMAND -> parse341(parameters);
-        case IRCMessage346.COMMAND -> parse346(parameters);
-        case IRCMessage347.COMMAND -> parse347(parameters);
-        case IRCMessage348.COMMAND -> parse348(parameters);
-        case IRCMessage349.COMMAND -> parse349(parameters);
-        case IRCMessage351.COMMAND -> parse351(parameters);
+        case IRCMessage341.COMMAND ->
+            parseExact(parameters, "client", "nick", "channel", IRCMessage341::new);
+        case IRCMessage346.COMMAND ->
+            parseExact(parameters, "client", "channel", "mask", IRCMessage346::new);
+        case IRCMessage347.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage347::new);
+        case IRCMessage348.COMMAND ->
+            parseExact(parameters, "client", "channel", "mask", IRCMessage348::new);
+        case IRCMessage349.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage349::new);
+        case IRCMessage351.COMMAND ->
+            parseExact(parameters, "client", "version", "server", "comments", IRCMessage351::new);
         case IRCMessage352.COMMAND -> parse352(parameters);
         case IRCMessage353.COMMAND -> parse353(parameters);
         case IRCMessage364.COMMAND -> parse364(parameters);
-        case IRCMessage365.COMMAND -> parse365(parameters);
-        case IRCMessage366.COMMAND -> parse366(parameters);
+        case IRCMessage365.COMMAND -> parseExact(parameters, "client", IRCMessage365::new);
+        case IRCMessage366.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage366::new);
         case IRCMessage367.COMMAND -> parse367(parameters);
-        case IRCMessage368.COMMAND -> parse368(parameters);
-        case IRCMessage369.COMMAND -> parse369(parameters);
-        case IRCMessage371.COMMAND -> parse371(parameters);
-        case IRCMessage372.COMMAND -> parse372(parameters);
-        case IRCMessage374.COMMAND -> parse374(parameters);
-        case IRCMessage375.COMMAND -> parse375(parameters);
-        case IRCMessage376.COMMAND -> parse376(parameters);
-        case IRCMessage378.COMMAND -> parse378(parameters);
-        case IRCMessage379.COMMAND -> parse379(parameters);
-        case IRCMessage381.COMMAND -> parse381(parameters);
-        case IRCMessage382.COMMAND -> parse382(parameters);
+        case IRCMessage368.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage368::new);
+        case IRCMessage369.COMMAND -> parseExact(parameters, "client", "nick", IRCMessage369::new);
+        case IRCMessage371.COMMAND ->
+            parseExact(parameters, "client", "string", IRCMessage371::new);
+        case IRCMessage372.COMMAND -> parseExact(parameters, "client", "line", IRCMessage372::new);
+        case IRCMessage374.COMMAND -> parseExact(parameters, "client", IRCMessage374::new);
+        case IRCMessage375.COMMAND -> parseExact(parameters, "client", "motd", IRCMessage375::new);
+        case IRCMessage376.COMMAND -> parseExact(parameters, "client", IRCMessage376::new);
+        case IRCMessage378.COMMAND ->
+            parseExact(parameters, "client", "nick", "text", IRCMessage378::new);
+        case IRCMessage379.COMMAND ->
+            parseExact(parameters, "client", "nick", "modes", IRCMessage379::new);
+        case IRCMessage381.COMMAND -> parseExact(parameters, "client", IRCMessage381::new);
+        case IRCMessage382.COMMAND -> parseExact(parameters, "client", "file", IRCMessage382::new);
         case IRCMessage391.COMMAND -> parse391(parameters);
         case IRCMessage400.COMMAND -> parse400(parameters);
-        case IRCMessage401.COMMAND -> parse401(parameters);
-        case IRCMessage402.COMMAND -> parse402(parameters);
-        case IRCMessage403.COMMAND -> parse403(parameters);
-        case IRCMessage404.COMMAND -> parse404(parameters);
-        case IRCMessage405.COMMAND -> parse405(parameters);
-        case IRCMessage406.COMMAND -> parse406(parameters);
-        case IRCMessage409.COMMAND -> parse409(parameters);
-        case IRCMessage411.COMMAND -> parse411(parameters);
-        case IRCMessage412.COMMAND -> parse412(parameters);
-        case IRCMessage417.COMMAND -> parse417(parameters);
-        case IRCMessage421.COMMAND -> parse421(parameters);
-        case IRCMessage422.COMMAND -> parse422(parameters);
-        case IRCMessage431.COMMAND -> parse431(parameters);
-        case IRCMessage432.COMMAND -> parse432(parameters);
-        case IRCMessage433.COMMAND -> parse433(parameters);
-        case IRCMessage436.COMMAND -> parse436(parameters);
-        case IRCMessage441.COMMAND -> parse441(parameters);
-        case IRCMessage442.COMMAND -> parse442(parameters);
-        case IRCMessage443.COMMAND -> parse443(parameters);
-        case IRCMessage451.COMMAND -> parse451(parameters);
-        case IRCMessage461.COMMAND -> parse461(parameters);
-        case IRCMessage462.COMMAND -> parse462(parameters);
-        case IRCMessage464.COMMAND -> parse464(parameters);
-        case IRCMessage465.COMMAND -> parse465(parameters);
-        case IRCMessage471.COMMAND -> parse471(parameters);
+        case IRCMessage401.COMMAND ->
+            parseExact(parameters, "client", "nickname", "text", IRCMessage401::new);
+        case IRCMessage402.COMMAND ->
+            parseExact(parameters, "client", "server name", "text", IRCMessage402::new);
+        case IRCMessage403.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage403::new);
+        case IRCMessage404.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage404::new);
+        case IRCMessage405.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage405::new);
+        case IRCMessage406.COMMAND ->
+            parseExact(parameters, "client", "nickname", "text", IRCMessage406::new);
+        case IRCMessage409.COMMAND -> parseExact(parameters, "client", "text", IRCMessage409::new);
+        case IRCMessage411.COMMAND -> parseExact(parameters, "client", "text", IRCMessage411::new);
+        case IRCMessage412.COMMAND -> parseExact(parameters, "client", "text", IRCMessage412::new);
+        case IRCMessage417.COMMAND -> parseExact(parameters, "client", "text", IRCMessage417::new);
+        case IRCMessage421.COMMAND ->
+            parseExact(parameters, "client", "command", IRCMessage421::new);
+        case IRCMessage422.COMMAND -> parseExact(parameters, "client", IRCMessage422::new);
+        case IRCMessage431.COMMAND -> parseExact(parameters, "client", IRCMessage431::new);
+        case IRCMessage432.COMMAND -> parseExact(parameters, "client", "nick", IRCMessage432::new);
+        case IRCMessage433.COMMAND -> parseExact(parameters, "client", "nick", IRCMessage433::new);
+        case IRCMessage436.COMMAND ->
+            parseExact(parameters, "client", "nick", "text", IRCMessage436::new);
+        case IRCMessage441.COMMAND ->
+            parseExact(parameters, "client", "nick", "channel", IRCMessage441::new);
+        case IRCMessage442.COMMAND ->
+            parseExact(parameters, "client", "channel", IRCMessage442::new);
+        case IRCMessage443.COMMAND ->
+            parseExact(parameters, "client", "nick", "channel", IRCMessage443::new);
+        case IRCMessage451.COMMAND -> parseExact(parameters, "client", "text", IRCMessage451::new);
+        case IRCMessage461.COMMAND ->
+            parseExact(parameters, "client", "command", "text", IRCMessage461::new);
+        case IRCMessage462.COMMAND -> parseExact(parameters, "client", IRCMessage462::new);
+        case IRCMessage464.COMMAND -> parseExact(parameters, "client", IRCMessage464::new);
+        case IRCMessage465.COMMAND -> parseExact(parameters, "client", "text", IRCMessage465::new);
+        case IRCMessage471.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage471::new);
         case IRCMessage472.COMMAND -> parse472(parameters);
-        case IRCMessage473.COMMAND -> parse473(parameters);
-        case IRCMessage474.COMMAND -> parse474(parameters);
-        case IRCMessage475.COMMAND -> parse475(parameters);
-        case IRCMessage476.COMMAND -> parse476(parameters);
-        case IRCMessage481.COMMAND -> parse481(parameters);
-        case IRCMessage482.COMMAND -> parse482(parameters);
-        case IRCMessage483.COMMAND -> parse483(parameters);
-        case IRCMessage491.COMMAND -> parse491(parameters);
-        case IRCMessage501.COMMAND -> parse501(parameters);
-        case IRCMessage502.COMMAND -> parse502(parameters);
-        case IRCMessage524.COMMAND -> parse524(parameters);
-        case IRCMessage525.COMMAND -> parse525(parameters);
-        case IRCMessage670.COMMAND -> parse670(parameters);
-        case IRCMessage671.COMMAND -> parse671(parameters);
-        case IRCMessage691.COMMAND -> parse691(parameters);
+        case IRCMessage473.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage473::new);
+        case IRCMessage474.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage474::new);
+        case IRCMessage475.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage475::new);
+        case IRCMessage476.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage476::new);
+        case IRCMessage481.COMMAND -> parseExact(parameters, "client", "text", IRCMessage481::new);
+        case IRCMessage482.COMMAND ->
+            parseExact(parameters, "client", "channel", "text", IRCMessage482::new);
+        case IRCMessage483.COMMAND -> parseExact(parameters, "client", "text", IRCMessage483::new);
+        case IRCMessage491.COMMAND -> parseExact(parameters, "client", "text", IRCMessage491::new);
+        case IRCMessage501.COMMAND -> parseExact(parameters, "client", "text", IRCMessage501::new);
+        case IRCMessage502.COMMAND -> parseExact(parameters, "client", "text", IRCMessage502::new);
+        case IRCMessage524.COMMAND ->
+            parseExact(parameters, "client", "subject", "text", IRCMessage524::new);
+        case IRCMessage525.COMMAND ->
+            parseExact(parameters, "client", "target chan", "text", IRCMessage525::new);
+        case IRCMessage670.COMMAND -> parseExact(parameters, "client", "text", IRCMessage670::new);
+        case IRCMessage671.COMMAND ->
+            parseExact(parameters, "client", "nick", "text", IRCMessage671::new);
+        case IRCMessage691.COMMAND -> parseExact(parameters, "client", "text", IRCMessage691::new);
         case IRCMessage696.COMMAND -> parse696(parameters);
-        case IRCMessage704.COMMAND -> parse704(parameters);
-        case IRCMessage705.COMMAND -> parse705(parameters);
-        case IRCMessage706.COMMAND -> parse706(parameters);
-        case IRCMessage723.COMMAND -> parse723(parameters);
+        case IRCMessage704.COMMAND ->
+            parseExact(parameters, "client", "subject", "text", IRCMessage704::new);
+        case IRCMessage705.COMMAND ->
+            parseExact(parameters, "client", "subject", "text", IRCMessage705::new);
+        case IRCMessage706.COMMAND ->
+            parseExact(parameters, "client", "subject", "text", IRCMessage706::new);
+        case IRCMessage723.COMMAND ->
+            parseExact(parameters, "client", "priv", "text", IRCMessage723::new);
         default ->
             new IRCMessageUnsupported(
                 command, message, tags, prefix.name(), prefix.user(), prefix.host());
       };
     } catch (Exception e) {
       return new IRCMessageParseError(
-          command, message, tags, prefix.name(), prefix.user(), prefix.host(), e.getMessage());
+          command,
+          message,
+          tags,
+          prefix.name(),
+          prefix.user(),
+          prefix.host(),
+          e.getMessage(),
+          parameters.errorParameters);
     }
   }
 
@@ -283,17 +346,8 @@ public class IRCMessageUnmarshaller {
     return parameters
         .injectConditionally()
         .ifIndexEquals(0, "END", p -> p.inject(IRCMessageCAPEND::new))
-        .ifIndexEquals(
-            0,
-            "LS",
-            p ->
-                p.inject(
-                    required("version"),
-                    IRCMessageCAPLSRequest::new))
-        .ifIndexEquals(
-            0,
-            "LIST",
-            p -> p.inject(IRCMessageCAPLISTRequest::new))
+        .ifIndexEquals(0, "LS", p -> p.inject(required("version"), IRCMessageCAPLSRequest::new))
+        .ifIndexEquals(0, "LIST", p -> p.inject(IRCMessageCAPLISTRequest::new))
         .ifIndexEquals(
             0,
             "REQ",
@@ -440,24 +494,12 @@ public class IRCMessageUnmarshaller {
 
   private IRCMessageUSER parseUser(Parameters parameters) throws Exception {
     return parameters
-        .consume(1, 2)
+        .discard(1, 2)
         .inject(required("username"), required("realname"), IRCMessageUSER::new);
   }
 
   private IRCMessageQUIT parseQuit(Parameters parameters) throws Exception {
     return parameters.inject(optional("reason"), IRCMessageQUIT::new);
-  }
-
-  private IRCMessage001 parse001(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("message"), IRCMessage001::new);
-  }
-
-  private IRCMessage002 parse002(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("message"), IRCMessage002::new);
-  }
-
-  private IRCMessage003 parse003(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("message"), IRCMessage003::new);
   }
 
   private IRCMessage004 parse004(Parameters parameters) throws Exception {
@@ -498,22 +540,6 @@ public class IRCMessageUnmarshaller {
         IRCMessage212::new);
   }
 
-  private IRCMessage219 parse219(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("stats letter"), IRCMessage219::new);
-  }
-
-  private IRCMessage221 parse221(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("user modes"), IRCMessage221::new);
-  }
-
-  private IRCMessage242 parse242(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("message"), IRCMessage242::new);
-  }
-
-  private IRCMessage251 parse251(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("message"), IRCMessage251::new);
-  }
-
   private IRCMessage252 parse252(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"), required("ops", Integer::parseInt), IRCMessage252::new);
@@ -529,30 +555,9 @@ public class IRCMessageUnmarshaller {
         required("client"), required("channels", Integer::parseInt), IRCMessage254::new);
   }
 
-  private IRCMessage255 parse255(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("message"), IRCMessage255::new);
-  }
-
   private IRCMessage256 parse256(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"), optional("server"), required("text"), IRCMessage256::new);
-  }
-
-  private IRCMessage257 parse257(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("info"), IRCMessage257::new);
-  }
-
-  private IRCMessage258 parse258(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("info"), IRCMessage258::new);
-  }
-
-  private IRCMessage259 parse259(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("info"), IRCMessage259::new);
-  }
-
-  private IRCMessage263 parse263(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("command"), required("text"), IRCMessage263::new);
   }
 
   private IRCMessage265 parse265(Parameters parameters) throws Exception {
@@ -573,36 +578,14 @@ public class IRCMessageUnmarshaller {
         IRCMessage266::new);
   }
 
-  private IRCMessage276 parse276(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("text"), IRCMessage276::new);
-  }
-
-  private IRCMessage301 parse301(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("message"), IRCMessage301::new);
-  }
-
   private IRCMessage302 parse302(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"), required("reply", splitToListDelimited("\\s+")), IRCMessage302::new);
   }
 
-  private IRCMessage305 parse305(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage305::new);
-  }
-
-  private IRCMessage306 parse306(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage306::new);
-  }
-
-  private IRCMessage307 parse307(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("nick"), IRCMessage307::new);
-  }
-
   private IRCMessage311 parse311(Parameters parameters) throws Exception {
     return parameters
-        .consume(4)
+        .discard(4)
         .inject(
             required("client"),
             required("nick"),
@@ -612,23 +595,9 @@ public class IRCMessageUnmarshaller {
             IRCMessage311::new);
   }
 
-  private IRCMessage312 parse312(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"),
-        required("nick"),
-        required("server"),
-        required("server info"),
-        IRCMessage312::new);
-  }
-
-  private IRCMessage313 parse313(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("text"), IRCMessage313::new);
-  }
-
   private IRCMessage314 parse314(Parameters parameters) throws Exception {
     return parameters
-        .consume(4)
+        .discard(4)
         .inject(
             required("client"),
             required("nick"),
@@ -638,10 +607,6 @@ public class IRCMessageUnmarshaller {
             IRCMessage314::new);
   }
 
-  private IRCMessage315 parse315(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("mask"), IRCMessage315::new);
-  }
-
   private IRCMessage317 parse317(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"),
@@ -649,10 +614,6 @@ public class IRCMessageUnmarshaller {
         required("secs"),
         required("signon", Long::parseLong),
         IRCMessage317::new);
-  }
-
-  private IRCMessage318 parse318(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("nick"), IRCMessage318::new);
   }
 
   private IRCMessage319 parse319(Parameters parameters) throws Exception {
@@ -666,15 +627,6 @@ public class IRCMessageUnmarshaller {
         IRCMessage319::new);
   }
 
-  private IRCMessage320 parse320(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("text"), IRCMessage320::new);
-  }
-
-  private IRCMessage321 parse321(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage321::new);
-  }
-
   private IRCMessage322 parse322(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"),
@@ -682,10 +634,6 @@ public class IRCMessageUnmarshaller {
         required("client count", Integer::parseInt),
         required("topic"),
         IRCMessage322::new);
-  }
-
-  private IRCMessage323 parse323(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage323::new);
   }
 
   private IRCMessage324 parse324(Parameters parameters) throws Exception {
@@ -705,20 +653,6 @@ public class IRCMessageUnmarshaller {
         IRCMessage329::new);
   }
 
-  private IRCMessage330 parse330(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("account"), IRCMessage330::new);
-  }
-
-  private IRCMessage331 parse331(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage331::new);
-  }
-
-  private IRCMessage332 parse332(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("topic"), IRCMessage332::new);
-  }
-
   private IRCMessage333 parse333(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"),
@@ -726,14 +660,6 @@ public class IRCMessageUnmarshaller {
         required("nick"),
         required("setat", Long::parseLong),
         IRCMessage333::new);
-  }
-
-  private IRCMessage336 parse336(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage336::new);
-  }
-
-  private IRCMessage337 parse337(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage337::new);
   }
 
   private IRCMessage parse338(Parameters parameters) throws Exception {
@@ -784,38 +710,6 @@ public class IRCMessageUnmarshaller {
         .inject();
   }
 
-  private IRCMessage341 parse341(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("channel"), IRCMessage341::new);
-  }
-
-  private IRCMessage346 parse346(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("mask"), IRCMessage346::new);
-  }
-
-  private IRCMessage347 parse347(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage347::new);
-  }
-
-  private IRCMessage348 parse348(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("mask"), IRCMessage348::new);
-  }
-
-  private IRCMessage349 parse349(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage349::new);
-  }
-
-  private IRCMessage351 parse351(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"),
-        required("version"),
-        required("server"),
-        required("comments"),
-        IRCMessage351::new);
-  }
-
   private IRCMessage352 parse352(Parameters parameters) throws Exception {
     SplittingParameterInjector<String, String> splitter =
         splitString("<hopcount> <realname>", "\\s+");
@@ -856,14 +750,6 @@ public class IRCMessageUnmarshaller {
         IRCMessage364::new);
   }
 
-  private IRCMessage365 parse365(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage365::new);
-  }
-
-  private IRCMessage366 parse366(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage366::new);
-  }
-
   private IRCMessage367 parse367(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"),
@@ -872,52 +758,6 @@ public class IRCMessageUnmarshaller {
         optional("who"),
         optional("set-ts", Long::parseLong),
         IRCMessage367::new);
-  }
-
-  private IRCMessage368 parse368(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage368::new);
-  }
-
-  private IRCMessage369 parse369(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("nick"), IRCMessage369::new);
-  }
-
-  private IRCMessage371 parse371(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("string"), IRCMessage371::new);
-  }
-
-  private IRCMessage372 parse372(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("string"), IRCMessage372::new);
-  }
-
-  private IRCMessage374 parse374(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage374::new);
-  }
-
-  private IRCMessage375 parse375(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("string"), IRCMessage375::new);
-  }
-
-  private IRCMessage376 parse376(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage376::new);
-  }
-
-  private IRCMessage378 parse378(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("text"), IRCMessage378::new);
-  }
-
-  private IRCMessage379 parse379(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nick"), required("modes"), IRCMessage379::new);
-  }
-
-  private IRCMessage381 parse381(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage381::new);
-  }
-
-  private IRCMessage382 parse382(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("config file"), IRCMessage382::new);
   }
 
   private IRCMessage391 parse391(Parameters parameters) throws Exception {
@@ -935,191 +775,12 @@ public class IRCMessageUnmarshaller {
         required("client"), greedyRequired("command"), required("info"), IRCMessage400::new);
   }
 
-  private IRCMessage401 parse401(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nickname"), required("text"), IRCMessage401::new);
-  }
-
-  private IRCMessage402 parse402(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("server name"), required("text"), IRCMessage402::new);
-  }
-
-  private IRCMessage403 parse403(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage403::new);
-  }
-
-  private IRCMessage404 parse404(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage404::new);
-  }
-
-  private IRCMessage405 parse405(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage405::new);
-  }
-
-  private IRCMessage406 parse406(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nickname"), required("text"), IRCMessage406::new);
-  }
-
-  private IRCMessage409 parse409(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage409::new);
-  }
-
-  private IRCMessage411 parse411(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage411::new);
-  }
-
-  private IRCMessage412 parse412(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage412::new);
-  }
-
-  private IRCMessage417 parse417(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage417::new);
-  }
-
-  private IRCMessage421 parse421(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("command"), IRCMessage421::new);
-  }
-
-  private IRCMessage422 parse422(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage422::new);
-  }
-
-  private IRCMessage431 parse431(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage431::new);
-  }
-
-  private IRCMessage432 parse432(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("nickname"), IRCMessage432::new);
-  }
-
-  private IRCMessage433 parse433(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("nickname"), IRCMessage433::new);
-  }
-
-  private IRCMessage436 parse436(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nickname"), required("text"), IRCMessage436::new);
-  }
-
-  private IRCMessage441 parse441(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nickname"), required("channel"), IRCMessage441::new);
-  }
-
-  private IRCMessage442 parse442(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("channel"), IRCMessage442::new);
-  }
-
-  private IRCMessage443 parse443(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nickname"), required("channel"), IRCMessage443::new);
-  }
-
-  private IRCMessage451 parse451(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage451::new);
-  }
-
-  private IRCMessage461 parse461(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("command"), required("text"), IRCMessage461::new);
-  }
-
-  private IRCMessage462 parse462(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage462::new);
-  }
-
-  private IRCMessage464 parse464(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), IRCMessage464::new);
-  }
-
-  private IRCMessage465 parse465(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("reason"), IRCMessage465::new);
-  }
-
-  private IRCMessage471 parse471(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage471::new);
-  }
-
   private IRCMessage472 parse472(Parameters parameters) throws Exception {
     return parameters.inject(
         required("client"),
         required("modechar", s -> s.charAt(0)),
         required("text"),
         IRCMessage472::new);
-  }
-
-  private IRCMessage473 parse473(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage473::new);
-  }
-
-  private IRCMessage474 parse474(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage474::new);
-  }
-
-  private IRCMessage475 parse475(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage475::new);
-  }
-
-  private IRCMessage476 parse476(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage476::new);
-  }
-
-  private IRCMessage481 parse481(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage481::new);
-  }
-
-  private IRCMessage482 parse482(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("channel"), required("text"), IRCMessage482::new);
-  }
-
-  private IRCMessage483 parse483(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage483::new);
-  }
-
-  private IRCMessage491 parse491(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage491::new);
-  }
-
-  private IRCMessage501 parse501(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage501::new);
-  }
-
-  private IRCMessage502 parse502(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage502::new);
-  }
-
-  private IRCMessage524 parse524(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("subject"), required("text"), IRCMessage524::new);
-  }
-
-  private IRCMessage525 parse525(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("target chan"), required("text"), IRCMessage525::new);
-  }
-
-  private IRCMessage670 parse670(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage670::new);
-  }
-
-  private IRCMessage671 parse671(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("nickname"), required("text"), IRCMessage671::new);
-  }
-
-  private IRCMessage691 parse691(Parameters parameters) throws Exception {
-    return parameters.inject(required("client"), required("text"), IRCMessage691::new);
   }
 
   private IRCMessage696 parse696(Parameters parameters) throws Exception {
@@ -1132,24 +793,46 @@ public class IRCMessageUnmarshaller {
         IRCMessage696::new);
   }
 
-  private IRCMessage704 parse704(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("subject"), required("text"), IRCMessage704::new);
+  // generic functions to parse the majority of numerics, which are rather simple
+  private <T extends IRCMessage> T parseExact(
+      Parameters parameters, IRCMessageFactory0<T> factory) {
+    return parameters.inject(factory);
   }
 
-  private IRCMessage705 parse705(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("subject"), required("text"), IRCMessage705::new);
+  private <T extends IRCMessage> T parseExact(
+      Parameters parameters, String arg0, IRCMessageFactory1<T, String> factory) throws Exception {
+    return parameters.inject(required(arg0), factory);
   }
 
-  private IRCMessage706 parse706(Parameters parameters) throws Exception {
-    return parameters.inject(
-        required("client"), required("subject"), required("text"), IRCMessage706::new);
+  private <T extends IRCMessage> T parseExact(
+      Parameters parameters,
+      String arg0,
+      String arg1,
+      IRCMessageFactory2<T, String, String> factory)
+      throws Exception {
+    return parameters.inject(required(arg0), required(arg1), factory);
   }
 
-  private IRCMessage723 parse723(Parameters parameters) throws Exception {
+  private <T extends IRCMessage> T parseExact(
+      Parameters parameters,
+      String arg0,
+      String arg1,
+      String arg2,
+      IRCMessageFactory3<T, String, String, String> factory)
+      throws Exception {
+    return parameters.inject(required(arg0), required(arg1), required(arg2), factory);
+  }
+
+  private <T extends IRCMessage> T parseExact(
+      Parameters parameters,
+      String arg0,
+      String arg1,
+      String arg2,
+      String arg3,
+      IRCMessageFactory4<T, String, String, String, String> factory)
+      throws Exception {
     return parameters.inject(
-        required("client"), required("priv"), required("text"), IRCMessage723::new);
+        required(arg0), required(arg1), required(arg2), required(arg3), factory);
   }
 
   // BEYOND THIS POINT IS SCARY PARSING CODE TO ENABLE MY NICE DSL
@@ -1234,7 +917,7 @@ public class IRCMessageUnmarshaller {
       return channelMembershipPrefixes;
     }
 
-    public Parameters consume(int... indexes) throws NotEnoughParametersException {
+    public Parameters discard(int... indexes) throws NotEnoughParametersException {
       List<String> filteredParameters = new ArrayList<>(params);
       List<Integer> removalIndexes =
           Arrays.stream(indexes).distinct().boxed().sorted(Comparator.reverseOrder()).toList();
@@ -1504,7 +1187,9 @@ public class IRCMessageUnmarshaller {
     }
 
     public ConditionalInjectionBuilder ifIndex(
-        int index, Predicate<String> predicate, ThrowingFunction<Parameters, IRCMessage> injection) {
+        int index,
+        Predicate<String> predicate,
+        ThrowingFunction<Parameters, IRCMessage> injection) {
       injections.add(new ConditionalInjection(index, predicate, injection));
       return this;
     }
@@ -1581,7 +1266,7 @@ public class IRCMessageUnmarshaller {
       }
       if (remaining < 0) {
         throw new NotEnoughParametersException(
-            "expected at least %d parameters".formatted(paramCount - remaining));
+            "expected at least %d parameters but got %d".formatted(paramCount - remaining, paramCount));
       }
 
       int position = 0;
@@ -1627,7 +1312,7 @@ public class IRCMessageUnmarshaller {
   }
 
   private <T> ParameterExtractor<T> optional(
-          String name, ThrowingFunction<String, T> mapper, T defaultValue) {
+      String name, ThrowingFunction<String, T> mapper, T defaultValue) {
     return new SingleParameterExtractor<>(mapper, false, defaultValue, name);
   }
 
@@ -1690,10 +1375,12 @@ public class IRCMessageUnmarshaller {
     String name();
   }
 
-  private static void logExtractionException(int start, int end, String parameter, String rawMessage, Throwable e) {
+  private static void logExtractionException(
+      int start, int end, String parameter, String rawMessage, Throwable e) {
     if (LOG.isLoggable(Level.FINEST)) {
       LogRecord record =
-              new LogRecord(Level.FINEST, "Error parsing parameter in {0}..{1} (value={2}) for message: {3}");
+          new LogRecord(
+              Level.FINEST, "Error parsing parameter in {0}..{1} (value={2}) for message: {3}");
       record.setParameters(new Object[] {start, end, parameter, rawMessage});
       record.setThrown(e);
       LOG.log(record);
@@ -1708,7 +1395,7 @@ public class IRCMessageUnmarshaller {
     private final String name;
 
     public SingleParameterExtractor(
-            ThrowingFunction<String, T> mapper, boolean required, T defaultValue, String name) {
+        ThrowingFunction<String, T> mapper, boolean required, T defaultValue, String name) {
       this.mapper = mapper;
       this.required = required;
       this.defaultValue = defaultValue;
@@ -1852,7 +1539,9 @@ public class IRCMessageUnmarshaller {
       if (index == null || extracted == index) {
         return result;
       } else if (extracted != -1) {
-        throw new IllegalStateException("SplittingParameterInjector already extracted %d and does not support reuse".formatted(extracted));
+        throw new IllegalStateException(
+            "SplittingParameterInjector already extracted %d and does not support reuse"
+                .formatted(extracted));
       }
       extracted = index;
 
@@ -1878,17 +1567,19 @@ public class IRCMessageUnmarshaller {
     }
 
     public ParameterExtractor<L> left(L defaultValue) {
-      return new SplitPart<L>((i, p) -> {
-        Pair<L, R> result = extract(i, p);
-        return result != null ? result.left() : defaultValue;
-      });
+      return new SplitPart<L>(
+          (i, p) -> {
+            Pair<L, R> result = extract(i, p);
+            return result != null ? result.left() : defaultValue;
+          });
     }
 
     public ParameterExtractor<R> right(R defaultValue) {
-      return new SplitPart<R>((i, p) -> {
-        Pair<L, R> result = extract(i, p);
-        return result != null ? result.right() : defaultValue;
-      });
+      return new SplitPart<R>(
+          (i, p) -> {
+            Pair<L, R> result = extract(i, p);
+            return result != null ? result.right() : defaultValue;
+          });
     }
 
     private class SplitPart<T> implements ParameterExtractor<T> {
