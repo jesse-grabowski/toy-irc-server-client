@@ -10,15 +10,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // did not expect this to be as painful as it was but here we are
-public final class IRCParameterParser {
+public final class IRCServerParametersUnmarshaller {
 
-  private static final Logger LOG = Logger.getLogger(IRCParameterParser.class.getName());
+  private static final Logger LOG =
+      Logger.getLogger(IRCServerParametersUnmarshaller.class.getName());
   private static final Pattern PREFIX_PATTERN =
       Pattern.compile("^\\((?<modes>[a-zA-Z]+)\\)(?<prefixes>\\S+)$");
 
-  private IRCParameterParser() {}
+  private IRCServerParametersUnmarshaller() {}
 
-  public static void parse(String parameter, String value, IRCClientState.Parameters parameters) {
+  public static void parse(String parameter, String value, IRCServerParameters parameters) {
     boolean disable = parameter.startsWith("-");
     if (disable) {
       parameter = parameter.substring(1);
@@ -64,7 +65,7 @@ public final class IRCParameterParser {
   }
 
   private static void parseCaseMapping(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+      boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setCaseMapping(IRCCaseMapping.RFC1459);
     } else {
@@ -90,7 +91,7 @@ public final class IRCParameterParser {
   }
 
   private static void parseChannelLimit(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+      boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setChannelLimits(Map.of());
     } else {
@@ -107,7 +108,7 @@ public final class IRCParameterParser {
   }
 
   private static void parseChannelModes(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+      boolean disable, String value, IRCServerParameters parameters) {
     parameters.setTypeAChannelModes(Set.of());
     parameters.setTypeBChannelModes(Set.of());
     parameters.setTypeCChannelModes(Set.of());
@@ -130,7 +131,7 @@ public final class IRCParameterParser {
   }
 
   private static void parseChannelTypes(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+      boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setChannelTypes(Set.of('#', '&'));
     } else {
@@ -151,7 +152,7 @@ public final class IRCParameterParser {
   }
 
   private static void parseExtendedBanModes(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+      boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setExtendedBanModes(Set.of());
       parameters.setExtendedBanPrefix(null);
@@ -165,8 +166,7 @@ public final class IRCParameterParser {
     }
   }
 
-  private static void parseMaxList(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+  private static void parseMaxList(boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setMaxList(Map.of());
     } else {
@@ -174,8 +174,7 @@ public final class IRCParameterParser {
     }
   }
 
-  private static void parseNetwork(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+  private static void parseNetwork(boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setNetwork("");
     } else {
@@ -183,8 +182,7 @@ public final class IRCParameterParser {
     }
   }
 
-  private static void parsePrefix(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+  private static void parsePrefix(boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setPrefixes(new LinkedHashMap<>());
     } else {
@@ -208,7 +206,7 @@ public final class IRCParameterParser {
   }
 
   private static void parseStatusMessage(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+      boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setStatusMessage(Set.of());
     } else {
@@ -230,8 +228,7 @@ public final class IRCParameterParser {
     return map;
   }
 
-  private static void parseTargMax(
-      boolean disable, String value, IRCClientState.Parameters parameters) {
+  private static void parseTargMax(boolean disable, String value, IRCServerParameters parameters) {
     if (disable) {
       parameters.setTargetMax(Map.of());
     } else {

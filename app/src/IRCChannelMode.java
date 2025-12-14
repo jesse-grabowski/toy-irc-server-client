@@ -12,7 +12,7 @@ public enum IRCChannelMode {
   PROTECTED,
   NO_EXTERNAL_MESSAGES;
 
-  public static Optional<IRCChannelMode> forName(IRCClientState.Parameters parameters, char name) {
+  public static Optional<IRCChannelMode> forName(IRCServerParameters parameters, char name) {
     return switch (name) {
       case 'b' -> Optional.of(BAN);
       case 'l' -> Optional.of(CLIENT_LIMIT);

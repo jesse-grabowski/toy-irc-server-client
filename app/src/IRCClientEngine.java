@@ -1,6 +1,5 @@
 import java.awt.Color;
 import java.io.Closeable;
-import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -212,13 +211,26 @@ public class IRCClientEngine implements Closeable {
   }
 
   private void receive(String message) {
-    receive(UNMARSHALLER.unmarshal(properties.getCharset(), message));
-  }
-
-  private void receive(IRCMessage message) {
-    if (engineState.get() != IRCClientEngineState.CLOSED) {
-      executor.execute(spy(() -> handle(message)));
+    if (engineState.get() == IRCClientEngineState.CLOSED) {
+      return;
     }
+    // use negotiated server parameters from RPL_ISUPPORT if available, otherwise
+    // use some reasonable defaults. Unfortunately since this requires state we need
+    // to handle parsing on the event loop, but it should be relatively quick
+    executor.execute(
+        spy(
+            () -> {
+              IRCClientState state = clientStateGuard.getState();
+              if (state == null) {
+                handle(
+                    UNMARSHALLER.unmarshal(
+                        new IRCServerParameters(), properties.getCharset(), message));
+              } else {
+                handle(
+                    UNMARSHALLER.unmarshal(
+                        state.getParameters(), properties.getCharset(), message));
+              }
+            }));
   }
 
   // note that I'm using sealed classes + switch expressions
@@ -232,9 +244,13 @@ public class IRCClientEngine implements Closeable {
       case IRCMessageCAPEND m -> {
         /* ignore */
       }
-      case IRCMessageCAPLISTRequest m -> { /* ignored */ }
+      case IRCMessageCAPLISTRequest m -> {
+        /* ignored */
+      }
       case IRCMessageCAPLISTResponse m -> handle(m);
-      case IRCMessageCAPLSRequest m -> { /* ignored */ }
+      case IRCMessageCAPLSRequest m -> {
+        /* ignored */
+      }
       case IRCMessageCAPLSResponse m -> handle(m);
       case IRCMessageCAPNAK m -> handle(m);
       case IRCMessageCAPNEW m -> handle(m);
@@ -842,7 +858,7 @@ public class IRCClientEngine implements Closeable {
       return;
     }
 
-    IRCClientState.Parameters parameters = state.getParameters();
+    IRCServerParameters parameters = state.getParameters();
 
     Boolean adding = null; // we don't know yet
     Iterator<String> argumentIterator = mode.getModeArguments().iterator();
@@ -1051,10 +1067,10 @@ public class IRCClientEngine implements Closeable {
       return;
     }
 
-    IRCClientState.Parameters parameters = state.getParameters();
+    IRCServerParameters parameters = state.getParameters();
 
     for (Map.Entry<String, String> entry : message.getParameters().sequencedEntrySet()) {
-      IRCParameterParser.parse(entry.getKey(), entry.getValue(), parameters);
+      IRCServerParametersUnmarshaller.parse(entry.getKey(), entry.getValue(), parameters);
     }
   }
 
@@ -1193,7 +1209,7 @@ public class IRCClientEngine implements Closeable {
   }
 
   private boolean isChannel(IRCClientState state, String target) {
-    IRCClientState.Parameters parameters = state.getParameters();
+    IRCServerParameters parameters = state.getParameters();
     return parameters.getChannelTypes().contains(target.charAt(0));
   }
 

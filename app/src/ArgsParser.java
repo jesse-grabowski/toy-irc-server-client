@@ -100,14 +100,20 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
 
   @Override
   public ArgsParserBuilder<T> addCharsetFlag(
-          char shortKey,
-          String longKey,
-          BiConsumer<T, Charset> propertiesSetter,
-          String description,
-          boolean required) {
+      char shortKey,
+      String longKey,
+      BiConsumer<T, Charset> propertiesSetter,
+      String description,
+      boolean required) {
     addFlagSpec(
-            new FlagSpec<>(
-                    shortKey, longKey, true, propertiesSetter, this::tryParseCharset, description, required));
+        new FlagSpec<>(
+            shortKey,
+            longKey,
+            true,
+            propertiesSetter,
+            this::tryParseCharset,
+            description,
+            required));
     return this;
   }
 

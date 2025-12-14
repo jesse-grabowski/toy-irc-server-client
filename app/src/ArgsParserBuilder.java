@@ -29,11 +29,11 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
       boolean required);
 
   ArgsParserBuilder<T> addCharsetFlag(
-          char shortKey,
-          String longKey,
-          BiConsumer<T, Charset> propertiesSetter,
-          String description,
-          boolean required);
+      char shortKey,
+      String longKey,
+      BiConsumer<T, Charset> propertiesSetter,
+      String description,
+      boolean required);
 
   ArgsParserBuilder<T> addStringPositional(
       int position, BiConsumer<T, String> propertiesSetter, String description, boolean required);

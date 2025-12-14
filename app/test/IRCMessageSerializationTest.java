@@ -15,7 +15,7 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: round-trip \"{0}\" -> \"{1}\"")
     @MethodSource("rawMessages")
     void roundTripRawMessages(String input, String expected) {
-        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
         assertFalse(parsed instanceof IRCMessageParseError);
         assertFalse(parsed instanceof IRCMessageUnsupported);
         String marshalled = marshaller.marshal(parsed);
@@ -226,7 +226,7 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: type for \"{0}\" is {1}")
     @MethodSource("messageTypes")
     void unmarshalProducesExpectedType(String input, Class<? extends IRCMessage> expectedType) {
-        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
         assertInstanceOf(expectedType, parsed);
     }
 
@@ -391,7 +391,7 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: parse error for \"{0}\"")
     @MethodSource("parseErrorMessages")
     void unmarshalProducesParseError(String input) {
-        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
         assertInstanceOf(IRCMessageParseError.class, parsed);
     }
 
@@ -463,7 +463,7 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: invalid grammar is unsupported for \"{0}\"")
     @MethodSource("invalidGrammarMessages")
     void unmarshalInvalidGrammarIsUnsupported(String input) {
-        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
         assertInstanceOf(IRCMessageUnsupported.class, parsed);
         assertFalse(parsed instanceof IRCMessageParseError);
     }
@@ -491,7 +491,7 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: length ok \"{0}\"")
     @MethodSource("lengthOkMessages")
     void lengthOkMessages(String input, String expected) {
-        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
         assertFalse(parsed instanceof IRCMessageParseError);
         assertFalse(parsed instanceof IRCMessageUnsupported);
         String marshalled = marshaller.marshal(parsed);
@@ -515,7 +515,7 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: length invalid is unsupported for \"{0}\"")
     @MethodSource("lengthInvalidMessages")
     void lengthInvalidMessages(String input) {
-        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
         assertInstanceOf(IRCMessageUnsupported.class, parsed);
         assertFalse(parsed instanceof IRCMessageParseError);
     }

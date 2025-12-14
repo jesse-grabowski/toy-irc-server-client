@@ -42,11 +42,14 @@ public class IRCMessageUnmarshaller {
   /**
    * Unmarshals the provided raw IRC message into an {@link IRCMessage} object.
    *
+   * @param serverParameters server parameters from RPL_ISUPPORT, mostly for prefix detection
    * @param charset the {@link Charset} used to interpret the encoding of the input message.
-   * @param message the raw IRC message as a {@link String} to be unmarshaled, without trailing newline.
+   * @param message the raw IRC message as a {@link String} to be unmarshaled, without trailing
+   *     newline.
    * @return an {@link IRCMessage} representing the unmarshaled input.
    */
-  public IRCMessage unmarshal(Charset charset, String message) {
+  public IRCMessage unmarshal(
+      IRCServerParameters serverParameters, Charset charset, String message) {
     try {
       enforceLength(charset, message);
     } catch (IllegalArgumentException e) {
@@ -72,7 +75,9 @@ public class IRCMessageUnmarshaller {
       return new IRCMessageParseError(
           command, message, tags, null, null, null, e.getMessage(), Set.of());
     }
-    Parameters parameters = new Parameters(message, tags, prefix, params);
+    Parameters parameters =
+        new Parameters(
+            new HashSet<>(serverParameters.getPrefixes().values()), message, tags, prefix, params);
 
     try {
       return switch (command) {
@@ -962,17 +967,21 @@ public class IRCMessageUnmarshaller {
 
   private static class Parameters {
 
-    private final Set<Character> channelMembershipPrefixes = Set.of('~', '&', '@', '%', '+');
-
     private final Set<String> errorParameters = new HashSet<>();
 
+    private final Set<Character> channelMembershipPrefixes;
     private final String raw;
     private final SequencedMap<String, String> tags;
     private final PrefixParts prefix;
     private final List<String> params;
 
     public Parameters(
-        String raw, SequencedMap<String, String> tags, PrefixParts prefix, List<String> params) {
+        Set<Character> channelMembershipPrefixes,
+        String raw,
+        SequencedMap<String, String> tags,
+        PrefixParts prefix,
+        List<String> params) {
+      this.channelMembershipPrefixes = channelMembershipPrefixes;
       this.raw = raw;
       this.tags = tags;
       this.prefix = prefix;
@@ -994,7 +1003,7 @@ public class IRCMessageUnmarshaller {
         }
         filteredParameters.remove(i);
       }
-      return new Parameters(raw, tags, prefix, filteredParameters);
+      return new Parameters(channelMembershipPrefixes, raw, tags, prefix, filteredParameters);
     }
 
     public ConditionalInjectionBuilder injectConditionally() {
@@ -1276,7 +1285,12 @@ public class IRCMessageUnmarshaller {
             return injection
                 .injection()
                 .apply(
-                    new Parameters(parameters.raw, parameters.tags, parameters.prefix, newParams));
+                    new Parameters(
+                        parameters.channelMembershipPrefixes,
+                        parameters.raw,
+                        parameters.tags,
+                        parameters.prefix,
+                        newParams));
           } else {
             return injection.injection().apply(parameters);
           }
