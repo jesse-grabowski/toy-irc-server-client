@@ -38,9 +38,6 @@ public class IRCMessageUnmarshaller {
       Pattern.compile(
           "^(?<name>[^\\s\\u0000!@]+)(?:!(?<user>[^\\s\\u0000@]+))?(?:@(?<host>[^\\s\\u0000]+))?$");
 
-  private static final Set<String> CAP_KNOWN_SUBCOMMANDS =
-      Set.of("LS", "LIST", "REQ", "ACK", "NAK", "END", "NEW", "DEL");
-
   public IRCMessage unmarshal(String message) {
     Matcher matcher = MESSAGE_PATTERN.matcher(message);
     if (!matcher.matches()) {
@@ -55,9 +52,9 @@ public class IRCMessageUnmarshaller {
 
     try {
       return switch (command) {
-        case IRCMessageCAPLS.COMMAND -> parseCap(parameters);
+        case "CAP" -> parseCap(parameters);
         case IRCMessageERROR.COMMAND -> parseError(parameters);
-        case IRCMessageJOINNormal.COMMAND -> parseJoin(parameters);
+        case "JOIN" -> parseJoin(parameters);
         case IRCMessageKICK.COMMAND -> parseKick(parameters);
         case IRCMessageMODE.COMMAND -> parseMode(parameters);
         case IRCMessageNICK.COMMAND -> parseNick(parameters);
@@ -273,20 +270,12 @@ public class IRCMessageUnmarshaller {
             "LS",
             p ->
                 p.inject(
-                    none(String.class),
                     required("version"),
-                    constant(false),
-                    constant(new LinkedHashMap<String, String>()),
-                    IRCMessageCAPLS::new))
+                    IRCMessageCAPLSRequest::new))
         .ifIndexEquals(
             0,
             "LIST",
-            p ->
-                p.inject(
-                    none(String.class),
-                    constant(false),
-                    constant(List.<String>of()),
-                    IRCMessageCAPLIST::new))
+            p -> p.inject(IRCMessageCAPLISTRequest::new))
         .ifIndexEquals(
             0,
             "REQ",
@@ -322,10 +311,9 @@ public class IRCMessageUnmarshaller {
             p ->
                 p.inject(
                     required("nick"),
-                    none(String.class),
                     optional("*", s -> true, false),
                     greedyRequiredMap("extensions", this::splitToEntry),
-                    IRCMessageCAPLS::new))
+                    IRCMessageCAPLSResponse::new))
         .ifIndexEquals(
             1,
             "LIST",
@@ -334,7 +322,7 @@ public class IRCMessageUnmarshaller {
                     required("nick"),
                     optional("*", s -> true, false),
                     required("extension", splitToListDelimited("\\s+")),
-                    IRCMessageCAPLIST::new))
+                    IRCMessageCAPLISTResponse::new))
         .ifIndexEquals(
             1,
             "NAK",
@@ -746,7 +734,7 @@ public class IRCMessageUnmarshaller {
                   splitter.right(null),
                   required("ip"),
                   required("text"),
-                  discardLast(IRCMessage338::new));
+                  IRCMessage338::new);
             })
         .ifIndex(
             2,
@@ -755,11 +743,9 @@ public class IRCMessageUnmarshaller {
                 p.inject(
                     required("client"),
                     required("nick"),
-                    none(String.class),
-                    none(String.class),
                     required("ip"),
                     required("text"),
-                    discardLast(IRCMessage338::new)))
+                    IRCMessage338::forIp))
         .ifIndex(
             2,
             not(this::isIP),
@@ -767,21 +753,16 @@ public class IRCMessageUnmarshaller {
                 p.inject(
                     required("client"),
                     required("nick"),
-                    none(String.class),
                     required("host"),
-                    none(String.class),
                     required("text"),
-                    discardLast(IRCMessage338::new)))
+                    IRCMessage338::forHost))
         .ifNoneMatch(
             p ->
                 p.inject(
                     required("client"),
                     required("nick"),
-                    none(String.class),
-                    none(String.class),
-                    none(String.class),
                     required("text"),
-                    discardLast(IRCMessage338::new)))
+                    IRCMessage338::forClientNick))
         .inject();
   }
 
@@ -1215,7 +1196,7 @@ public class IRCMessageUnmarshaller {
 
     String[] entries = param.split(delimiter);
     for (String entry : entries) {
-      String[] kv = entry.split(delimiter, 2);
+      String[] kv = entry.split("=", 2);
       if (kv.length == 1) {
         map.put(kv[0], mapper.apply(""));
       } else {
@@ -1630,14 +1611,6 @@ public class IRCMessageUnmarshaller {
     }
   }
 
-  private <T> ParameterExtractor<T> none(Class<T> unused) {
-    return new NoneParameterInjector<T>();
-  }
-
-  private <T> ParameterExtractor<T> constant(T value) {
-    return new ConstantParameterInjector<>(value);
-  }
-
   private ParameterExtractor<String> required(String name) {
     return new SingleParameterExtractor<>(x -> x, true, null, name);
   }
@@ -1716,68 +1689,6 @@ public class IRCMessageUnmarshaller {
     T getDefaultValue();
 
     String name();
-  }
-
-  private static class NoneParameterInjector<T> implements ParameterExtractor<T> {
-
-    @Override
-    public T extract(int start, int endInclusive, Parameters parameters) {
-      return null;
-    }
-
-    @Override
-    public int consumeAtLeast() {
-      return 0;
-    }
-
-    @Override
-    public int consumeAtMost() {
-      return 0;
-    }
-
-    @Override
-    public T getDefaultValue() {
-      return null;
-    }
-
-    @Override
-    public String name() {
-      return "";
-    }
-  }
-
-  private static class ConstantParameterInjector<T> implements ParameterExtractor<T> {
-
-    private final T value;
-
-    public ConstantParameterInjector(T value) {
-      this.value = value;
-    }
-
-    @Override
-    public T extract(int start, int endInclusive, Parameters parameters) {
-      return value;
-    }
-
-    @Override
-    public int consumeAtLeast() {
-      return 0;
-    }
-
-    @Override
-    public int consumeAtMost() {
-      return 0;
-    }
-
-    @Override
-    public T getDefaultValue() {
-      return value;
-    }
-
-    @Override
-    public String name() {
-      return "";
-    }
   }
 
   private static class SingleParameterExtractor<T> implements ParameterExtractor<T> {
@@ -2074,71 +1985,10 @@ public class IRCMessageUnmarshaller {
     }
   }
 
-  private <T extends IRCMessage, A> IRCMessageFactory1<T, A> discardFirst(
-      IRCMessageFactory0<T> constructor) {
-    return (rawMessage, tags, name, user, host, arg0) ->
-        constructor.create(rawMessage, tags, name, user, host);
-  }
-
-  private <T extends IRCMessage, A> IRCMessageFactory1<T, A> discardLast(
-      IRCMessageFactory0<T> constructor) {
-    return (rawMessage, tags, name, user, host, arg0) ->
-        constructor.create(rawMessage, tags, name, user, host);
-  }
-
-  private <T extends IRCMessage, A, B> IRCMessageFactory2<T, A, B> discardFirst(
-      IRCMessageFactory1<T, B> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1) ->
-        constructor.create(rawMessage, tags, name, user, host, arg1);
-  }
-
-  private <T extends IRCMessage, A, B> IRCMessageFactory2<T, A, B> discardLast(
-      IRCMessageFactory1<T, A> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1) ->
-        constructor.create(rawMessage, tags, name, user, host, arg0);
-  }
-
-  private <T extends IRCMessage, A, B, C> IRCMessageFactory3<T, A, B, C> discardFirst(
-      IRCMessageFactory2<T, B, C> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2) ->
-        constructor.create(rawMessage, tags, name, user, host, arg1, arg2);
-  }
-
   private <T extends IRCMessage, A, B, C> IRCMessageFactory3<T, A, B, C> discardLast(
       IRCMessageFactory2<T, A, B> constructor) {
     return (rawMessage, tags, name, user, host, arg0, arg1, arg2) ->
         constructor.create(rawMessage, tags, name, user, host, arg0, arg1);
-  }
-
-  private <T extends IRCMessage, A, B, C, D> IRCMessageFactory4<T, A, B, C, D> discardFirst(
-      IRCMessageFactory3<T, B, C, D> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3) ->
-        constructor.create(rawMessage, tags, name, user, host, arg1, arg2, arg3);
-  }
-
-  private <T extends IRCMessage, A, B, C, D> IRCMessageFactory4<T, A, B, C, D> discardLast(
-      IRCMessageFactory3<T, A, B, C> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3) ->
-        constructor.create(rawMessage, tags, name, user, host, arg0, arg1, arg2);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E> IRCMessageFactory5<T, A, B, C, D, E> discardFirst(
-      IRCMessageFactory4<T, B, C, D, E> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4) ->
-        constructor.create(rawMessage, tags, name, user, host, arg1, arg2, arg3, arg4);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E> IRCMessageFactory5<T, A, B, C, D, E> discardLast(
-      IRCMessageFactory4<T, A, B, C, D> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4) ->
-        constructor.create(rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F>
-      IRCMessageFactory6<T, A, B, C, D, E, F> discardFirst(
-          IRCMessageFactory5<T, B, C, D, E, F> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5) ->
-        constructor.create(rawMessage, tags, name, user, host, arg1, arg2, arg3, arg4, arg5);
   }
 
   private <T extends IRCMessage, A, B, C, D, E, F>
@@ -2146,84 +1996,6 @@ public class IRCMessageUnmarshaller {
           IRCMessageFactory5<T, A, B, C, D, E> constructor) {
     return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5) ->
         constructor.create(rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F, G>
-      IRCMessageFactory7<T, A, B, C, D, E, F, G> discardFirst(
-          IRCMessageFactory6<T, B, C, D, E, F, G> constructor) {
-
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5, arg6) ->
-        constructor.create(rawMessage, tags, name, user, host, arg1, arg2, arg3, arg4, arg5, arg6);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F, G>
-      IRCMessageFactory7<T, A, B, C, D, E, F, G> discardLast(
-          IRCMessageFactory6<T, A, B, C, D, E, F> constructor) {
-
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5, arg6) ->
-        constructor.create(rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F, G, H>
-      IRCMessageFactory8<T, A, B, C, D, E, F, G, H> discardFirst(
-          IRCMessageFactory7<T, B, C, D, E, F, G, H> constructor) {
-
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7) ->
-        constructor.create(
-            rawMessage, tags, name, user, host, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F, G, H>
-      IRCMessageFactory8<T, A, B, C, D, E, F, G, H> discardLast(
-          IRCMessageFactory7<T, A, B, C, D, E, F, G> constructor) {
-
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7) ->
-        constructor.create(
-            rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F, G, H, I>
-      IRCMessageFactory9<T, A, B, C, D, E, F, G, H, I> discardFirst(
-          IRCMessageFactory8<T, B, C, D, E, F, G, H, I> constructor) {
-
-    return (rawMessage,
-        tags,
-        name,
-        user,
-        host,
-        arg0,
-        arg1,
-        arg2,
-        arg3,
-        arg4,
-        arg5,
-        arg6,
-        arg7,
-        arg8) ->
-        constructor.create(
-            rawMessage, tags, name, user, host, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F, G, H, I>
-      IRCMessageFactory9<T, A, B, C, D, E, F, G, H, I> discardLast(
-          IRCMessageFactory8<T, A, B, C, D, E, F, G, H> constructor) {
-
-    return (rawMessage,
-        tags,
-        name,
-        user,
-        host,
-        arg0,
-        arg1,
-        arg2,
-        arg3,
-        arg4,
-        arg5,
-        arg6,
-        arg7,
-        arg8) ->
-        constructor.create(
-            rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
   }
 
   @FunctionalInterface

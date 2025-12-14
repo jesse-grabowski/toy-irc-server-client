@@ -127,7 +127,7 @@ public class IRCClientEngine implements Closeable {
       clientStateGuard.setState(new IRCClientState());
 
       String nick = NicknameGenerator.generate(properties.getNickname());
-      send(new IRCMessageCAPLS(null, "302", false, new LinkedHashMap<>()));
+      send(new IRCMessageCAPLSRequest("302"));
       if (properties.getPassword() != null && !properties.getPassword().isBlank()) {
         send(new IRCMessagePASS(properties.getPassword()));
       }
@@ -233,8 +233,10 @@ public class IRCClientEngine implements Closeable {
       case IRCMessageCAPEND m -> {
         /* ignore */
       }
-      case IRCMessageCAPLIST m -> handle(m);
-      case IRCMessageCAPLS m -> handle(m);
+      case IRCMessageCAPLISTRequest m -> { /* ignored */ }
+      case IRCMessageCAPLISTResponse m -> handle(m);
+      case IRCMessageCAPLSRequest m -> { /* ignored */ }
+      case IRCMessageCAPLSResponse m -> handle(m);
       case IRCMessageCAPNAK m -> handle(m);
       case IRCMessageCAPNEW m -> handle(m);
       case IRCMessageCAPREQ m -> {
@@ -624,7 +626,7 @@ public class IRCClientEngine implements Closeable {
     updateStatusAndPrompt();
   }
 
-  private void handle(IRCMessageCAPLS message) {
+  private void handle(IRCMessageCAPLSResponse message) {
     IRCClientState state = clientStateGuard.getState();
     IRCClientEngineState engineState = this.engineState.get();
     if (state == null
@@ -707,7 +709,7 @@ public class IRCClientEngine implements Closeable {
     LOG.info(() -> "Server deleted capabilities: " + message.getCapabilities());
   }
 
-  private void handle(IRCMessageCAPLIST message) {
+  private void handle(IRCMessageCAPLISTResponse message) {
     IRCClientState state = clientStateGuard.getState();
     IRCClientEngineState engineState = this.engineState.get();
     if (state == null || engineState != IRCClientEngineState.REGISTERED) {

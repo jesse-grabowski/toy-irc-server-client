@@ -17,8 +17,10 @@ public class IRCMessageMarshaller {
       case IRCMessageCAPACK m -> marshal(m, this::marshalCapACK);
       case IRCMessageCAPDEL m -> marshal(m, this::marshalCapDEL);
       case IRCMessageCAPEND m -> marshal(m, this::marshalCapEND);
-      case IRCMessageCAPLIST m -> marshal(m, this::marshalCapLIST);
-      case IRCMessageCAPLS m -> marshal(m, this::marshalCapLS);
+      case IRCMessageCAPLISTRequest m -> marshal(m, this::marshalCapLISTRequest);
+      case IRCMessageCAPLISTResponse m -> marshal(m, this::marshalCapLISTResponse);
+      case IRCMessageCAPLSRequest m -> marshal(m, this::marshalCapLSRequest);
+      case IRCMessageCAPLSResponse m -> marshal(m, this::marshalCapLSResponse);
       case IRCMessageCAPNAK m -> marshal(m, this::marshalCapNAK);
       case IRCMessageCAPNEW m -> marshal(m, this::marshalCapNEW);
       case IRCMessageCAPREQ m -> marshal(m, this::marshalCapREQ);
@@ -232,20 +234,20 @@ public class IRCMessageMarshaller {
     return l("END");
   }
 
-  private List<String> marshalCapLIST(IRCMessageCAPLIST message) {
-    if (message.getNick() == null) { // request
-      return l("LIST");
-    } else {
-      return l(message.getNick(), "LIST", when(message.isHasMore(), "*"), trailing(delimited(" ", message.getCapabilities())));
-    }
+  private List<String> marshalCapLISTRequest(IRCMessageCAPLISTRequest message) {
+    return l("LIST");
   }
 
-  private List<String> marshalCapLS(IRCMessageCAPLS message) {
-    if (message.getNick() == null) {
-      return l("LS", message.getVersion());
-    } else {
-      return l(message.getNick(), "LS", when(message.isHasMore(), "*"), trailing(marshalMap(message.getCapabilities(), " ", Function.identity())));
-    }
+  private List<String> marshalCapLISTResponse(IRCMessageCAPLISTResponse message) {
+    return l(message.getNick(), "LIST", when(message.isHasMore(), "*"), trailing(delimited(" ", message.getCapabilities())));
+  }
+
+  private List<String> marshalCapLSRequest(IRCMessageCAPLSRequest message) {
+    return l("LS", message.getVersion());
+  }
+
+  private List<String> marshalCapLSResponse(IRCMessageCAPLSResponse message) {
+    return l(message.getNick(), "LS", when(message.isHasMore(), "*"), trailing(marshalMap(message.getCapabilities(), " ", Function.identity())));
   }
 
   private List<String> marshalCapNAK(IRCMessageCAPNAK message) {
