@@ -6,6 +6,7 @@ public final class IRCMessage005 extends IRCMessage {
 
   private final String client;
   private final SequencedMap<String, String> parameters;
+  private final String text;
 
   public IRCMessage005(
       String rawMessage,
@@ -14,10 +15,12 @@ public final class IRCMessage005 extends IRCMessage {
       String prefixUser,
       String prefixHost,
       String client,
-      SequencedMap<String, String> parameters) {
+      SequencedMap<String, String> parameters,
+      String text) {
     super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
     this.client = client;
     this.parameters = parameters;
+    this.text = text;
   }
 
   public String getClient() {
@@ -26,5 +29,9 @@ public final class IRCMessage005 extends IRCMessage {
 
   public SequencedMap<String, String> getParameters() {
     return parameters;
+  }
+
+  public String getText() {
+    return text;
   }
 }

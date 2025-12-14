@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -44,7 +44,7 @@ public class IRCMessageUnmarshaller {
       return new IRCMessageUnsupported(null, message, new LinkedHashMap<>(), null, null, null);
     }
 
-    SequencedMap<String, String> tags = safeParseMap(matcher.group("tags"), ";", this::unescapeTag);
+    SequencedMap<String, String> tags = parseTags(matcher.group("tags"));
     PrefixParts prefix = parsePrefix(matcher.group("prefix"));
     String command = matcher.group("command").toUpperCase(Locale.ROOT);
     List<String> params = parseParams(matcher.group("params"));
@@ -194,6 +194,24 @@ public class IRCMessageUnmarshaller {
       return new IRCMessageParseError(
           command, message, tags, prefix.name(), prefix.user(), prefix.host(), e.getMessage());
     }
+  }
+
+  private SequencedMap<String, String> parseTags(String param) {
+    SequencedMap<String, String> map = new LinkedHashMap<>();
+    if (param == null || param.isEmpty()) {
+      return map;
+    }
+
+    String[] entries = param.split(";");
+    for (String entry : entries) {
+      String[] kv = entry.split("=", 2);
+      if (kv.length == 1) {
+        map.put(kv[0], "");
+      } else {
+        map.put(kv[0], unescapeTag(kv[1]));
+      }
+    }
+    return map;
   }
 
   private String unescapeTag(String tag) {
@@ -458,7 +476,7 @@ public class IRCMessageUnmarshaller {
         required("client"),
         greedyRequiredMap("tokens", this::splitToEntry),
         required("text"),
-        discardLast(IRCMessage005::new));
+        IRCMessage005::new);
   }
 
   private IRCMessage010 parse010(Parameters parameters) throws Exception {
@@ -517,7 +535,7 @@ public class IRCMessageUnmarshaller {
 
   private IRCMessage256 parse256(Parameters parameters) throws Exception {
     return parameters.inject(
-        required("client"), optional("server"), required("text"), discardLast(IRCMessage256::new));
+        required("client"), optional("server"), required("text"), IRCMessage256::new);
   }
 
   private IRCMessage257 parse257(Parameters parameters) throws Exception {
@@ -1149,7 +1167,7 @@ public class IRCMessageUnmarshaller {
     return Arrays.asList(raw.split(","));
   }
 
-  private UnsafeFunction<String, List<String>> splitToListDelimited(String regex) {
+  private ThrowingFunction<String, List<String>> splitToListDelimited(String regex) {
     return raw -> Arrays.asList(raw.split(regex));
   }
 
@@ -1162,7 +1180,7 @@ public class IRCMessageUnmarshaller {
     }
   }
 
-  private UnsafeFunction2<String, List<String>, List<Character>> splitForPrefixes(
+  private ThrowingFunction<String, Pair<List<String>, List<Character>>> splitForPrefixes(
       Set<Character> validPrefixes) {
     return raw -> {
       List<String> values = new ArrayList<>();
@@ -1185,25 +1203,6 @@ public class IRCMessageUnmarshaller {
       }
       return new Pair<>(values, prefixes);
     };
-  }
-
-  private <T> SequencedMap<String, T> safeParseMap(
-      String param, String delimiter, Function<String, T> mapper) {
-    SequencedMap<String, T> map = new LinkedHashMap<>();
-    if (param == null || param.isEmpty()) {
-      return map;
-    }
-
-    String[] entries = param.split(delimiter);
-    for (String entry : entries) {
-      String[] kv = entry.split("=", 2);
-      if (kv.length == 1) {
-        map.put(kv[0], mapper.apply(""));
-      } else {
-        map.put(kv[0], mapper.apply(kv[1]));
-      }
-    }
-    return map;
   }
 
   private record PrefixParts(String name, String user, String host) {
@@ -1482,7 +1481,7 @@ public class IRCMessageUnmarshaller {
   }
 
   private record ConditionalInjection(
-      int index, Predicate<String> predicate, UnsafeFunction<Parameters, IRCMessage> injection) {}
+      int index, Predicate<String> predicate, ThrowingFunction<Parameters, IRCMessage> injection) {}
 
   private static class ConditionalInjectionBuilder {
 
@@ -1490,7 +1489,7 @@ public class IRCMessageUnmarshaller {
     private final List<ConditionalInjection> injections;
     private final boolean consumeTestParameter;
 
-    private UnsafeFunction<Parameters, IRCMessage> defaultInjection;
+    private ThrowingFunction<Parameters, IRCMessage> defaultInjection;
 
     public ConditionalInjectionBuilder(Parameters parameters, boolean consumeTestParameter) {
       this.parameters = parameters;
@@ -1499,19 +1498,19 @@ public class IRCMessageUnmarshaller {
     }
 
     public ConditionalInjectionBuilder ifIndexEquals(
-        int index, String value, UnsafeFunction<Parameters, IRCMessage> injection) {
+        int index, String value, ThrowingFunction<Parameters, IRCMessage> injection) {
       injections.add(new ConditionalInjection(index, value::equals, injection));
       return this;
     }
 
     public ConditionalInjectionBuilder ifIndex(
-        int index, Predicate<String> predicate, UnsafeFunction<Parameters, IRCMessage> injection) {
+        int index, Predicate<String> predicate, ThrowingFunction<Parameters, IRCMessage> injection) {
       injections.add(new ConditionalInjection(index, predicate, injection));
       return this;
     }
 
     public ConditionalInjectionBuilder ifNoneMatch(
-        UnsafeFunction<Parameters, IRCMessage> injection) {
+        ThrowingFunction<Parameters, IRCMessage> injection) {
       defaultInjection = injection;
       return this;
     }
@@ -1615,7 +1614,7 @@ public class IRCMessageUnmarshaller {
     return new SingleParameterExtractor<>(x -> x, true, null, name);
   }
 
-  private <T> ParameterExtractor<T> required(String name, UnsafeFunction<String, T> mapper) {
+  private <T> ParameterExtractor<T> required(String name, ThrowingFunction<String, T> mapper) {
     return new SingleParameterExtractor<>(mapper, true, null, name);
   }
 
@@ -1623,12 +1622,12 @@ public class IRCMessageUnmarshaller {
     return new SingleParameterExtractor<>(x -> x, false, null, name);
   }
 
-  private <T> ParameterExtractor<T> optional(String name, UnsafeFunction<String, T> mapper) {
+  private <T> ParameterExtractor<T> optional(String name, ThrowingFunction<String, T> mapper) {
     return new SingleParameterExtractor<>(mapper, false, null, name);
   }
 
   private <T> ParameterExtractor<T> optional(
-      String name, UnsafeFunction<String, T> mapper, T defaultValue) {
+          String name, ThrowingFunction<String, T> mapper, T defaultValue) {
     return new SingleParameterExtractor<>(mapper, false, defaultValue, name);
   }
 
@@ -1643,7 +1642,7 @@ public class IRCMessageUnmarshaller {
   }
 
   private <K, V> ParameterExtractor<SequencedMap<K, V>> greedyRequiredMap(
-      String name, UnsafeFunction<String, Map.Entry<K, V>> mapper) {
+      String name, ThrowingFunction<String, Map.Entry<K, V>> mapper) {
     return new MultipleParameterExtractor<
         List<Map.Entry<K, V>>, Map.Entry<K, V>, SequencedMap<K, V>>(
         ArrayList::new,
@@ -1661,7 +1660,7 @@ public class IRCMessageUnmarshaller {
   }
 
   private <L, R> SplittingParameterInjector<L, R> splitRequired(
-      String name, UnsafeFunction2<String, L, R> splitter) {
+      String name, ThrowingFunction<String, Pair<L, R>> splitter) {
     return new SplittingParameterInjector<>(true, splitter, name);
   }
 
@@ -1691,15 +1690,25 @@ public class IRCMessageUnmarshaller {
     String name();
   }
 
+  private static void logExtractionException(int start, int end, String parameter, String rawMessage, Throwable e) {
+    if (LOG.isLoggable(Level.FINEST)) {
+      LogRecord record =
+              new LogRecord(Level.FINEST, "Error parsing parameter in {0}..{1} (value={2}) for message: {3}");
+      record.setParameters(new Object[] {start, end, parameter, rawMessage});
+      record.setThrown(e);
+      LOG.log(record);
+    }
+  }
+
   private static class SingleParameterExtractor<T> implements ParameterExtractor<T> {
 
-    private final UnsafeFunction<String, T> mapper;
+    private final ThrowingFunction<String, T> mapper;
     private final boolean required;
     private final T defaultValue;
     private final String name;
 
     public SingleParameterExtractor(
-        UnsafeFunction<String, T> mapper, boolean required, T defaultValue, String name) {
+            ThrowingFunction<String, T> mapper, boolean required, T defaultValue, String name) {
       this.mapper = mapper;
       this.required = required;
       this.defaultValue = defaultValue;
@@ -1713,13 +1722,7 @@ public class IRCMessageUnmarshaller {
         rawValue = parameters.params.get(start);
         return mapper.apply(rawValue);
       } catch (Exception e) {
-        if (LOG.isLoggable(Level.FINEST)) {
-          LogRecord record =
-              new LogRecord(Level.FINEST, "Error parsing parameter at index {0} with value {1}");
-          record.setParameters(new Object[] {start, rawValue});
-          record.setThrown(e);
-          LOG.log(record);
-        }
+        logExtractionException(start, endInclusive, rawValue, parameters.raw, e);
         parameters.errorParameters.add(name);
         return defaultValue;
       }
@@ -1750,9 +1753,9 @@ public class IRCMessageUnmarshaller {
       implements ParameterExtractor<R> {
 
     private final Supplier<C> factory;
-    private final UnsafeFunction<String, T> mapper;
+    private final ThrowingFunction<String, T> mapper;
     private final BiConsumer<C, T> accumulator;
-    private final UnsafeFunction<C, R> finisher;
+    private final ThrowingFunction<C, R> finisher;
     private final int consumeAtLeast;
     private final int consumeAtMost;
     private final R defaultValue;
@@ -1760,9 +1763,9 @@ public class IRCMessageUnmarshaller {
 
     public MultipleParameterExtractor(
         Supplier<C> factory,
-        UnsafeFunction<String, T> mapper,
+        ThrowingFunction<String, T> mapper,
         BiConsumer<C, T> accumulator,
-        UnsafeFunction<C, R> finisher,
+        ThrowingFunction<C, R> finisher,
         int consumeAtLeast,
         int consumeAtMost,
         R defaultValue,
@@ -1783,13 +1786,7 @@ public class IRCMessageUnmarshaller {
       try {
         collection = factory.get();
       } catch (Exception e) {
-        if (LOG.isLoggable(Level.FINEST)) {
-          LogRecord record =
-              new LogRecord(Level.FINEST, "Error initializing collection over {0}..{1}: {2}");
-          record.setParameters(new Object[] {start, endInclusive, parameters.raw});
-          record.setThrown(e);
-          LOG.log(record);
-        }
+        logExtractionException(start, endInclusive, "<collection initializer>", parameters.raw, e);
         parameters.errorParameters.add(name);
         return defaultValue;
       }
@@ -1800,27 +1797,14 @@ public class IRCMessageUnmarshaller {
           T mappedValue = mapper.apply(rawValue);
           accumulator.accept(collection, mappedValue);
         } catch (Exception e) {
-          if (LOG.isLoggable(Level.FINEST)) {
-            LogRecord record =
-                new LogRecord(
-                    Level.FINEST, "Error parsing parameter at index {0} with value {1}: {2}");
-            record.setParameters(new Object[] {start, rawValue, parameters.raw});
-            record.setThrown(e);
-            LOG.log(record);
-          }
+          logExtractionException(start, endInclusive, rawValue, parameters.raw, e);
           parameters.errorParameters.add(name);
         }
       }
       try {
         return finisher.apply(collection);
       } catch (Exception e) {
-        if (LOG.isLoggable(Level.FINEST)) {
-          LogRecord record =
-              new LogRecord(Level.FINEST, "Error finishing collection over {0}..{1}: {2}");
-          record.setParameters(new Object[] {start, endInclusive, parameters.raw});
-          record.setThrown(e);
-          LOG.log(record);
-        }
+        logExtractionException(start, endInclusive, "<collection finisher>", parameters.raw, e);
         parameters.errorParameters.add(name);
         return defaultValue;
       }
@@ -1847,98 +1831,100 @@ public class IRCMessageUnmarshaller {
     }
   }
 
-  private static class SplittingParameterInjector<L, R> implements ParameterExtractor<Void> {
+  private static class SplittingParameterInjector<L, R> {
 
     private final boolean required;
-    private final UnsafeFunction2<String, L, R> splitter;
+    private final ThrowingFunction<String, Pair<L, R>> splitter;
     private final String name;
 
-    private Pair<L, R> results = null;
+    private Pair<L, R> result = null;
+    private int extracted = -1;
+    private boolean staked = false;
 
     public SplittingParameterInjector(
-        boolean required, UnsafeFunction2<String, L, R> splitter, String name) {
+        boolean required, ThrowingFunction<String, Pair<L, R>> splitter, String name) {
       this.required = required;
       this.splitter = splitter;
       this.name = name;
     }
 
-    @Override
-    public Void extract(int start, int endInclusive, Parameters parameters) {
+    private Pair<L, R> extract(Integer index, Parameters parameters) {
+      if (index == null || extracted == index) {
+        return result;
+      } else if (extracted != -1) {
+        throw new IllegalStateException("SplittingParameterInjector already extracted %d and does not support reuse".formatted(extracted));
+      }
+      extracted = index;
+
       String rawValue = null;
       try {
-        rawValue = parameters.params.get(start);
-        results = splitter.apply(rawValue);
-        return null;
+        rawValue = parameters.params.get(index);
+        result = splitter.apply(rawValue);
+        return result;
       } catch (Exception e) {
-        if (LOG.isLoggable(Level.FINEST)) {
-          LogRecord record =
-              new LogRecord(Level.FINEST, "Error parsing parameter at index {0} with value {1}");
-          record.setParameters(new Object[] {start, rawValue});
-          record.setThrown(e);
-          LOG.log(record);
-        }
+        logExtractionException(index, index, rawValue, parameters.raw, e);
         parameters.errorParameters.add(name);
         return null;
       }
     }
 
-    @Override
-    public int consumeAtLeast() {
-      return required ? 1 : 0;
-    }
-
-    @Override
-    public int consumeAtMost() {
-      return 1;
-    }
-
-    @Override
-    public Void getDefaultValue() {
-      return null;
-    }
-
-    @Override
-    public String name() {
-      return name;
+    private Pair<Integer, Integer> claimStake() {
+      if (staked) {
+        return new Pair<>(0, 0);
+      } else {
+        staked = true;
+        return new Pair<>(required ? 1 : 0, 1);
+      }
     }
 
     public ParameterExtractor<L> left(L defaultValue) {
-      return new LeftPart(defaultValue);
+      return new SplitPart<L>((i, p) -> {
+        Pair<L, R> result = extract(i, p);
+        return result != null ? result.left() : defaultValue;
+      });
     }
 
     public ParameterExtractor<R> right(R defaultValue) {
-      return new RightPart(defaultValue);
+      return new SplitPart<R>((i, p) -> {
+        Pair<L, R> result = extract(i, p);
+        return result != null ? result.right() : defaultValue;
+      });
     }
 
-    private class LeftPart implements ParameterExtractor<L> {
+    private class SplitPart<T> implements ParameterExtractor<T> {
 
-      private final L defaultValue;
+      private final BiFunction<Integer, Parameters, T> resultExtractor;
 
-      public LeftPart(L defaultValue) {
-        this.defaultValue = defaultValue;
+      private Pair<Integer, Integer> stake;
+
+      public SplitPart(BiFunction<Integer, Parameters, T> resultExtractor) {
+        this.resultExtractor = resultExtractor;
       }
 
       @Override
-      public L extract(int start, int endInclusive, Parameters parameters) {
-        if (results == null) {
-          SplittingParameterInjector.this.extract(start, endInclusive, parameters);
-        }
-        return results == null ? defaultValue : results.left();
+      public T extract(int start, int endInclusive, Parameters parameters) {
+        return resultExtractor.apply(start, parameters);
       }
 
       @Override
       public int consumeAtLeast() {
-        return required ? 1 : 0;
+        if (stake == null) {
+          stake = SplittingParameterInjector.this.claimStake();
+        }
+        return stake.left();
       }
 
       @Override
       public int consumeAtMost() {
-        return 1;
+        if (stake == null) {
+          stake = SplittingParameterInjector.this.claimStake();
+        }
+        return stake.right();
       }
 
       @Override
-      public L getDefaultValue() {
-        return results == null ? defaultValue : results.left();
+      public T getDefaultValue() {
+        return resultExtractor.apply(null, null);
       }
 
       @Override
@@ -1946,69 +1932,14 @@ public class IRCMessageUnmarshaller {
         return name;
       }
     }
-
-    private class RightPart implements ParameterExtractor<R> {
-
-      private final R defaultValue;
-
-      public RightPart(R defaultValue) {
-        this.defaultValue = defaultValue;
-      }
-
-      @Override
-      public R extract(int start, int endInclusive, Parameters parameters) {
-        if (results == null) {
-          SplittingParameterInjector.this.extract(start, endInclusive, parameters);
-        }
-        return results == null ? defaultValue : results.right();
-      }
-
-      @Override
-      public int consumeAtLeast() {
-        return 0;
-      }
-
-      @Override
-      public int consumeAtMost() {
-        return 0;
-      }
-
-      @Override
-      public R getDefaultValue() {
-        return results == null ? defaultValue : results.right();
-      }
-
-      @Override
-      public String name() {
-        return name;
-      }
-    }
-  }
-
-  private <T extends IRCMessage, A, B, C> IRCMessageFactory3<T, A, B, C> discardLast(
-      IRCMessageFactory2<T, A, B> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2) ->
-        constructor.create(rawMessage, tags, name, user, host, arg0, arg1);
-  }
-
-  private <T extends IRCMessage, A, B, C, D, E, F>
-      IRCMessageFactory6<T, A, B, C, D, E, F> discardLast(
-          IRCMessageFactory5<T, A, B, C, D, E> constructor) {
-    return (rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4, arg5) ->
-        constructor.create(rawMessage, tags, name, user, host, arg0, arg1, arg2, arg3, arg4);
   }
 
   @FunctionalInterface
-  interface UnsafeFunction<I, O> {
+  interface ThrowingFunction<I, O> {
     O apply(I input) throws Exception;
   }
 
   record Pair<L, R>(L left, R right) {}
-
-  @FunctionalInterface
-  interface UnsafeFunction2<I, L, R> {
-    Pair<L, R> apply(I input) throws Exception;
-  }
 
   @FunctionalInterface
   interface IRCMessageFactory0<T extends IRCMessage> {
