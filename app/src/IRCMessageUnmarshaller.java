@@ -1,6 +1,7 @@
 import static java.util.function.Predicate.not;
 
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,22 +33,45 @@ public class IRCMessageUnmarshaller {
   // in the modern IRC grammar (but not processing individual tags/params yet)
   private static final Pattern MESSAGE_PATTERN =
       Pattern.compile(
-          "^(?:@(?<tags>[^\\s\\u0000]+)\\s+)?(?::(?<prefix>[^\\s\\u0000]+)\\s+)?(?<command>(?:[A-Za-z]+)|(?:\\d{3}))(?:\\s+(?<params>.+))?\\s*$");
+          "^(?:@(?<tags>[^\\s\\u0000]+)\\x20+)?(?::(?<prefix>[^\\s\\u0000]+)\\x20+)?(?<command>(?:[A-Za-z]+)|(?:\\d{3}))(?:\\x20+(?<params>[^\\u0000\\r\\n]+))?\\x20*$");
 
   private static final Pattern PREFIX_PATTERN =
       Pattern.compile(
-          "^(?<name>[^\\s\\u0000!@]+)(?:!(?<user>[^\\s\\u0000@]+))?(?:@(?<host>[^\\s\\u0000]+))?$");
+          "^(?<name>[^\\s\\u0000!@]+)(?:!(?<user>[^\\s\\u0000!@]+))?(?:@(?<host>[^\\s\\u0000!@]+))?$");
 
-  public IRCMessage unmarshal(String message) {
+  /**
+   * Unmarshals the provided raw IRC message into an {@link IRCMessage} object.
+   *
+   * @param charset the {@link Charset} used to interpret the encoding of the input message.
+   * @param message the raw IRC message as a {@link String} to be unmarshaled, without trailing newline.
+   * @return an {@link IRCMessage} representing the unmarshaled input.
+   */
+  public IRCMessage unmarshal(Charset charset, String message) {
+    try {
+      enforceLength(charset, message);
+    } catch (IllegalArgumentException e) {
+      return new IRCMessageUnsupported(
+          null, message, new LinkedHashMap<>(), null, null, null, e.getMessage());
+    }
     Matcher matcher = MESSAGE_PATTERN.matcher(message);
     if (!matcher.matches()) {
-      return new IRCMessageUnsupported(null, message, new LinkedHashMap<>(), null, null, null);
+      return new IRCMessageUnsupported(
+          null, message, new LinkedHashMap<>(), null, null, null, "message is malformed");
     }
 
-    SequencedMap<String, String> tags = parseTags(matcher.group("tags"));
-    PrefixParts prefix = parsePrefix(matcher.group("prefix"));
     String command = matcher.group("command").toUpperCase(Locale.ROOT);
-    List<String> params = parseParams(matcher.group("params"));
+
+    SequencedMap<String, String> tags = null;
+    PrefixParts prefix = null;
+    List<String> params = null;
+    try {
+      tags = parseTags(matcher.group("tags"));
+      prefix = parsePrefix(matcher.group("prefix"));
+      params = parseParams(matcher.group("params"));
+    } catch (Exception e) {
+      return new IRCMessageParseError(
+          command, message, tags, null, null, null, e.getMessage(), Set.of());
+    }
     Parameters parameters = new Parameters(message, tags, prefix, params);
 
     try {
@@ -244,7 +268,13 @@ public class IRCMessageUnmarshaller {
             parseExact(parameters, "client", "priv", "text", IRCMessage723::new);
         default ->
             new IRCMessageUnsupported(
-                command, message, tags, prefix.name(), prefix.user(), prefix.host());
+                command,
+                message,
+                tags,
+                prefix.name(),
+                prefix.user(),
+                prefix.host(),
+                "command not recognized");
       };
     } catch (Exception e) {
       return new IRCMessageParseError(
@@ -259,15 +289,45 @@ public class IRCMessageUnmarshaller {
     }
   }
 
-  private SequencedMap<String, String> parseTags(String param) {
+  private void enforceLength(Charset charset, String message) {
+    // empty methods can't be valid, no need to even check
+    if (message.isEmpty()) {
+      throw new IllegalArgumentException("message is empty");
+    }
+    // 8191 (tags) + 510 (body), quick sanity check before we get more involved
+    if (message.length() > 8701) {
+      throw new IllegalArgumentException("message is too long");
+    }
+    int i = 0;
+    if (message.charAt(0) == '@') {
+      i = message.indexOf(' ', 1);
+      if (i == -1) {
+        throw new IllegalArgumentException("message contains only tags");
+      }
+      while (i < message.length() && message.charAt(i) == ' ') {
+        i++;
+      }
+      if (message.substring(0, i).getBytes(charset).length > 8191) {
+        throw new IllegalArgumentException("tag part is too long");
+      }
+    }
+    if (message.substring(i).getBytes(charset).length > 510) {
+      throw new IllegalArgumentException("message body is too long");
+    }
+  }
+
+  private SequencedMap<String, String> parseTags(String tags) {
     SequencedMap<String, String> map = new LinkedHashMap<>();
-    if (param == null || param.isEmpty()) {
+    if (tags == null || tags.isBlank()) {
       return map;
     }
 
-    String[] entries = param.split(";");
+    String[] entries = tags.split(";");
     for (String entry : entries) {
       String[] kv = entry.split("=", 2);
+      if (kv[0].isEmpty()) {
+        continue;
+      }
       if (kv.length == 1) {
         map.put(kv[0], "");
       } else {
@@ -283,15 +343,14 @@ public class IRCMessageUnmarshaller {
     for (char c : tag.toCharArray()) {
       if (escaped) {
         escaped = false;
-        result.append(
-            switch (c) {
-              case ':' -> ";";
-              case 's' -> " ";
-              case '\\' -> "\\";
-              case 'r' -> "\r";
-              case 'n' -> "\n";
-              default -> "\\" + c;
-            });
+        switch (c) {
+          case ':' -> result.append(';');
+          case 's' -> result.append(' ');
+          case '\\' -> result.append('\\');
+          case 'r' -> result.append('\r');
+          case 'n' -> result.append('\n');
+          default -> result.append('\\').append(c);
+        }
       } else if (c == '\\') {
         escaped = true;
       } else {
@@ -305,13 +364,13 @@ public class IRCMessageUnmarshaller {
   }
 
   private PrefixParts parsePrefix(String prefix) {
-    if (prefix == null || prefix.isBlank()) {
+    if (prefix == null) {
       return new PrefixParts();
     }
 
     Matcher matcher = PREFIX_PATTERN.matcher(prefix);
     if (!matcher.matches()) {
-      return new PrefixParts();
+      throw new IllegalArgumentException("Invalid prefix: " + prefix);
     }
     String name = matcher.group("name");
     String user = matcher.group("user");
@@ -334,8 +393,8 @@ public class IRCMessageUnmarshaller {
     }
 
     // otherwise we need to handle middle params
-    String[] parts = params.split("\\s+:", 2);
-    List<String> results = new ArrayList<>(Arrays.asList(parts[0].split("\\s+")));
+    String[] parts = params.split("\\x20+:", 2);
+    List<String> results = new ArrayList<>(Arrays.asList(parts[0].split("\\x20+")));
     if (parts.length > 1) {
       results.add(parts[1]);
     }
@@ -419,6 +478,9 @@ public class IRCMessageUnmarshaller {
   }
 
   private Pair<List<String>, List<String>> splitEnabledDisabledCaps(String caps) {
+    if (caps.isBlank()) {
+      throw new IllegalArgumentException("No capabilities specified");
+    }
     List<String> enabledCapabilities = new ArrayList<>();
     List<String> disabledCapabilities = new ArrayList<>();
     for (String cap : caps.split("\\s+")) {
@@ -467,7 +529,9 @@ public class IRCMessageUnmarshaller {
 
   private IRCMessageNOTICE parseNotice(Parameters parameters) throws Exception {
     return parameters.inject(
-        required("target", this::splitToList), required("text to be sent"), IRCMessageNOTICE::new);
+        required("target", this::splitToList),
+        requiredAllowEmpty("text to be sent"),
+        IRCMessageNOTICE::new);
   }
 
   private IRCMessagePART parsePart(Parameters parameters) throws Exception {
@@ -489,7 +553,9 @@ public class IRCMessageUnmarshaller {
 
   private IRCMessagePRIVMSG parsePrivmsg(Parameters parameters) throws Exception {
     return parameters.inject(
-        required("target", this::splitToList), required("text to be sent"), IRCMessagePRIVMSG::new);
+        required("target", this::splitToList),
+        requiredAllowEmpty("text to be sent"),
+        IRCMessagePRIVMSG::new);
   }
 
   private IRCMessageUSER parseUser(Parameters parameters) throws Exception {
@@ -611,7 +677,7 @@ public class IRCMessageUnmarshaller {
     return parameters.inject(
         required("client"),
         required("nick"),
-        required("secs"),
+        required("secs", Integer::parseInt),
         required("signon", Long::parseLong),
         IRCMessage317::new);
   }
@@ -1266,7 +1332,8 @@ public class IRCMessageUnmarshaller {
       }
       if (remaining < 0) {
         throw new NotEnoughParametersException(
-            "expected at least %d parameters but got %d".formatted(paramCount - remaining, paramCount));
+            "expected at least %d parameters but got %d"
+                .formatted(paramCount - remaining, paramCount));
       }
 
       int position = 0;
@@ -1296,24 +1363,28 @@ public class IRCMessageUnmarshaller {
   }
 
   private ParameterExtractor<String> required(String name) {
-    return new SingleParameterExtractor<>(x -> x, true, null, name);
+    return new SingleParameterExtractor<>(x -> x, true, false, null, name);
+  }
+
+  private ParameterExtractor<String> requiredAllowEmpty(String name) {
+    return new SingleParameterExtractor<>(x -> x, true, true, null, name);
   }
 
   private <T> ParameterExtractor<T> required(String name, ThrowingFunction<String, T> mapper) {
-    return new SingleParameterExtractor<>(mapper, true, null, name);
+    return new SingleParameterExtractor<>(mapper, true, false, null, name);
   }
 
   private ParameterExtractor<String> optional(String name) {
-    return new SingleParameterExtractor<>(x -> x, false, null, name);
+    return new SingleParameterExtractor<>(x -> x, false, false, null, name);
   }
 
   private <T> ParameterExtractor<T> optional(String name, ThrowingFunction<String, T> mapper) {
-    return new SingleParameterExtractor<>(mapper, false, null, name);
+    return new SingleParameterExtractor<>(mapper, false, false, null, name);
   }
 
   private <T> ParameterExtractor<T> optional(
       String name, ThrowingFunction<String, T> mapper, T defaultValue) {
-    return new SingleParameterExtractor<>(mapper, false, defaultValue, name);
+    return new SingleParameterExtractor<>(mapper, false, false, defaultValue, name);
   }
 
   private ParameterExtractor<List<String>> greedyRequired(String name) {
@@ -1391,13 +1462,19 @@ public class IRCMessageUnmarshaller {
 
     private final ThrowingFunction<String, T> mapper;
     private final boolean required;
+    private final boolean allowEmpty;
     private final T defaultValue;
     private final String name;
 
     public SingleParameterExtractor(
-        ThrowingFunction<String, T> mapper, boolean required, T defaultValue, String name) {
+        ThrowingFunction<String, T> mapper,
+        boolean required,
+        boolean allowEmpty,
+        T defaultValue,
+        String name) {
       this.mapper = mapper;
       this.required = required;
+      this.allowEmpty = allowEmpty;
       this.defaultValue = defaultValue;
       this.name = name;
     }
@@ -1407,6 +1484,14 @@ public class IRCMessageUnmarshaller {
       String rawValue = null;
       try {
         rawValue = parameters.params.get(start);
+        if (rawValue.isEmpty() && !allowEmpty) {
+          if (required) {
+            throw new ParserErrorException(
+                "required parameter %s must not be empty".formatted(name));
+          } else {
+            return defaultValue;
+          }
+        }
         return mapper.apply(rawValue);
       } catch (Exception e) {
         logExtractionException(start, endInclusive, rawValue, parameters.raw, e);

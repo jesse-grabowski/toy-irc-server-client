@@ -45,7 +45,7 @@ public class IRCClient {
                 IRCClientProperties::setConnectTimeout,
                 "timeout for establishing server connection (default 10000)",
                 false)
-            .addStringFlag(
+            .addCharsetFlag(
                 'C',
                 "charset",
                 IRCClientProperties::setCharset,

@@ -1,5 +1,7 @@
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -68,6 +70,16 @@ class ArgsParserTest {
         TestProps props = parse(parser, "--count", "42");
 
         assertEquals(42, props.count);
+    }
+
+    @Test
+    void parsesCharsetFlag() throws ArgsParserHelpRequestedException {
+        ArgsParserBuilder<TestProps> parser = newParser()
+                .addCharsetFlag('c', "charset", (p, v) -> p.charset = v, "charset", false);
+
+        TestProps props = parse(parser, "--charset", "UTF-8");
+
+        assertEquals(StandardCharsets.UTF_8, props.charset);
     }
 
     @Test
@@ -668,6 +680,7 @@ class ArgsParserTest {
         String input;
         String message;
         List<String> extraArgs;
+        Charset charset;
 
         @Override
         public void validate() {

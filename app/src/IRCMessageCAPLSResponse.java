@@ -1,4 +1,3 @@
-import java.util.LinkedHashMap;
 import java.util.SequencedMap;
 
 public final class IRCMessageCAPLSResponse extends IRCMessage {

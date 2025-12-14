@@ -9,7 +9,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -111,7 +110,7 @@ public class IRCClientEngine implements Closeable {
           IRCClientConnectionFactory.create(
               properties.getHost(),
               properties.getPort(),
-              Charset.forName(properties.getCharset()),
+              properties.getCharset(),
               properties.getConnectTimeout(),
               properties.getReadTimeout());
       connection.addShutdownHandler(this::afterDisconnect);
@@ -213,7 +212,7 @@ public class IRCClientEngine implements Closeable {
   }
 
   private void receive(String message) {
-    receive(UNMARSHALLER.unmarshal(message));
+    receive(UNMARSHALLER.unmarshal(properties.getCharset(), message));
   }
 
   private void receive(IRCMessage message) {

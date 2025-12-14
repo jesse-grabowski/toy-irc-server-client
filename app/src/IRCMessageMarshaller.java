@@ -163,7 +163,8 @@ public class IRCMessageMarshaller {
     };
   }
 
-  private <T extends IRCMessage> String marshal(T message, Function<T, List<String>> paramMarshaller) {
+  private <T extends IRCMessage> String marshal(
+      T message, Function<T, List<String>> paramMarshaller) {
     StringBuilder messageBuilder = new StringBuilder();
     if (message.getTags() != null && !message.getTags().isEmpty()) {
       messageBuilder.append('@');
@@ -180,7 +181,11 @@ public class IRCMessageMarshaller {
 
     messageBuilder.append(message.getCommand());
 
-    List<String> params = paramMarshaller.apply(message).stream().filter(Objects::nonNull).filter(not(String::isBlank)).toList();
+    List<String> params =
+        paramMarshaller.apply(message).stream()
+            .filter(Objects::nonNull)
+            .filter(not(String::isBlank))
+            .toList();
     if (params.isEmpty()) {
       return messageBuilder.toString();
     }
@@ -223,7 +228,10 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshalCapACK(IRCMessageCAPACK message) {
-    return l(message.getNick(), "ACK", trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
+    return l(
+        message.getNick(),
+        "ACK",
+        trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
   }
 
   private List<String> marshalCapDEL(IRCMessageCAPDEL message) {
@@ -239,7 +247,11 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshalCapLISTResponse(IRCMessageCAPLISTResponse message) {
-    return l(message.getNick(), "LIST", when(message.isHasMore(), "*"), trailing(delimited(" ", message.getCapabilities())));
+    return l(
+        message.getNick(),
+        "LIST",
+        when(message.isHasMore(), "*"),
+        trailing(delimited(" ", message.getCapabilities())));
   }
 
   private List<String> marshalCapLSRequest(IRCMessageCAPLSRequest message) {
@@ -247,19 +259,30 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshalCapLSResponse(IRCMessageCAPLSResponse message) {
-    return l(message.getNick(), "LS", when(message.isHasMore(), "*"), trailing(marshalMap(message.getCapabilities(), " ", Function.identity())));
+    return l(
+        message.getNick(),
+        "LS",
+        when(message.isHasMore(), "*"),
+        trailing(marshalMap(message.getCapabilities(), " ", Function.identity())));
   }
 
   private List<String> marshalCapNAK(IRCMessageCAPNAK message) {
-    return l(message.getNick(), "NAK", trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
+    return l(
+        message.getNick(),
+        "NAK",
+        trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
   }
 
   private List<String> marshalCapNEW(IRCMessageCAPNEW message) {
-    return l(message.getNick(), "NEW", trailing(marshalMap(message.getCapabilities(), " ", Function.identity())));
+    return l(
+        message.getNick(),
+        "NEW",
+        trailing(marshalMap(message.getCapabilities(), " ", Function.identity())));
   }
 
   private List<String> marshalCapREQ(IRCMessageCAPREQ message) {
-    return l("REQ", trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
+    return l(
+        "REQ", trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
   }
 
   private List<String> marshalError(IRCMessageERROR message) {
@@ -279,7 +302,8 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshalMode(IRCMessageMODE message) {
-    return l(message.getTarget(), message.getModeString(), delimited(" ", message.getModeArguments()));
+    return l(
+        message.getTarget(), message.getModeString(), delimited(" ", message.getModeArguments()));
   }
 
   private List<String> marshalNick(IRCMessageNICK message) {
@@ -331,19 +355,34 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal004(IRCMessage004 message) {
-    return l(message.getClient(), message.getServerName(), message.getVersion(), message.getUserModes(), message.getChannelModes(), message.getChannelModesWithParam());
+    return l(
+        message.getClient(),
+        message.getServerName(),
+        message.getVersion(),
+        message.getUserModes(),
+        message.getChannelModes(),
+        message.getChannelModesWithParam());
   }
 
   private List<String> marshal005(IRCMessage005 message) {
-    return l(message.getClient(), marshalMap(message.getParameters(), " ", Function.identity()), trailing("are supported by this server"));
+    return l(
+        message.getClient(),
+        marshalMap(message.getParameters(), " ", Function.identity()),
+        trailing("are supported by this server"));
   }
 
   private List<String> marshal010(IRCMessage010 message) {
-    return l(message.getClient(), message.getHostname(), message.getPort(), trailing(message.getInfo()));
+    return l(
+        message.getClient(), message.getHostname(), message.getPort(), trailing(message.getInfo()));
   }
 
   private List<String> marshal212(IRCMessage212 message) {
-    return l(message.getClient(), message.getTargetCommand(), message.getCount(), message.getByteCount(), message.getRemoteCount());
+    return l(
+        message.getClient(),
+        message.getTargetCommand(),
+        message.getCount(),
+        message.getByteCount(),
+        message.getRemoteCount());
   }
 
   private List<String> marshal219(IRCMessage219 message) {
@@ -399,11 +438,19 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal265(IRCMessage265 message) {
-    return l(message.getClient(), message.getLocalUsers(), message.getMaxLocalUsers(), trailing(message.getText()));
+    return l(
+        message.getClient(),
+        message.getLocalUsers(),
+        message.getMaxLocalUsers(),
+        trailing(message.getText()));
   }
 
   private List<String> marshal266(IRCMessage266 message) {
-    return l(message.getClient(), message.getGlobalUsers(), message.getMaxGlobalUsers(), trailing(message.getText()));
+    return l(
+        message.getClient(),
+        message.getGlobalUsers(),
+        message.getMaxGlobalUsers(),
+        trailing(message.getText()));
   }
 
   private List<String> marshal276(IRCMessage276 message) {
@@ -431,11 +478,21 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal311(IRCMessage311 message) {
-    return l(message.getClient(), message.getNick(), message.getUser(), message.getHost(), "*", trailing(message.getRealName()));
+    return l(
+        message.getClient(),
+        message.getNick(),
+        message.getUser(),
+        message.getHost(),
+        "*",
+        trailing(message.getRealName()));
   }
 
   private List<String> marshal312(IRCMessage312 message) {
-    return l(message.getClient(), message.getNick(), message.getServer(), trailing(message.getServerInfo()));
+    return l(
+        message.getClient(),
+        message.getNick(),
+        message.getServer(),
+        trailing(message.getServerInfo()));
   }
 
   private List<String> marshal313(IRCMessage313 message) {
@@ -443,7 +500,13 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal314(IRCMessage314 message) {
-    return l(message.getClient(), message.getNick(), message.getUser(), message.getHost(), "*", trailing(message.getRealName()));
+    return l(
+        message.getClient(),
+        message.getNick(),
+        message.getUser(),
+        message.getHost(),
+        "*",
+        trailing(message.getRealName()));
   }
 
   private List<String> marshal315(IRCMessage315 message) {
@@ -460,7 +523,8 @@ public class IRCMessageMarshaller {
             "%s, %s"
                 .formatted(
                     message.getSecondsIdle(),
-                    DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(message.getSignOnTime())))));
+                    DateTimeFormatter.ISO_INSTANT.format(
+                        Instant.ofEpochMilli(message.getSignOnTime())))));
   }
 
   private List<String> marshal318(IRCMessage318 message) {
@@ -468,7 +532,10 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal319(IRCMessage319 message) {
-    return l(message.getClient(), message.getNick(), trailing(delimited(" ", zip(message.getPrefixes(), message.getChannels()))));
+    return l(
+        message.getClient(),
+        message.getNick(),
+        trailing(delimited(" ", zip(message.getPrefixes(), message.getChannels()))));
   }
 
   private List<String> marshal320(IRCMessage320 message) {
@@ -480,7 +547,11 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal322(IRCMessage322 message) {
-    return l(message.getClient(), message.getChannel(), message.getClientCount(), trailing(message.getTopic()));
+    return l(
+        message.getClient(),
+        message.getChannel(),
+        message.getClientCount(),
+        trailing(message.getTopic()));
   }
 
   private List<String> marshal323(IRCMessage323 message) {
@@ -488,7 +559,11 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal324(IRCMessage324 message) {
-    return l(message.getClient(), message.getChannel(), message.getModeString(), delimited(" ", message.getModeArguments()));
+    return l(
+        message.getClient(),
+        message.getChannel(),
+        message.getModeString(),
+        delimited(" ", message.getModeArguments()));
   }
 
   private List<String> marshal329(IRCMessage329 message) {
@@ -496,7 +571,8 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal330(IRCMessage330 message) {
-    return l(message.getClient(), message.getNick(), message.getAccount(), trailing("is logged in as"));
+    return l(
+        message.getClient(), message.getNick(), message.getAccount(), trailing("is logged in as"));
   }
 
   private List<String> marshal331(IRCMessage331 message) {
@@ -522,13 +598,26 @@ public class IRCMessageMarshaller {
   // probably need to get some actual information here but that's out of scope for now
   private List<String> marshal338(IRCMessage338 message) {
     if (message.getHostname() != null && message.getIp() != null) {
-      return l(message.getClient(), message.getNick(), message.getUsername() + "@" + message.getHostname(), message.getIp(), trailing("is actually using host"));
+      return l(
+          message.getClient(),
+          message.getNick(),
+          message.getUsername() + "@" + message.getHostname(),
+          message.getIp(),
+          trailing("is actually using host"));
     }
     if (message.getHostname() != null) {
-      return l(message.getClient(), message.getNick(), message.getHostname(), trailing("Is actually using host"));
+      return l(
+          message.getClient(),
+          message.getNick(),
+          message.getHostname(),
+          trailing("Is actually using host"));
     }
     if (message.getIp() != null) {
-      return l(message.getClient(), message.getNick(), message.getIp(), trailing("Is actually using host"));
+      return l(
+          message.getClient(),
+          message.getNick(),
+          message.getIp(),
+          trailing("Is actually using host"));
     }
     return l(message.getClient(), message.getNick(), trailing("is actually ..."));
   }
@@ -542,7 +631,10 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal347(IRCMessage347 message) {
-    return l(message.getClient(), message.getChannel(), trailing("End of Channel Invite Exception List"));
+    return l(
+        message.getClient(),
+        message.getChannel(),
+        trailing("End of Channel Invite Exception List"));
   }
 
   private List<String> marshal348(IRCMessage348 message) {
@@ -554,28 +646,39 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal351(IRCMessage351 message) {
-    return l(message.getClient(), message.getVersion(), message.getServer(), trailing(message.getComments()));
+    return l(
+        message.getClient(),
+        message.getVersion(),
+        message.getServer(),
+        trailing(message.getComments()));
   }
 
   private List<String> marshal352(IRCMessage352 message) {
     return l(
-            message.getClient(),
-            message.getChannel(),
-            message.getUser(),
-            message.getHost(),
-            message.getServer(),
-            message.getNick(),
-            message.getFlags(),
-            trailing(message.getHopcount() + " " + message.getRealName())
-    );
+        message.getClient(),
+        message.getChannel(),
+        message.getUser(),
+        message.getHost(),
+        message.getServer(),
+        message.getNick(),
+        message.getFlags(),
+        trailing(message.getHopcount() + " " + message.getRealName()));
   }
 
   private List<String> marshal353(IRCMessage353 message) {
-    return l(message.getClient(), message.getSymbol(), message.getChannel(), trailing(delimited(" ", zip(message.getModes(), message.getNicks()))));
+    return l(
+        message.getClient(),
+        message.getSymbol(),
+        message.getChannel(),
+        trailing(delimited(" ", zip(message.getModes(), message.getNicks()))));
   }
 
   private List<String> marshal364(IRCMessage364 message) {
-    return l(message.getClient(), message.getServer1(), message.getServer2(), trailing(message.getHopCount() + " " + message.getServerInfo()));
+    return l(
+        message.getClient(),
+        message.getServer1(),
+        message.getServer2(),
+        trailing(message.getHopCount() + " " + message.getServerInfo()));
   }
 
   private List<String> marshal365(IRCMessage365 message) {
@@ -587,7 +690,12 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal367(IRCMessage367 message) {
-      return l(message.getClient(), message.getChannel(), message.getMask(), message.getSetBy(), message.getSetAt());
+    return l(
+        message.getClient(),
+        message.getChannel(),
+        message.getMask(),
+        message.getSetBy(),
+        message.getSetAt());
   }
 
   private List<String> marshal368(IRCMessage368 message) {
@@ -635,11 +743,17 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal391(IRCMessage391 message) {
-    return l(message.getClient(), message.getServer(), message.getTimestamp(), message.getTsOffset(), trailing(message.getTimeString()));
+    return l(
+        message.getClient(),
+        message.getServer(),
+        message.getTimestamp(),
+        message.getTsOffset(),
+        trailing(message.getTimeString()));
   }
 
   private List<String> marshal400(IRCMessage400 message) {
-    return l(message.getClient(), delimited(" ", message.getCommands()), trailing(message.getInfo()));
+    return l(
+        message.getClient(), delimited(" ", message.getCommands()), trailing(message.getInfo()));
   }
 
   private List<String> marshal401(IRCMessage401 message) {
@@ -707,7 +821,11 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal441(IRCMessage441 message) {
-    return l(message.getClient(), message.getNick(), message.getChannel(), trailing("They aren't on that channel"));
+    return l(
+        message.getClient(),
+        message.getNick(),
+        message.getChannel(),
+        trailing("They aren't on that channel"));
   }
 
   private List<String> marshal442(IRCMessage442 message) {
@@ -715,7 +833,11 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal443(IRCMessage443 message) {
-    return l(message.getClient(), message.getNick(), message.getChannel(), trailing("is already on channel"));
+    return l(
+        message.getClient(),
+        message.getNick(),
+        message.getChannel(),
+        trailing("is already on channel"));
   }
 
   private List<String> marshal451(IRCMessage451 message) {
@@ -807,7 +929,12 @@ public class IRCMessageMarshaller {
   }
 
   private List<String> marshal696(IRCMessage696 message) {
-    return l(message.getClient(), message.getTarget(), message.getMode(), message.getParameter(), trailing(message.getDescription()));
+    return l(
+        message.getClient(),
+        message.getTarget(),
+        message.getMode(),
+        message.getParameter(),
+        trailing(message.getDescription()));
   }
 
   private List<String> marshal704(IRCMessage704 message) {
@@ -840,7 +967,7 @@ public class IRCMessageMarshaller {
         .collect(Collectors.joining(delimiter));
   }
 
-  private List<String> l(Object ... values) {
+  private List<String> l(Object... values) {
     List<String> result = new ArrayList<>();
     for (Object value : values) {
       if (value == null) {
@@ -856,14 +983,12 @@ public class IRCMessageMarshaller {
   }
 
   private String ieList(List<String> inclusion, List<String> exclusion) {
-    return Stream.concat(
-                    inclusion.stream(),
-                    exclusion.stream().map(s -> "-" + s))
-            .collect(Collectors.joining(" "));
+    return Stream.concat(inclusion.stream(), exclusion.stream().map(s -> "-" + s))
+        .collect(Collectors.joining(" "));
   }
 
   private String trailing(String value) {
-    if (value == null || value.isBlank()) {
+    if (value == null) {
       return null;
     }
     return ":" + value;

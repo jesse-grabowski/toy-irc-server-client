@@ -31,38 +31,28 @@ public final class IRCMessage338 extends IRCMessage {
   }
 
   public static IRCMessage338 forClientNick(
-          String rawMessage,
-          SequencedMap<String, String> tags,
-          String prefixName,
-          String prefixUser,
-          String prefixHost,
-          String client,
-          String nick,
-          String text) {
+      String rawMessage,
+      SequencedMap<String, String> tags,
+      String prefixName,
+      String prefixUser,
+      String prefixHost,
+      String client,
+      String nick,
+      String text) {
     return new IRCMessage338(
-            rawMessage,
-            tags,
-            prefixName,
-            prefixUser,
-            prefixHost,
-            client,
-            nick,
-            null,
-            null,
-            null,
-            text);
+        rawMessage, tags, prefixName, prefixUser, prefixHost, client, nick, null, null, null, text);
   }
 
   public static IRCMessage338 forHost(
-          String rawMessage,
-          SequencedMap<String, String> tags,
-          String prefixName,
-          String prefixUser,
-          String prefixHost,
-          String client,
-          String nick,
-          String hostname,
-          String text) {
+      String rawMessage,
+      SequencedMap<String, String> tags,
+      String prefixName,
+      String prefixUser,
+      String prefixHost,
+      String client,
+      String nick,
+      String hostname,
+      String text) {
     return new IRCMessage338(
         rawMessage,
         tags,
@@ -74,31 +64,21 @@ public final class IRCMessage338 extends IRCMessage {
         null,
         hostname,
         null,
-            text);
+        text);
   }
 
   public static IRCMessage338 forIp(
-          String rawMessage,
-          SequencedMap<String, String> tags,
-          String prefixName,
-          String prefixUser,
-          String prefixHost,
-          String client,
-          String nick,
-          String ip,
-          String text) {
+      String rawMessage,
+      SequencedMap<String, String> tags,
+      String prefixName,
+      String prefixUser,
+      String prefixHost,
+      String client,
+      String nick,
+      String ip,
+      String text) {
     return new IRCMessage338(
-            rawMessage,
-            tags,
-            prefixName,
-            prefixUser,
-            prefixHost,
-            client,
-            nick,
-            null,
-            null,
-            ip,
-            text);
+        rawMessage, tags, prefixName, prefixUser, prefixHost, client, nick, null, null, ip, text);
   }
 
   public String getClient() {

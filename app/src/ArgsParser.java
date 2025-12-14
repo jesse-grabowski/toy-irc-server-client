@@ -1,5 +1,7 @@
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -93,6 +95,19 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     addFlagSpec(
         new FlagSpec<>(
             shortKey, longKey, true, propertiesSetter, this::tryParseInt, description, required));
+    return this;
+  }
+
+  @Override
+  public ArgsParserBuilder<T> addCharsetFlag(
+          char shortKey,
+          String longKey,
+          BiConsumer<T, Charset> propertiesSetter,
+          String description,
+          boolean required) {
+    addFlagSpec(
+            new FlagSpec<>(
+                    shortKey, longKey, true, propertiesSetter, this::tryParseCharset, description, required));
     return this;
   }
 
@@ -213,6 +228,14 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
       return InetAddress.getByName(value);
     } catch (UnknownHostException e) {
       throw new IllegalArgumentException("failed to resolve hostname '%s'".formatted(value), e);
+    }
+  }
+
+  private Charset tryParseCharset(String value) {
+    try {
+      return Charset.forName(value);
+    } catch (UnsupportedCharsetException e) {
+      throw new IllegalArgumentException("failed to resolve charset '%s'".formatted(value), e);
     }
   }
 

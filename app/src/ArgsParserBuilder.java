@@ -1,4 +1,5 @@
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -26,6 +27,13 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
       BiConsumer<T, Integer> propertiesSetter,
       String description,
       boolean required);
+
+  ArgsParserBuilder<T> addCharsetFlag(
+          char shortKey,
+          String longKey,
+          BiConsumer<T, Charset> propertiesSetter,
+          String description,
+          boolean required);
 
   ArgsParserBuilder<T> addStringPositional(
       int position, BiConsumer<T, String> propertiesSetter, String description, boolean required);

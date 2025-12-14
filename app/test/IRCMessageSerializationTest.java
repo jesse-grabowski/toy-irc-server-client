@@ -2,6 +2,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -14,8 +15,9 @@ public class IRCMessageSerializationTest {
     @ParameterizedTest(name = "{index}: round-trip \"{0}\" -> \"{1}\"")
     @MethodSource("rawMessages")
     void roundTripRawMessages(String input, String expected) {
-        IRCMessage parsed = unmarshaller.unmarshal(input);
+        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
         assertFalse(parsed instanceof IRCMessageParseError);
+        assertFalse(parsed instanceof IRCMessageUnsupported);
         String marshalled = marshaller.marshal(parsed);
 
         assertEquals(expected, marshalled);
@@ -170,7 +172,6 @@ public class IRCMessageSerializationTest {
                         "@a=1;b=hello\\sworld :nick!user@host PRIVMSG #chan :hi there",
                         "@a=1;b=hello\\sworld :nick!user@host PRIVMSG #chan :hi there"
                 ),
-                Arguments.of("UNKNOWN arg1 arg2", "UNKNOWN arg1 arg2"),
                 Arguments.of("CAP LS 302", "CAP LS 302"),
                 Arguments.of("CAP LIST", "CAP LIST"),
                 Arguments.of("CAP REQ :multi-prefix sasl -batch", "CAP REQ :multi-prefix sasl -batch"),
@@ -182,14 +183,50 @@ public class IRCMessageSerializationTest {
                 Arguments.of("CAP nick LS :multi-prefix sasl", "CAP nick LS :multi-prefix sasl"),
                 Arguments.of("CAP nick LS * :multi-prefix sasl", "CAP nick LS * :multi-prefix sasl"),
                 Arguments.of("CAP nick LIST :multi-prefix sasl", "CAP nick LIST :multi-prefix sasl"),
-                Arguments.of("CAP nick LIST * :multi-prefix sasl", "CAP nick LIST * :multi-prefix sasl")
+                Arguments.of("CAP nick LIST * :multi-prefix sasl", "CAP nick LIST * :multi-prefix sasl"),
+                Arguments.of("KICK #c nick :", "KICK #c nick"),
+                Arguments.of("QUIT :", "QUIT"),
+                Arguments.of("PART #chan :", "PART #chan"),
+                Arguments.of("ping :12345", "PING :12345"),
+                Arguments.of(":nick@host PRIVMSG #c :hi", ":nick@host PRIVMSG #c :hi"),
+                Arguments.of(":nick!user PRIVMSG #c :hi", ":nick!user PRIVMSG #c :hi"),
+                Arguments.of("@a=1 PRIVMSG #c :hi", "@a=1 PRIVMSG #c :hi"),
+                Arguments.of("@a=;b PRIVMSG #c :hi", "@a;b PRIVMSG #c :hi"),
+                Arguments.of("@a=hello\\:world PRIVMSG #c :hi", "@a=hello\\:world PRIVMSG #c :hi"),
+                Arguments.of("@a=hello\\nworld PRIVMSG #c :hi", "@a=hello\\nworld PRIVMSG #c :hi"),
+                Arguments.of("@a=hello\\rworld PRIVMSG #c :hi", "@a=hello\\rworld PRIVMSG #c :hi"),
+                Arguments.of("@a=hello\\\\world PRIVMSG #c :hi", "@a=hello\\\\world PRIVMSG #c :hi"),
+                Arguments.of("@a=1;a=2 PRIVMSG #c :hi", "@a=2 PRIVMSG #c :hi"),
+                Arguments.of("PRIVMSG #a,#b :hi", "PRIVMSG #a,#b :hi"),
+                Arguments.of("NOTICE #a,#b :hi", "NOTICE #a,#b :hi"),
+                Arguments.of("JOIN #a,#b key1,key2", "JOIN #a,#b key1,key2"),
+                Arguments.of("PING :12345   ", "PING :12345   "),
+                Arguments.of("PING abc:def", "PING :abc:def"),
+                Arguments.of("PRIVMSG #c ::hi", "PRIVMSG #c ::hi"),
+                Arguments.of("NOTICE #c ::hi", "NOTICE #c ::hi"),
+                Arguments.of("ERROR ::oops", "ERROR ::oops"),
+                Arguments.of("QUIT :bye", "QUIT :bye"),
+                Arguments.of("MODE #chan +b *!*@bad.host", "MODE #chan +b *!*@bad.host"),
+                Arguments.of("MODE #chan +k key", "MODE #chan +k key"),
+                Arguments.of("JOIN #a,#b", "JOIN #a,#b"),
+                Arguments.of("JOIN #a,#b :", "JOIN #a,#b"),
+                Arguments.of("@a=hello\\qworld PRIVMSG #c :hi", "@a=hello\\\\qworld PRIVMSG #c :hi"),
+                Arguments.of("@a=hello\\ PRIVMSG #c :hi", "@a=hello\\\\ PRIVMSG #c :hi"),
+                Arguments.of("@=1 PRIVMSG #c :hi", "PRIVMSG #c :hi"),
+                Arguments.of("@a==b PRIVMSG #c :hi", "@a==b PRIVMSG #c :hi"),
+                Arguments.of("CAP nick ACK :multi-prefix", "CAP nick ACK :multi-prefix"),
+                Arguments.of("CAP nick NAK :multi-prefix", "CAP nick NAK :multi-prefix"),
+                Arguments.of("CAP REQ :multi-prefix", "CAP REQ :multi-prefix"),
+                Arguments.of("CAP nick DEL :multi-prefix", "CAP nick DEL :multi-prefix"),
+                Arguments.of("PRIVMSG #c :", "PRIVMSG #c :"),
+                Arguments.of("NOTICE #c :", "NOTICE #c :")
         );
     }
 
     @ParameterizedTest(name = "{index}: type for \"{0}\" is {1}")
     @MethodSource("messageTypes")
     void unmarshalProducesExpectedType(String input, Class<? extends IRCMessage> expectedType) {
-        IRCMessage parsed = unmarshaller.unmarshal(input);
+        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
         assertInstanceOf(expectedType, parsed);
     }
 
@@ -348,6 +385,155 @@ public class IRCMessageSerializationTest {
                 Arguments.of(":irc.example.net 705 alice subject :JOIN <channel>", IRCMessage705.class),
                 Arguments.of(":irc.example.net 706 alice subject :End of HELP", IRCMessage706.class),
                 Arguments.of(":irc.example.net 723 alice priv :Insufficient privileges", IRCMessage723.class)
+        );
+    }
+
+    @ParameterizedTest(name = "{index}: parse error for \"{0}\"")
+    @MethodSource("parseErrorMessages")
+    void unmarshalProducesParseError(String input) {
+        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        assertInstanceOf(IRCMessageParseError.class, parsed);
+    }
+
+    static Stream<Arguments> parseErrorMessages() {
+        return Stream.of(
+                Arguments.of("PING"),
+                Arguments.of("PONG"),
+                Arguments.of("JOIN"),
+                Arguments.of("KICK #chan"),
+                Arguments.of("MODE"),
+                Arguments.of("NOTICE #chan"),
+                Arguments.of("PRIVMSG #chan"),
+                Arguments.of("PASS"),
+                Arguments.of("NICK"),
+                Arguments.of("USER myuser 0 *"),
+                Arguments.of(":irc.example.net 010 alice irc.backup.example.net notaport :Please connect"),
+                Arguments.of(":irc.example.net 265 alice notInt 50 :Current local users"),
+                Arguments.of(":irc.example.net 329 alice #chat notATimestamp"),
+                Arguments.of(":irc.example.net 333 alice #chat bob notATimestamp"),
+                Arguments.of(":irc.example.net 317 alice bob notInt 1700000000 :seconds idle, signon time"),
+                Arguments.of(":irc.example.net 317 alice bob 120 notALong :seconds idle, signon time"),
+                Arguments.of(":irc.example.net 472 alice :missing modechar"),
+                Arguments.of(":irc.example.net 696 alice #chat k :missing parameter and description"),
+                Arguments.of("CAP LS"),
+                Arguments.of("CAP REQ"),
+                Arguments.of("CAP nick ACK"),
+                Arguments.of("CAP nick ACK :"),
+                Arguments.of("CAP nick LS"),
+                Arguments.of("CAP nick DEL"),
+                Arguments.of("CAP nick FOO :bar"),
+                Arguments.of(":nick! PRIVMSG #c :hi"),
+                Arguments.of(":nick! PRIVMSG #c :hi"),
+                Arguments.of(":nick@ PRIVMSG #c :hi"),
+                Arguments.of(":nick!user@ PRIVMSG #c :hi"),
+                Arguments.of(":nick!user@host@extra PRIVMSG #c :hi"),
+                Arguments.of(":@host PRIVMSG #c :hi"),
+                Arguments.of("PING :"),
+                Arguments.of("ERROR :"),
+                Arguments.of("PASS :"),
+                Arguments.of("NICK :"),
+                Arguments.of(":irc.example.net 322 alice #chat 12 :"),
+                Arguments.of(":irc.example.net 001 alice :"),
+                Arguments.of(":irc.example.net 400 alice KICK :"),
+                Arguments.of("PONG irc.example.com :"),
+                Arguments.of(":irc.example.net 256 alice irc.example.net :"),
+                Arguments.of(":irc.example.net 391 alice irc.example.net 1700000000 -05:00 :"),
+                Arguments.of(":irc.example.net 010 alice irc.backup.example.net 999999999999999999999 :Please connect"),
+                Arguments.of(":irc.example.net 317 alice bob 999999999999999999999 1700000000 :seconds idle, signon time"),
+                Arguments.of(":irc.example.net 317 alice bob 120 999999999999999999999 :seconds idle, signon time"),
+                Arguments.of("CAP REQ :"),
+                Arguments.of("CAP nick NAK :"),
+                Arguments.of("CAP nick ACK :"),
+                Arguments.of("JOIN :"),
+                Arguments.of("PART :"),
+                Arguments.of("PRIVMSG :hi"),
+                Arguments.of("NOTICE :hi"),
+                Arguments.of("PONG :"),
+                Arguments.of("PRIVMSG #c\t:hi"),
+                Arguments.of("PING  "),
+                Arguments.of("PRIVMSG #c"),
+                Arguments.of("NOTICE #c"),
+                Arguments.of("ERROR"),
+                Arguments.of("CAP"),
+                Arguments.of("CAP nick"),
+                Arguments.of("CAP nick ACK")
+        );
+    }
+
+    @ParameterizedTest(name = "{index}: invalid grammar is unsupported for \"{0}\"")
+    @MethodSource("invalidGrammarMessages")
+    void unmarshalInvalidGrammarIsUnsupported(String input) {
+        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        assertInstanceOf(IRCMessageUnsupported.class, parsed);
+        assertFalse(parsed instanceof IRCMessageParseError);
+    }
+
+    static Stream<Arguments> invalidGrammarMessages() {
+        return Stream.of(
+                Arguments.of(""),
+                Arguments.of("   "),
+                Arguments.of("@"),
+                Arguments.of(":"),
+                Arguments.of("@a=1 :"),
+                Arguments.of("!@#$"),
+                Arguments.of("PRIVMSG\u0000#chan :hi"),
+                Arguments.of("PING :hi\r\nPONG :x"),
+                Arguments.of("@a=1;b=2"),
+                Arguments.of("@a=1;b=2  "),
+                Arguments.of("@a=1;b=2 :nick"),
+                Arguments.of("@a=1 b=2 PRIVMSG #c :hi"),
+                Arguments.of(": PRIVMSG #c :hi"),
+                Arguments.of("PRIVMSG\t#c :hi"),
+                Arguments.of("PRIVMSG #c :hi\u0000there")
+        );
+    }
+
+    @ParameterizedTest(name = "{index}: length ok \"{0}\"")
+    @MethodSource("lengthOkMessages")
+    void lengthOkMessages(String input, String expected) {
+        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        assertFalse(parsed instanceof IRCMessageParseError);
+        assertFalse(parsed instanceof IRCMessageUnsupported);
+        String marshalled = marshaller.marshal(parsed);
+        assertEquals(expected, marshalled);
+    }
+
+    static Stream<Arguments> lengthOkMessages() {
+        String tagValue8191 = "a".repeat(8191 - "@a=".length() - " ".length());
+        String tagMax = "@a=" + tagValue8191 + " PRIVMSG #c :hi";
+
+        int bodyPrefixLen = "PRIVMSG #c :".length();
+        String bodyValue510 = "a".repeat(510 - bodyPrefixLen);
+        String bodyMax = "PRIVMSG #c :" + bodyValue510;
+
+        return Stream.of(
+                Arguments.of(tagMax, tagMax),
+                Arguments.of(bodyMax, bodyMax)
+        );
+    }
+
+    @ParameterizedTest(name = "{index}: length invalid is unsupported for \"{0}\"")
+    @MethodSource("lengthInvalidMessages")
+    void lengthInvalidMessages(String input) {
+        IRCMessage parsed = unmarshaller.unmarshal(StandardCharsets.UTF_8, input);
+        assertInstanceOf(IRCMessageUnsupported.class, parsed);
+        assertFalse(parsed instanceof IRCMessageParseError);
+    }
+
+    static Stream<Arguments> lengthInvalidMessages() {
+        String tagValue8192 = "a".repeat(8192 - "@a=".length() - " ".length());
+        String tagTooLong = "@a=" + tagValue8192 + " PRIVMSG #c :hi";
+
+        int bodyPrefixLen = "PRIVMSG #c :".length();
+        String bodyValue511 = "a".repeat(511 - bodyPrefixLen);
+        String bodyTooLong = "PRIVMSG #c :" + bodyValue511;
+
+        String messageTooLong = "A".repeat(8702);
+
+        return Stream.of(
+                Arguments.of(tagTooLong),
+                Arguments.of(bodyTooLong),
+                Arguments.of(messageTooLong)
         );
     }
 }

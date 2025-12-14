@@ -1,5 +1,6 @@
 import java.net.InetAddress;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.logging.Level;
 
@@ -10,7 +11,7 @@ public class IRCClientProperties implements ArgsProperties {
   private int port = 6667;
   private int connectTimeout = 10000;
   private int readTimeout = 10 * 60 * 1000;
-  private String charset = "UTF-8";
+  private Charset charset = StandardCharsets.UTF_8;
   private boolean useSimpleTerminal = false;
   private String nickname = "auto";
   private String realName = "Unknown";
@@ -28,10 +29,6 @@ public class IRCClientProperties implements ArgsProperties {
     }
     if (readTimeout < 0) {
       throw new IllegalArgumentException("readTimeout must be greater than 0");
-    }
-    if (!Charset.isSupported(charset)) {
-      throw new IllegalArgumentException(
-          "charset must be one of " + Charset.availableCharsets().keySet());
     }
     try {
       Paths.get(logFile);
@@ -78,11 +75,11 @@ public class IRCClientProperties implements ArgsProperties {
     this.readTimeout = readTimeout;
   }
 
-  public String getCharset() {
+  public Charset getCharset() {
     return charset;
   }
 
-  public void setCharset(String charset) {
+  public void setCharset(Charset charset) {
     this.charset = charset;
   }
 
