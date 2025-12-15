@@ -71,7 +71,7 @@ public abstract class TerminalUI {
                         running = false;
                     }
                 },
-                "com.jessegrabowski.irc.client.tui.TerminalUI-Loop");
+                "TerminalUI-Loop");
 
         thread.setDaemon(true);
         thread.start();
@@ -81,11 +81,6 @@ public abstract class TerminalUI {
         running = false;
         if (thread != null) {
             thread.interrupt();
-            try {
-                thread.join(1000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
         }
     }
 

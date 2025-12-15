@@ -63,6 +63,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.jessegrabowski.irc.client.tui.RichString.B;
+import static com.jessegrabowski.irc.client.tui.RichString.b;
+import static com.jessegrabowski.irc.client.tui.RichString.f;
+import static com.jessegrabowski.irc.client.tui.RichString.j;
+import static com.jessegrabowski.irc.client.tui.RichString.s;
+
 public class IRCClientEngine implements Closeable {
 
     private static final DateTimeFormatter FRIENDLY_DATE_FORMAT = DateTimeFormatter.ofPattern(
@@ -87,11 +93,8 @@ public class IRCClientEngine implements Closeable {
         this.terminal = terminal;
 
         // using a single-threaded executor for engine tasks greatly simplifies our state management
-        // without
-        // any real loss of performance (as the com.jessegrabowski.irc.network.IRCConnection class handles additional
-        // threads for
-        // server
-        // communication)
+        // without any real loss of performance (as the IRCConnection class handles additional threads for
+        // server communication)
         ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
                 1,
                 Thread.ofPlatform()
@@ -101,8 +104,7 @@ public class IRCClientEngine implements Closeable {
                         .uncaughtExceptionHandler((t, e) -> LOG.log(Level.SEVERE, "Error executing task", e))
                         .factory(),
                 // the more important bit is that we're overriding the default exception behavior, the
-                // logging
-                // just makes it a bit easier for us to spot stray messages during shutdown (which are
+                // logging just makes it a bit easier for us to spot stray messages during shutdown (which are
                 // harmless)
                 (task, exec) -> LOG.log(
                         exec.isShutdown() ? Level.FINE : Level.SEVERE,
@@ -1403,6 +1405,7 @@ public class IRCClientEngine implements Closeable {
                         status = s("Chatting in ", f(channel.getName()), " all alone ", formattedTopic);
                     }
                     prompt = s(
+                            state.isOperator() ? b(Color.RED, f(Color.WHITE, "[OPER]")) : "",
                             "[",
                             f(state.getMe()),
                             "@",
@@ -1445,6 +1448,8 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
+        LOG.info("IRCClientEngine shutting down...");
+
         IRCConnection connection = connectionHolder.getAndSet(null);
         if (connection != null) {
             try {
@@ -1455,6 +1460,7 @@ public class IRCClientEngine implements Closeable {
         }
 
         executor.shutdownNow();
+        terminal.stop();
     }
 
     private static final class StateGuard<T> {
@@ -1506,27 +1512,5 @@ public class IRCClientEngine implements Closeable {
         CONNECTED,
         REGISTERED,
         CLOSED
-    }
-
-    // We can't import static from the default package so we reimplement these here
-    // to use them as single-character functions
-    private static RichString s(Object arg0, Object... args) {
-        return RichString.s(arg0, args);
-    }
-
-    private static RichString j(Object del, RichString... args) {
-        return RichString.j(del, args);
-    }
-
-    private static RichString f(Object arg0) {
-        return RichString.f(arg0);
-    }
-
-    private static RichString f(Color color, Object arg0) {
-        return RichString.f(color, arg0);
-    }
-
-    private static RichString B(Object arg0) {
-        return RichString.B(arg0);
     }
 }

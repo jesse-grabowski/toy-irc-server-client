@@ -46,6 +46,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class FancyTerminalUI extends TerminalUI {
@@ -131,9 +132,16 @@ public class FancyTerminalUI extends TerminalUI {
 
     @Override
     protected synchronized void initialize() {
-        LOG.info("Initializing com.jessegrabowski.irc.client.tui.FancyTerminalUI");
+        LOG.info("Enabling full-screen mode");
+        System.out.print("\u001b[?1049h");
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            LOG.info("Disabling full-screen mode");
+            System.out.print("\u001b[?1049l");
+        }));
+
+        LOG.info("Initializing FancyTerminalUI");
         STTY.restoreTerminalStateOnExit();
-        LOG.info("Registered com.jessegrabowski.irc.client.tui.STTY restoration shutdown hook");
+        LOG.info("Registered STTY restoration shutdown hook");
         STTY.enableRawMode();
         LOG.info("Enabled Raw terminal mode");
 
@@ -217,7 +225,7 @@ public class FancyTerminalUI extends TerminalUI {
     }
 
     private synchronized void redraw() {
-        LOG.fine("Redrawing com.jessegrabowski.irc.client.tui.TerminalUI");
+        LOG.fine("Redrawing TerminalUI");
         renderMessages();
         renderFooter();
     }
@@ -459,6 +467,7 @@ public class FancyTerminalUI extends TerminalUI {
 
     @Override
     public synchronized void stop() {
+        LOG.info("FancyTerminalUI shutting down...");
         super.stop();
         scheduler.shutdownNow();
     }
