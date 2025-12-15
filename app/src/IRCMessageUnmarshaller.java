@@ -88,6 +88,7 @@ public class IRCMessageUnmarshaller {
         case IRCMessageMODE.COMMAND -> parseMode(parameters);
         case IRCMessageNICK.COMMAND -> parseNick(parameters);
         case IRCMessageNOTICE.COMMAND -> parseNotice(parameters);
+        case IRCMessageOPER.COMMAND -> parseExact(parameters, "name", "password", IRCMessageOPER::new);
         case IRCMessagePART.COMMAND -> parsePart(parameters);
         case IRCMessagePASS.COMMAND -> parsePass(parameters);
         case IRCMessagePING.COMMAND -> parsePing(parameters);

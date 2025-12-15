@@ -272,6 +272,7 @@ public class IRCClientEngine implements Closeable {
       case IRCMessageMODE m -> handle(m);
       case IRCMessageNICK m -> handle(m);
       case IRCMessageNOTICE m -> handle(m);
+      case IRCMessageOPER m -> { /* ignore */ }
       case IRCMessagePART m -> handle(m);
       case IRCMessagePASS m -> {
         /* ignore */
@@ -476,9 +477,7 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage379 m -> {
         /* ignore */
       }
-      case IRCMessage381 m -> {
-        /* ignore */
-      }
+      case IRCMessage381 m -> handle(m);
       case IRCMessage382 m -> {
         /* ignore */
       }
@@ -550,9 +549,7 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage462 m -> {
         /* ignore */
       }
-      case IRCMessage464 m -> {
-        /* ignore */
-      }
+      case IRCMessage464 m -> terminal.println(makeSystemErrorMessage("Command failed -- Invalid password"));
       case IRCMessage465 m -> {
         /* ignore */
       }
@@ -583,9 +580,7 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage483 m -> {
         /* ignore */
       }
-      case IRCMessage491 m -> {
-        /* ignore */
-      }
+      case IRCMessage491 m -> terminal.println(makeSystemErrorMessage(m.getText()));
       case IRCMessage501 m -> {
         /* ignore */
       }
@@ -1156,6 +1151,16 @@ public class IRCClientEngine implements Closeable {
     }
   }
 
+  private void handle(IRCMessage381 message) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+      return;
+    }
+
+    terminal.println(makeSystemTerminalMessage(f(Color.GREEN, B("You are now an operator"))));
+    state.setOperator(true);
+  }
+
   private void handle(IRCMessage442 message) {
     terminal.println(
         makeSystemTerminalMessage(
@@ -1181,6 +1186,7 @@ public class IRCClientEngine implements Closeable {
       case ClientCommandNotice c -> handle(c);
       case ClientCommandMsgCurrent c -> handle(c);
       case ClientCommandNick c -> handle(c);
+      case ClientCommandOper c -> handle(c);
       case ClientCommandPart c -> handle(c);
       case ClientCommandQuit c -> handle(c);
       case ClientCommandTopic c -> handle(c);
@@ -1254,6 +1260,10 @@ public class IRCClientEngine implements Closeable {
 
   private void handle(ClientCommandNick command) {
     send(new IRCMessageNICK(command.getNick()));
+  }
+
+  private void handle(ClientCommandOper command) {
+    send(new IRCMessageOPER(command.getName(), command.getPassword()));
   }
 
   private void handle(ClientCommandNotice command) {
@@ -1351,6 +1361,11 @@ public class IRCClientEngine implements Closeable {
   private TerminalMessage makeSystemErrorMessage(String message) {
     return new TerminalMessage(
         LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.RED, message));
+  }
+
+  private TerminalMessage makeSystemErrorMessage(RichString message) {
+    return new TerminalMessage(
+            LocalTime.now(), f(Color.YELLOW, "SYSTEM"), null, f(Color.RED, message));
   }
 
   private void updateStatusAndPrompt() {

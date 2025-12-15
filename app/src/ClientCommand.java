@@ -9,6 +9,7 @@ public sealed interface ClientCommand extends ArgsProperties
         ClientCommandMsgCurrent,
         ClientCommandNick,
         ClientCommandNotice,
+        ClientCommandOper,
         ClientCommandPart,
         ClientCommandQuit,
         ClientCommandTopic {}

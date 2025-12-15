@@ -31,6 +31,7 @@ public class IRCMessageMarshaller {
       case IRCMessageMODE m -> marshal(m, this::marshalMode);
       case IRCMessageNICK m -> marshal(m, this::marshalNick);
       case IRCMessageNOTICE m -> marshal(m, this::marshalNotice);
+      case IRCMessageOPER m -> marshal(m, this::marshalOper);
       case IRCMessagePART m -> marshal(m, this::marshalPart);
       case IRCMessagePASS m -> marshal(m, this::marshalPass);
       case IRCMessagePING m -> marshal(m, this::marshalPing);
@@ -313,6 +314,10 @@ public class IRCMessageMarshaller {
 
   private List<String> marshalNotice(IRCMessageNOTICE message) {
     return l(delimited(",", message.getTargets()), trailing(message.getMessage()));
+  }
+
+  private List<String> marshalOper(IRCMessageOPER message) {
+    return l(message.getName(), message.getPassword());
   }
 
   private List<String> marshalPart(IRCMessagePART message) {

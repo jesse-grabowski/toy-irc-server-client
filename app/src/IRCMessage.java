@@ -21,6 +21,7 @@ public abstract sealed class IRCMessage
         IRCMessageMODE,
         IRCMessageNICK,
         IRCMessageNOTICE,
+        IRCMessageOPER,
         IRCMessagePART,
         IRCMessagePASS,
         IRCMessagePING,

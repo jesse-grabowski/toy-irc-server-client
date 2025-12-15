@@ -20,6 +20,7 @@ public class IRCClientState {
   private final Map<String, Channel> channels = new HashMap<>();
 
   private String me;
+  private boolean operator;
 
   private String canonicalizeChannel(String channelName) {
     return parameters.getCaseMapping().normalizeChannel(channelName);
@@ -71,6 +72,14 @@ public class IRCClientState {
   public void setMe(String nickname) {
     me = nickname;
     getOrCreateUser(me);
+  }
+
+  public boolean isOperator() {
+    return operator;
+  }
+
+  public void setOperator(boolean operator) {
+    this.operator = operator;
   }
 
   public void addChannelMember(String channelName, String nickname, char... modes) {

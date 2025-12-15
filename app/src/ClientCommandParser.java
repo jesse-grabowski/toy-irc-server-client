@@ -122,6 +122,13 @@ public class ClientCommandParser {
             .addGreedyStringPositional(1, ClientCommandNotice::setText, "text to send", true)
             .build());
     parsers.put(
+            "/oper",
+            ArgsParser.builder(ClientCommandOper::new, false, "become a server operator")
+                    .addUsageExample("/oper <name> <password>")
+                    .addStringPositional(0, ClientCommandOper::setName, "operator name", true)
+                    .addStringPositional(1, ClientCommandOper::setPassword, "operator password", true)
+                    .build());
+    parsers.put(
         "/part",
         ArgsParser.builder(ClientCommandPart::new, false, "leave a channel")
             .addUsageExample("/part <channel>[,<channel>...] [<reason>]")
