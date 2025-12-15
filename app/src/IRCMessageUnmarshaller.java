@@ -1467,10 +1467,10 @@ public class IRCMessageUnmarshaller {
 
   private static void logExtractionException(
       int start, int end, String parameter, String rawMessage, Throwable e) {
-    if (LOG.isLoggable(Level.FINEST)) {
+    if (LOG.isLoggable(Level.FINE)) {
       LogRecord record =
           new LogRecord(
-              Level.FINEST, "Error parsing parameter in {0}..{1} (value={2}) for message: {3}");
+              Level.FINE, "Error parsing parameter in {0}..{1} (value={2}) for message: {3}");
       record.setParameters(new Object[] {start, end, parameter, rawMessage});
       record.setThrown(e);
       LOG.log(record);

@@ -119,7 +119,7 @@ public class IRCConnection implements Closeable {
         throw new IllegalStateException("inconsistent state in initialization");
       }
 
-      LOG.finest("Started IRC connection");
+      LOG.fine("Started IRC connection");
     } catch (IOException | RuntimeException e) {
       LOG.log(Level.WARNING, "Failed to start IRC connection", e);
       close();
@@ -131,6 +131,7 @@ public class IRCConnection implements Closeable {
     try {
       String line;
       while (state.get() != ConnectionState.CLOSED && (line = bufferedReader.readLine()) != null) {
+        LOG.log(Level.FINE, "Received IRC line: {0}", line);
         for (Consumer<String> handler : ingressHandlers) {
           try {
             handler.accept(line);
@@ -166,6 +167,8 @@ public class IRCConnection implements Closeable {
         bufferedWriter.write(line);
         bufferedWriter.write("\r\n");
         bufferedWriter.flush();
+
+        LOG.log(Level.FINE, "Sent IRC line: {0}", line);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

@@ -141,6 +141,18 @@ public class ClientCommandParser {
             .addGreedyStringPositional(
                 0, ClientCommandQuit::setReason, "reason for disconnection", false)
             .build());
+    parsers.put(
+        "/topic",
+        ArgsParser.builder(ClientCommandTopic::new, false, "view or set a channel's topic")
+            .addUsageExample("/topic <channel> [<topic>]")
+            .addUsageExample("/topic")
+            .addUsageExample("/topic This is my new topic")
+            .addUsageExample("/topic -c #chan")
+            .addUsageExample("/topic -c #chan This is my new topic")
+            .addStringFlag(
+                'c', "channel", ClientCommandTopic::setChannel, "channel to view/modify", false)
+            .addGreedyStringPositional(0, ClientCommandTopic::setTopic, "topic to set", false)
+            .build());
 
     List<String> commands = new ArrayList<>(parsers.keySet());
     commands.sort((a, b) -> Integer.compare(b.length(), a.length()));

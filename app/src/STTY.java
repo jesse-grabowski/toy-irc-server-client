@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
  * mode)
  */
 public final class STTY {
+
+  private static final Logger LOG = Logger.getLogger(STTY.class.getName());
 
   private static final Pattern SIZE_PATTERN = Pattern.compile("^(?<rows>\\d+)\\s+(?<cols>\\d+)$");
   private static final TerminalDimensions UNKNOWN_TERMINAL_DIMENSIONS =
@@ -124,9 +128,12 @@ public final class STTY {
     try {
       exitCode = p.waitFor();
     } catch (InterruptedException e) {
+      LOG.log(Level.WARNING, "Interrupted while waiting for stty", e);
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while waiting for stty", e);
     }
+
+    LOG.log(Level.FINEST, "STTY: {0} -> {1}", new Object[] {command, output});
 
     if (exitCode != 0) {
       throw new IOException("stty exited with code %d: %s".formatted(exitCode, output));

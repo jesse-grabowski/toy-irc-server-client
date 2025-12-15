@@ -25,6 +25,8 @@ public final class LoggingConfigurer {
     fileHandler.setFormatter(new LogbackishFormatter());
     fileHandler.setLevel(Level.ALL);
 
+    Logger.getLogger("java.lang").setLevel(Level.WARNING);
+
     Logger root = Logger.getLogger("");
     root.addHandler(fileHandler);
     root.setLevel(level);

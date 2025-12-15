@@ -4,11 +4,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +22,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class IRCClientEngine implements Closeable {
+
+  private static final DateTimeFormatter FRIENDLY_DATE_FORMAT =
+      DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH)
+          .withZone(ZoneId.systemDefault());
 
   private static final Logger LOG = Logger.getLogger(IRCClientEngine.class.getName());
   private static final IRCMessageUnmarshaller UNMARSHALLER = new IRCMessageUnmarshaller();
@@ -403,9 +409,7 @@ public class IRCClientEngine implements Closeable {
       }
       case IRCMessage331 m -> handle(m);
       case IRCMessage332 m -> handle(m);
-      case IRCMessage333 m -> {
-        /* ignore */
-      }
+      case IRCMessage333 m -> handle(m);
       case IRCMessage336 m -> {
         /* ignore */
       }
@@ -533,9 +537,7 @@ public class IRCClientEngine implements Closeable {
       case IRCMessage441 m -> {
         /* ignore */
       }
-      case IRCMessage442 m -> {
-        /* ignore */
-      }
+      case IRCMessage442 m -> handle(m);
       case IRCMessage443 m -> {
         /* ignore */
       }
@@ -1041,7 +1043,20 @@ public class IRCClientEngine implements Closeable {
       return;
     }
 
+    String oldTopic = state.getChannelTopic(message.getChannel());
     state.setChannelTopic(message.getChannel(), message.getTopic());
+    terminal.println(
+        makeSystemTerminalMessage(
+            s(
+                f(message.getPrefixName()),
+                " changed the topic of ",
+                f(message.getChannel()),
+                oldTopic != null && !oldTopic.isBlank()
+                    ? s(" from \"", f(Color.DARK_GRAY, oldTopic), "\"")
+                    : "",
+                " to \"",
+                f(Color.ORANGE, message.getTopic()),
+                "\"")));
   }
 
   private void handle(IRCMessage001 message) {
@@ -1089,6 +1104,25 @@ public class IRCClientEngine implements Closeable {
     }
 
     state.setChannelTopic(message.getChannel(), message.getTopic());
+    terminal.println(
+        makeSystemTerminalMessage(
+            s("Topic for ", f(message.getChannel()), " is \"", message.getTopic(), "\"")));
+  }
+
+  private void handle(IRCMessage333 message) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null) {
+      return;
+    }
+
+    // TODO update state
+    terminal.println(
+        makeSystemTerminalMessage(
+            s(
+                "Topic set by ",
+                f(message.getSetBy()),
+                " on ",
+                B(FRIENDLY_DATE_FORMAT.format(Instant.ofEpochMilli(message.getSetAt()))))));
   }
 
   private void handle(IRCMessage353 message) {
@@ -1118,6 +1152,17 @@ public class IRCClientEngine implements Closeable {
     }
   }
 
+  private void handle(IRCMessage442 message) {
+    terminal.println(
+        makeSystemTerminalMessage(
+            f(
+                Color.RED,
+                s(
+                    "Could not complete command, you must first join ",
+                    f(message.getChannel()),
+                    "!"))));
+  }
+
   private void handle(ClientCommand command) {
     switch (command) {
       case ClientCommandConnect c -> handle(c);
@@ -1134,6 +1179,7 @@ public class IRCClientEngine implements Closeable {
       case ClientCommandNick c -> handle(c);
       case ClientCommandPart c -> handle(c);
       case ClientCommandQuit c -> handle(c);
+      case ClientCommandTopic c -> handle(c);
     }
     updateStatusAndPrompt();
   }
@@ -1164,7 +1210,7 @@ public class IRCClientEngine implements Closeable {
     IRCClientState state = clientStateGuard.getState();
     if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
       terminal.println(
-          makeSystemTerminalMessage("Could not send message -- connection not yet registered"));
+          makeSystemErrorMessage("Could not send message -- connection not yet registered"));
       return;
     }
 
@@ -1183,13 +1229,13 @@ public class IRCClientEngine implements Closeable {
     IRCClientState state = clientStateGuard.getState();
     if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
       terminal.println(
-          makeSystemTerminalMessage("Could not send message -- connection not yet registered"));
+          makeSystemErrorMessage("Could not send message -- connection not yet registered"));
       return;
     }
 
     IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
     if (channel == null) {
-      terminal.println(makeSystemTerminalMessage("Failed to send message -- no channel focused"));
+      terminal.println(makeSystemErrorMessage("Failed to send message -- no channel focused"));
       return;
     }
 
@@ -1210,7 +1256,7 @@ public class IRCClientEngine implements Closeable {
     IRCClientState state = clientStateGuard.getState();
     if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
       terminal.println(
-          makeSystemTerminalMessage("Could not send message -- connection not yet registered"));
+          makeSystemErrorMessage("Could not send message -- connection not yet registered"));
       return;
     }
 
@@ -1218,11 +1264,38 @@ public class IRCClientEngine implements Closeable {
   }
 
   private void handle(ClientCommandPart command) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+      terminal.println(
+          makeSystemErrorMessage("Could not part channel -- connection not yet registered"));
+      return;
+    }
+
     send(new IRCMessagePART(command.getChannels(), command.getReason()));
   }
 
   private void handle(ClientCommandQuit command) {
     send(new IRCMessageQUIT(command.getReason()));
+  }
+
+  private void handle(ClientCommandTopic command) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+      terminal.println(
+          makeSystemErrorMessage("Could not set topic -- connection not yet registered"));
+      return;
+    }
+
+    String channel = command.getChannel();
+    if (command.getChannel() == null) {
+      channel = state.getFocusedChannel().map(IRCClientState.Channel::getName).orElse(null);
+    }
+
+    if (channel != null) {
+      send(new IRCMessageTOPIC(channel, command.getTopic()));
+    } else {
+      terminal.println(makeSystemErrorMessage("Failed to set topic -- no channel specified"));
+    }
   }
 
   private boolean isChannel(IRCClientState state, String target) {
