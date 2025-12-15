@@ -1,12 +1,42 @@
+/*
+ * This project is licensed under the MIT License.
+ *
+ * In addition to the rights granted under the MIT License, explicit permission
+ * is granted to the faculty, instructors, teaching assistants, and evaluators
+ * of Ritsumeikan University for unrestricted educational evaluation and grading.
+ *
+ * ---------------------------------------------------------------------------
+ *
+ * MIT License
+ *
+ * Copyright (c) 2026 Jesse Grabowski
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package com.jessegrabowski.irc;
 
-import com.jessegrabowski.irc.client.IRCClientState;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import com.jessegrabowski.irc.client.IRCClientState;
 import java.util.Map;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 public class IRCServerParametersUnmarshallerTest {
 
@@ -40,7 +70,7 @@ public class IRCServerParametersUnmarshallerTest {
     void chanLimitEnableDisableWithAndWithoutValues() {
         IRCServerParameters p = newParameters();
         IRCServerParametersUnmarshaller.parse("CHANLIMIT", "#:10,&", p);
-        Map<Character,Integer> limits = p.getChannelLimits();
+        Map<Character, Integer> limits = p.getChannelLimits();
         assertEquals(10, limits.get('#'));
         assertEquals(Integer.MAX_VALUE, limits.get('&'));
         IRCServerParametersUnmarshaller.parse("-CHANLIMIT", "", p);
@@ -162,7 +192,7 @@ public class IRCServerParametersUnmarshallerTest {
     void maxListEnableDisableWithAndWithoutValues() {
         IRCServerParameters p = newParameters();
         IRCServerParametersUnmarshaller.parse("MAXLIST", "beI:60,q", p);
-        Map<Character,Integer> max = p.getMaxList();
+        Map<Character, Integer> max = p.getMaxList();
         assertEquals(60, max.get('b'));
         assertEquals(60, max.get('e'));
         assertEquals(60, max.get('I'));
@@ -255,7 +285,7 @@ public class IRCServerParametersUnmarshallerTest {
         IRCServerParametersUnmarshaller.parse("TARGMAX", "", p);
         assertEquals(Map.of(), p.getTargetMax());
         IRCServerParametersUnmarshaller.parse("TARGMAX", "PRIVMSG:4,NOTICE:3,JOIN", p);
-        Map<String,Integer> max = p.getTargetMax();
+        Map<String, Integer> max = p.getTargetMax();
         assertEquals(4, max.get("PRIVMSG"));
         assertEquals(3, max.get("NOTICE"));
         assertEquals(Integer.MAX_VALUE, max.get("JOIN"));
