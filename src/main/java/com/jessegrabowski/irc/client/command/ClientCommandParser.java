@@ -56,6 +56,20 @@ public class ClientCommandParser {
 
         parsers = new LinkedHashMap<>();
         parsers.put(
+                "/afk",
+                ArgsParser.builder(ClientCommandAfk::new, false, "mark self away")
+                        .addUsageExample("/afk [<message>]")
+                        .addUsageExample("/afk")
+                        .addUsageExample("/afk I'll be right back")
+                        .addStringPositional(
+                                0, ClientCommandAfk::setText, "message shown as reason for being away", false)
+                        .build());
+        parsers.put(
+                "/back",
+                ArgsParser.builder(ClientCommandBack::new, false, "mark self back (not away)")
+                        .addUsageExample("/back")
+                        .build());
+        parsers.put(
                 "/connect",
                 ArgsParser.builder(ClientCommandConnect::new, false, "reconnect to the server")
                         .addUsageExample("/connect")

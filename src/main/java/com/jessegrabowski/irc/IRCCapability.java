@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public enum IRCCapability {
+    AWAY_NOTIFY("away-notify"),
     CAP_NOTIFY("cap-notify"),
     ECHO_MESSAGE("echo-message"),
     MESSAGE_TAGS("message-tags"),

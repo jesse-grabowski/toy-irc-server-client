@@ -110,6 +110,7 @@ public class IRCMessageUnmarshaller {
 
         try {
             return switch (command) {
+                case IRCMessageAWAY.COMMAND -> parseAway(parameters);
                 case "CAP" -> parseCap(parameters);
                 case IRCMessageERROR.COMMAND -> parseError(parameters);
                 case "JOIN" -> parseJoin(parameters);
@@ -385,6 +386,10 @@ public class IRCMessageUnmarshaller {
             results.add(parts[1]);
         }
         return results;
+    }
+
+    private IRCMessageAWAY parseAway(Parameters parameters) throws Exception {
+        return parameters.inject(optional("text"), IRCMessageAWAY::new);
     }
 
     private IRCMessage parseCap(Parameters parameters) throws Exception {

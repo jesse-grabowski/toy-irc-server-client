@@ -48,6 +48,7 @@ public class IRCMessageMarshaller {
 
     public String marshal(IRCMessage message) {
         return switch (message) {
+            case IRCMessageAWAY m -> marshal(m, this::marshalAway);
             case IRCMessageCAPACK m -> marshal(m, this::marshalCapACK);
             case IRCMessageCAPDEL m -> marshal(m, this::marshalCapDEL);
             case IRCMessageCAPEND m -> marshal(m, this::marshalCapEND);
@@ -260,6 +261,10 @@ public class IRCMessageMarshaller {
         } else {
             return name;
         }
+    }
+
+    private List<String> marshalAway(IRCMessageAWAY message) {
+        return l(trailing(message.getText()));
     }
 
     private List<String> marshalCapACK(IRCMessageCAPACK message) {

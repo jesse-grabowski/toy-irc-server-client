@@ -36,6 +36,7 @@ import java.util.SequencedMap;
 public abstract sealed class IRCMessage
         permits
                 // capability negotiation
+                IRCMessageAWAY,
                 IRCMessageCAPACK,
                 IRCMessageCAPDEL,
                 IRCMessageCAPEND,

@@ -55,7 +55,6 @@ public class IRCClientState {
     private final Map<String, Channel> channels = new HashMap<>();
 
     private String me;
-    private boolean operator;
 
     private String canonicalizeChannel(String channelName) {
         return parameters.getCaseMapping().normalizeChannel(channelName);
@@ -104,12 +103,41 @@ public class IRCClientState {
         getOrCreateUser(me);
     }
 
-    public boolean isOperator() {
-        return operator;
+    public boolean isOperator(String nickname) {
+        User user = findUser(nickname);
+        if (user == null) {
+            return false;
+        }
+        return user.isOperator();
     }
 
-    public void setOperator(boolean operator) {
-        this.operator = operator;
+    public void setOperator(String nickname, boolean operator) {
+        User user = getOrCreateUser(nickname);
+        user.setOperator(operator);
+    }
+
+    public boolean isAway(String nickname) {
+        User user = findUser(nickname);
+        if (user == null) {
+            return false;
+        }
+        return user.isAway();
+    }
+
+    public void setAway(String nickname, String reason) {
+        User user = findUser(nickname);
+        if (user == null) {
+            return;
+        }
+        user.setAwayStatus(reason);
+    }
+
+    public String getAwayStatus(String nickname) {
+        User user = findUser(nickname);
+        if (user == null) {
+            return null;
+        }
+        return user.getAwayStatus();
     }
 
     public void addChannelMember(String channelName, String nickname, char... modes) {
@@ -522,6 +550,8 @@ public class IRCClientState {
     public static final class User {
 
         private String nickname;
+        private String awayStatus;
+        private boolean operator;
         private long lastTouched = System.currentTimeMillis();
         private final SequencedSet<Channel> channels = new LinkedHashSet<>();
         private final Set<Character> flags = new HashSet<>();
@@ -542,6 +572,26 @@ public class IRCClientState {
 
         private boolean checkFlag(Character mode) {
             return flags.contains(mode);
+        }
+
+        private void setAwayStatus(String status) {
+            this.awayStatus = status;
+        }
+
+        private String getAwayStatus() {
+            return awayStatus;
+        }
+
+        private boolean isAway() {
+            return awayStatus != null;
+        }
+
+        private boolean isOperator() {
+            return operator;
+        }
+
+        private void setOperator(boolean operator) {
+            this.operator = operator;
         }
     }
 

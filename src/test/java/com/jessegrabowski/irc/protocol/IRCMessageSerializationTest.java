@@ -59,6 +59,8 @@ public class IRCMessageSerializationTest {
 
     static Stream<Arguments> rawMessages() {
         return Stream.of(
+                Arguments.of("AWAY", "AWAY"),
+                Arguments.of("AWAY :I'll be right back", "AWAY :I'll be right back"),
                 Arguments.of("PING :12345", "PING :12345"),
                 Arguments.of("PONG :12345", "PONG :12345"),
                 Arguments.of("PONG irc.example.com :12345", "PONG irc.example.com :12345"),

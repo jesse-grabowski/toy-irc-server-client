@@ -31,23 +31,8 @@
  */
 package com.jessegrabowski.irc.client.command.model;
 
-import com.jessegrabowski.irc.args.ArgsProperties;
+public final class ClientCommandBack implements ClientCommand {
 
-public sealed interface ClientCommand extends ArgsProperties
-        permits ClientCommandAfk,
-                ClientCommandBack,
-                ClientCommandConnect,
-                ClientCommandExit,
-                ClientCommandHelp,
-                ClientCommandJoin,
-                ClientCommandKick,
-                ClientCommandKill,
-                ClientCommandMode,
-                ClientCommandMsg,
-                ClientCommandMsgCurrent,
-                ClientCommandNick,
-                ClientCommandNotice,
-                ClientCommandOper,
-                ClientCommandPart,
-                ClientCommandQuit,
-                ClientCommandTopic {}
+    @Override
+    public void validate() {}
+}

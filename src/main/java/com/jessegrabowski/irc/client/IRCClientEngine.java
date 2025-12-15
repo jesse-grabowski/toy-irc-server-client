@@ -31,6 +31,12 @@
  */
 package com.jessegrabowski.irc.client;
 
+import static com.jessegrabowski.irc.client.tui.RichString.B;
+import static com.jessegrabowski.irc.client.tui.RichString.b;
+import static com.jessegrabowski.irc.client.tui.RichString.f;
+import static com.jessegrabowski.irc.client.tui.RichString.j;
+import static com.jessegrabowski.irc.client.tui.RichString.s;
+
 import com.jessegrabowski.irc.*;
 import com.jessegrabowski.irc.client.command.model.*;
 import com.jessegrabowski.irc.client.tui.RichString;
@@ -62,12 +68,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static com.jessegrabowski.irc.client.tui.RichString.B;
-import static com.jessegrabowski.irc.client.tui.RichString.b;
-import static com.jessegrabowski.irc.client.tui.RichString.f;
-import static com.jessegrabowski.irc.client.tui.RichString.j;
-import static com.jessegrabowski.irc.client.tui.RichString.s;
 
 public class IRCClientEngine implements Closeable {
 
@@ -269,6 +269,7 @@ public class IRCClientEngine implements Closeable {
     // visitor pattern but we're living in the future
     private void handle(IRCMessage message) {
         switch (message) {
+            case IRCMessageAWAY m -> handle(m);
             case IRCMessageCAPACK m -> handle(m);
             case IRCMessageCAPDEL m -> handle(m);
             case IRCMessageCAPEND m -> {
@@ -293,7 +294,8 @@ public class IRCClientEngine implements Closeable {
             }
             case IRCMessageJOINNormal m -> handle(m);
             case IRCMessageKICK m -> handle(m);
-            case IRCMessageKILL m -> terminal.println(makeSystemTerminalMessage(s(f(m.getPrefixName()), " killed ", f(m.getNickname()))));
+            case IRCMessageKILL m ->
+                terminal.println(makeSystemTerminalMessage(s(f(m.getPrefixName()), " killed ", f(m.getNickname()))));
             case IRCMessageMODE m -> handle(m);
             case IRCMessageNICK m -> handle(m);
             case IRCMessageNOTICE m -> handle(m);
@@ -375,18 +377,10 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage276 m -> {
                 /* ignore */
             }
-            case IRCMessage301 m -> {
-                /* ignore */
-            }
-            case IRCMessage302 m -> {
-                /* ignore */
-            }
-            case IRCMessage305 m -> {
-                /* ignore */
-            }
-            case IRCMessage306 m -> {
-                /* ignore */
-            }
+            case IRCMessage301 m -> handle(m);
+            case IRCMessage302 m -> handle(m);
+            case IRCMessage305 m -> handle(m);
+            case IRCMessage306 m -> handle(m);
             case IRCMessage307 m -> {
                 /* ignore */
             }
@@ -465,9 +459,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage351 m -> {
                 /* ignore */
             }
-            case IRCMessage352 m -> {
-                /* ignore */
-            }
+            case IRCMessage352 m -> handle(m);
             case IRCMessage353 m -> handle(m);
             case IRCMessage364 m -> {
                 /* ignore */
@@ -649,6 +641,15 @@ public class IRCClientEngine implements Closeable {
                 terminal.println(makeSystemErrorMessage("(PARSE ERROR) » " + m.getRawMessage()));
         }
         updateStatusAndPrompt();
+    }
+
+    private void handle(IRCMessageAWAY message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        state.setAway(message.getPrefixName(), message.getText());
     }
 
     private void handle(IRCMessageCAPLSResponse message) {
@@ -1091,6 +1092,62 @@ public class IRCClientEngine implements Closeable {
         }
     }
 
+    private void handle(IRCMessage301 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        state.setAway(message.getPrefixName(), message.getAwayMessage());
+        terminal.println(makeSystemTerminalMessage(
+                f(Color.GRAY, s("* ", message.getPrefixName(), " is away: ", message.getAwayMessage()))));
+    }
+
+    private void handle(IRCMessage302 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        for (String reply : message.getUserhosts()) {
+            String[] parts = reply.split("=", 2);
+            if (parts.length != 2) {
+                LOG.warning("Malformed USERHOST reply: " + reply);
+                continue;
+            }
+            String nickname = parts[0];
+            boolean operator = nickname.endsWith("*");
+            if (operator) {
+                nickname = nickname.substring(0, nickname.length() - 1);
+            }
+            boolean away = parts[1].startsWith("-");
+
+            state.setOperator(nickname, operator);
+            state.setAway(
+                    nickname,
+                    away ? Objects.requireNonNullElse(state.getAwayStatus(nickname), "Marked AWAY by server") : null);
+        }
+    }
+
+    private void handle(IRCMessage305 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        state.setAway(state.getMe(), null);
+    }
+
+    private void handle(IRCMessage306 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        state.setAway(
+                state.getMe(), Objects.requireNonNullElse(state.getAwayStatus(state.getMe()), "Marked AWAY by server"));
+    }
+
     private void handle(IRCMessage331 message) {
         IRCClientState state = clientStateGuard.getState();
         if (state == null) {
@@ -1124,6 +1181,27 @@ public class IRCClientEngine implements Closeable {
                 f(message.getSetBy()),
                 " on ",
                 B(FRIENDLY_DATE_FORMAT.format(Instant.ofEpochMilli(message.getSetAt()))))));
+    }
+
+    private void handle(IRCMessage352 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        String flags = message.getFlags();
+        if (flags.length() >= 2) {
+            state.setOperator(message.getNick(), flags.charAt(1) == '*');
+        }
+        if (!flags.isEmpty()) {
+            boolean away = flags.charAt(0) == 'G';
+            state.setAway(
+                    message.getNick(),
+                    away
+                            ? Objects.requireNonNullElse(
+                                    state.getAwayStatus(message.getNick()), "Marked AWAY by server")
+                            : null);
+        }
     }
 
     private void handle(IRCMessage353 message) {
@@ -1161,7 +1239,7 @@ public class IRCClientEngine implements Closeable {
         }
 
         terminal.println(makeSystemTerminalMessage(f(Color.GREEN, B("You are now an operator"))));
-        state.setOperator(true);
+        state.setOperator(state.getMe(), true);
     }
 
     private void handle(IRCMessage442 message) {
@@ -1171,6 +1249,8 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommand command) {
         switch (command) {
+            case ClientCommandAfk c -> handle(c);
+            case ClientCommandBack c -> handle(c);
             case ClientCommandConnect c -> handle(c);
             case ClientCommandExit c -> handle(c);
             case ClientCommandHelp c -> {
@@ -1190,6 +1270,21 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandTopic c -> handle(c);
         }
         updateStatusAndPrompt();
+    }
+
+    private void handle(ClientCommandAfk command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        String message = Objects.requireNonNullElse(command.getText(), "be right back");
+        state.setAway(state.getMe(), message);
+        send(new IRCMessageAWAY(message));
+    }
+
+    private void handle(ClientCommandBack command) {
+        send(new IRCMessageAWAY(null));
     }
 
     private void handle(ClientCommandConnect command) {
@@ -1215,7 +1310,7 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        if (!state.isOperator()) {
+        if (!state.isOperator(state.getMe())) {
             terminal.println(makeSystemErrorMessage("You are not an operator (see /oper)"));
             return;
         }
@@ -1397,9 +1492,10 @@ public class IRCClientEngine implements Closeable {
         if (ies == IRCClientEngineState.REGISTERED) {
             IRCClientState state = clientStateGuard.getState();
             if (state != null) {
-                RichString operPart = state.isOperator() ? b(Color.RED, f(Color.WHITE, "[OPER]")) : s("");
+                RichString operPart = state.isOperator(state.getMe()) ? b(Color.RED, f(Color.WHITE, "[OPER]")) : s("");
+                RichString mePart = state.isAway(state.getMe()) ? f(Color.GRAY, state.getMe()) : f(state.getMe());
                 IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
-                prompt = s(operPart, "[", f(state.getMe()), "@", f(properties.getHost().getHostName()), "]:");
+                prompt = s(operPart, "[", mePart, "@", f(properties.getHost().getHostName()), "]:");
                 if (channel != null) {
                     String topic = state.getChannelTopic(channel.getName());
                     RichString formattedTopic = topic == null ? s("(no topic)") : s("(", topic, ")");
@@ -1409,11 +1505,14 @@ public class IRCClientEngine implements Closeable {
                             .map(entry -> {
                                 IRCClientState.User user = entry.getKey();
                                 IRCClientState.Membership membership = entry.getValue();
+                                RichString nickname = state.isAway(user.getNickname())
+                                        ? f(Color.GRAY, user.getNickname())
+                                        : f(user.getNickname());
                                 return state.getParameters().getPrefixes().entrySet().stream()
                                         .filter(e -> membership.getModes().contains(e.getKey()))
                                         .findFirst()
-                                        .map(e -> s(f(Color.YELLOW, e.getValue()), f(user.getNickname())))
-                                        .orElse(f(user.getNickname()));
+                                        .map(e -> s(f(Color.YELLOW, e.getValue()), nickname))
+                                        .orElse(nickname);
                             })
                             .toArray(RichString[]::new);
                     if (members.length > 0) {
@@ -1425,7 +1524,7 @@ public class IRCClientEngine implements Closeable {
                     prompt = s(
                             operPart,
                             "[",
-                            f(state.getMe()),
+                            mePart,
                             "@",
                             f(properties.getHost().getHostName()),
                             "/",

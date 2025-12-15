@@ -29,25 +29,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.client.command.model;
+package com.jessegrabowski.irc.protocol.model;
 
-import com.jessegrabowski.irc.args.ArgsProperties;
+import java.util.LinkedHashMap;
+import java.util.SequencedMap;
 
-public sealed interface ClientCommand extends ArgsProperties
-        permits ClientCommandAfk,
-                ClientCommandBack,
-                ClientCommandConnect,
-                ClientCommandExit,
-                ClientCommandHelp,
-                ClientCommandJoin,
-                ClientCommandKick,
-                ClientCommandKill,
-                ClientCommandMode,
-                ClientCommandMsg,
-                ClientCommandMsgCurrent,
-                ClientCommandNick,
-                ClientCommandNotice,
-                ClientCommandOper,
-                ClientCommandPart,
-                ClientCommandQuit,
-                ClientCommandTopic {}
+public final class IRCMessageAWAY extends IRCMessage {
+
+    public static final String COMMAND = "AWAY";
+
+    private final String text;
+
+    public IRCMessageAWAY(
+            String rawMessage,
+            SequencedMap<String, String> tags,
+            String prefixName,
+            String prefixUser,
+            String prefixHost,
+            String text) {
+        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
+        this.text = text;
+    }
+
+    public IRCMessageAWAY(String text) {
+        this(null, new LinkedHashMap<>(), null, null, null, text);
+    }
+
+    public String getText() {
+        return text;
+    }
+}
