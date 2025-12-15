@@ -244,6 +244,16 @@ public class IRCClientState {
     channel.setTopic(topic);
   }
 
+  public void setChannelTopicUpdater(String channelName, String setBy, long setAt) {
+    Channel channel = findChannel(channelName);
+    if (channel == null) {
+      return;
+    }
+
+    channel.setTopicSetBy(setBy);
+    channel.setTopicSetAt(setAt);
+  }
+
   public void setUserFlag(String nick, Character mode) {
     User user = findUser(nick);
     if (user == null) {
@@ -368,6 +378,8 @@ public class IRCClientState {
   public static final class Channel {
     private String name;
     private String topic;
+    private String topicSetBy;
+    private long topicSetAt;
     private final Map<User, Membership> members = new HashMap<>();
     private final Map<Character, List<String>> lists = new HashMap<>();
     private final Map<Character, String> settings = new HashMap<>();
@@ -443,6 +455,22 @@ public class IRCClientState {
 
     private void setTopic(String topic) {
       this.topic = topic;
+    }
+
+    private String getTopicSetBy() {
+      return topicSetBy;
+    }
+
+    private void setTopicSetBy(String topicSetBy) {
+      this.topicSetBy = topicSetBy;
+    }
+
+    private long getTopicSetAt() {
+      return topicSetAt;
+    }
+
+    private void setTopicSetAt(long topicSetAt) {
+      this.topicSetAt = topicSetAt;
     }
   }
 

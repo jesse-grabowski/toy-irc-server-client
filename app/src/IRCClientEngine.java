@@ -1045,6 +1045,7 @@ public class IRCClientEngine implements Closeable {
 
     String oldTopic = state.getChannelTopic(message.getChannel());
     state.setChannelTopic(message.getChannel(), message.getTopic());
+    state.setChannelTopicUpdater(message.getChannel(), message.getPrefixName(), getMessageInstant(message).toEpochMilli());
     terminal.println(
         makeSystemTerminalMessage(
             s(
@@ -1095,6 +1096,9 @@ public class IRCClientEngine implements Closeable {
     }
 
     state.setChannelTopic(message.getChannel(), null);
+    terminal.println(
+            makeSystemTerminalMessage(
+                    s(f(message.getChannel()), " does not have a topic")));
   }
 
   private void handle(IRCMessage332 message) {
@@ -1115,7 +1119,7 @@ public class IRCClientEngine implements Closeable {
       return;
     }
 
-    // TODO update state
+    state.setChannelTopicUpdater(message.getChannel(), message.getSetBy(), message.getSetAt());
     terminal.println(
         makeSystemTerminalMessage(
             s(
@@ -1301,6 +1305,19 @@ public class IRCClientEngine implements Closeable {
   private boolean isChannel(IRCClientState state, String target) {
     IRCServerParameters parameters = state.getParameters();
     return parameters.getChannelTypes().contains(target.charAt(0));
+  }
+
+  private Instant getMessageInstant(IRCMessage message) {
+    String serverTime = message.getTags().get("time");
+    if (serverTime != null) {
+      try {
+        return Instant.parse(serverTime);
+      } catch (Exception e) {
+        return Instant.now();
+      }
+    } else {
+      return Instant.now();
+    }
   }
 
   private LocalTime getMessageTime(IRCMessage message) {
