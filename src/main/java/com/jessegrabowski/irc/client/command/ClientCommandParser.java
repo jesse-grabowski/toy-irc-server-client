@@ -101,8 +101,16 @@ public class ClientCommandParser {
                         .addGreedyStringPositional(2, ClientCommandKick::setReason, "reason for kick", false)
                         .build());
         parsers.put(
+                "/kill",
+                ArgsParser.builder(ClientCommandKill::new, false, "disconnect a user from the server (requires OPER)")
+                        .addUsageExample("/kill <nickname> <reason>")
+                        .addUsageExample("/kill taro you shouldn't have done that")
+                        .addStringPositional(0, ClientCommandKill::setNick, "nickname", true)
+                        .addGreedyStringPositional(1, ClientCommandKill::setReason, "reason", true)
+                        .build());
+        parsers.put(
                 "/mode",
-                ArgsParser.builder(ClientCommandMode::new, false, "update modes on a user or channel (advanced)")
+                ArgsParser.builder(ClientCommandMode::new, false, "update modes on a user or channel")
                         .setFlagParsingEnabled(false)
                         .addUsageExample("/mode <target> [<modestring> [<modeargs>...]]")
                         .addUsageExample("/mode #channel")

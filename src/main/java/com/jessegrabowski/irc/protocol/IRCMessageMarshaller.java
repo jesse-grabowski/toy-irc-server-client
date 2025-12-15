@@ -62,6 +62,7 @@ public class IRCMessageMarshaller {
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
             case IRCMessageKICK m -> marshal(m, this::marshalKick);
+            case IRCMessageKILL m -> marshal(m, this::marshalKill);
             case IRCMessageMODE m -> marshal(m, this::marshalMode);
             case IRCMessageNICK m -> marshal(m, this::marshalNick);
             case IRCMessageNOTICE m -> marshal(m, this::marshalNotice);
@@ -329,6 +330,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalKick(IRCMessageKICK message) {
         return l(message.getChannel(), message.getNick(), trailing(message.getReason()));
+    }
+
+    private List<String> marshalKill(IRCMessageKILL message) {
+        return l(message.getNickname(), trailing(message.getComment()));
     }
 
     private List<String> marshalMode(IRCMessageMODE message) {

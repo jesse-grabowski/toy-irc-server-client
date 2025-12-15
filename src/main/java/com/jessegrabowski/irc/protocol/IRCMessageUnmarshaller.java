@@ -114,6 +114,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageERROR.COMMAND -> parseError(parameters);
                 case "JOIN" -> parseJoin(parameters);
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);
+                case IRCMessageKILL.COMMAND -> parseExact(parameters, "nickname", "comment", IRCMessageKILL::new);
                 case IRCMessageMODE.COMMAND -> parseMode(parameters);
                 case IRCMessageNICK.COMMAND -> parseNick(parameters);
                 case IRCMessageNOTICE.COMMAND -> parseNotice(parameters);

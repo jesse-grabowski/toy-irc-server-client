@@ -51,6 +51,7 @@ public abstract sealed class IRCMessage
                 IRCMessageJOIN0,
                 IRCMessageJOINNormal,
                 IRCMessageKICK,
+                IRCMessageKILL,
                 IRCMessageMODE,
                 IRCMessageNICK,
                 IRCMessageNOTICE,

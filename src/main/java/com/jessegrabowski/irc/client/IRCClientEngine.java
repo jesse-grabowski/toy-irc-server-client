@@ -293,6 +293,7 @@ public class IRCClientEngine implements Closeable {
             }
             case IRCMessageJOINNormal m -> handle(m);
             case IRCMessageKICK m -> handle(m);
+            case IRCMessageKILL m -> terminal.println(makeSystemTerminalMessage(s(f(m.getPrefixName()), " killed ", f(m.getNickname()))));
             case IRCMessageMODE m -> handle(m);
             case IRCMessageNICK m -> handle(m);
             case IRCMessageNOTICE m -> handle(m);
@@ -1177,6 +1178,7 @@ public class IRCClientEngine implements Closeable {
             }
             case ClientCommandJoin c -> handle(c);
             case ClientCommandKick c -> handle(c);
+            case ClientCommandKill c -> handle(c);
             case ClientCommandMode c -> handle(c);
             case ClientCommandMsg c -> handle(c);
             case ClientCommandNotice c -> handle(c);
@@ -1204,6 +1206,21 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandKick command) {
         send(new IRCMessageKICK(command.getChannel(), command.getNick(), command.getReason()));
+    }
+
+    private void handle(ClientCommandKill command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not kill -- connection not yet registered"));
+            return;
+        }
+
+        if (!state.isOperator()) {
+            terminal.println(makeSystemErrorMessage("You are not an operator (see /oper)"));
+            return;
+        }
+
+        send(new IRCMessageKILL(command.getNick(), command.getReason()));
     }
 
     private void handle(ClientCommandMode command) {
@@ -1380,8 +1397,9 @@ public class IRCClientEngine implements Closeable {
         if (ies == IRCClientEngineState.REGISTERED) {
             IRCClientState state = clientStateGuard.getState();
             if (state != null) {
+                RichString operPart = state.isOperator() ? b(Color.RED, f(Color.WHITE, "[OPER]")) : s("");
                 IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
-                prompt = s("[", f(state.getMe()), "@", f(properties.getHost().getHostName()), "]:");
+                prompt = s(operPart, "[", f(state.getMe()), "@", f(properties.getHost().getHostName()), "]:");
                 if (channel != null) {
                     String topic = state.getChannelTopic(channel.getName());
                     RichString formattedTopic = topic == null ? s("(no topic)") : s("(", topic, ")");
@@ -1405,7 +1423,7 @@ public class IRCClientEngine implements Closeable {
                         status = s("Chatting in ", f(channel.getName()), " all alone ", formattedTopic);
                     }
                     prompt = s(
-                            state.isOperator() ? b(Color.RED, f(Color.WHITE, "[OPER]")) : "",
+                            operPart,
                             "[",
                             f(state.getMe()),
                             "@",

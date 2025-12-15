@@ -70,6 +70,7 @@ public class IRCMessageSerializationTest {
                 Arguments.of("JOIN #chan1,#chan2 key1,key2", "JOIN #chan1,#chan2 key1,key2"),
                 Arguments.of("KICK #chan nick", "KICK #chan nick"),
                 Arguments.of("KICK #chan nick :I don't like you", "KICK #chan nick :I don't like you"),
+                Arguments.of("KILL nick :you did bad", "KILL nick :you did bad"),
                 Arguments.of("MODE #chan", "MODE #chan"),
                 Arguments.of("MODE #chan +ov nick1 nick2", "MODE #chan +ov nick1 nick2"),
                 Arguments.of("OPER admin s3cr3tP@ssw0rd", "OPER admin s3cr3tP@ssw0rd"),

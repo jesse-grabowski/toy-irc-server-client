@@ -29,23 +29,40 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.client.command.model;
+package com.jessegrabowski.irc.protocol.model;
 
-import com.jessegrabowski.irc.args.ArgsProperties;
+import java.util.LinkedHashMap;
+import java.util.SequencedMap;
 
-public sealed interface ClientCommand extends ArgsProperties
-        permits ClientCommandConnect,
-                ClientCommandExit,
-                ClientCommandHelp,
-                ClientCommandJoin,
-                ClientCommandKick,
-                ClientCommandKill,
-                ClientCommandMode,
-                ClientCommandMsg,
-                ClientCommandMsgCurrent,
-                ClientCommandNick,
-                ClientCommandNotice,
-                ClientCommandOper,
-                ClientCommandPart,
-                ClientCommandQuit,
-                ClientCommandTopic {}
+public final class IRCMessageKILL extends IRCMessage {
+
+    public static final String COMMAND = "KILL";
+
+    private final String nickname;
+    private final String comment;
+
+    public IRCMessageKILL(
+            String rawMessage,
+            SequencedMap<String, String> tags,
+            String prefixName,
+            String prefixUser,
+            String prefixHost,
+            String nickname,
+            String comment) {
+        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
+        this.nickname = nickname;
+        this.comment = comment;
+    }
+
+    public IRCMessageKILL(String nickname, String comment) {
+        this(null, new LinkedHashMap<>(), null, null, null, nickname, comment);
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+}

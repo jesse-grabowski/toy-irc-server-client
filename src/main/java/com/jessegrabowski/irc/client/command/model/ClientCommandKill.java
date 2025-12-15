@@ -31,21 +31,27 @@
  */
 package com.jessegrabowski.irc.client.command.model;
 
-import com.jessegrabowski.irc.args.ArgsProperties;
+public final class ClientCommandKill implements ClientCommand {
 
-public sealed interface ClientCommand extends ArgsProperties
-        permits ClientCommandConnect,
-                ClientCommandExit,
-                ClientCommandHelp,
-                ClientCommandJoin,
-                ClientCommandKick,
-                ClientCommandKill,
-                ClientCommandMode,
-                ClientCommandMsg,
-                ClientCommandMsgCurrent,
-                ClientCommandNick,
-                ClientCommandNotice,
-                ClientCommandOper,
-                ClientCommandPart,
-                ClientCommandQuit,
-                ClientCommandTopic {}
+    private String nick;
+    private String reason;
+
+    @Override
+    public void validate() {}
+
+    public String getNick() {
+        return nick;
+    }
+
+    public void setNick(String nick) {
+        this.nick = nick;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+}
