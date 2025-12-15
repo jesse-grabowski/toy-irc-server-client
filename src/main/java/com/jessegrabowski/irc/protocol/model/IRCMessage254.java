@@ -1,0 +1,30 @@
+package com.jessegrabowski.irc.protocol.model;
+
+import java.util.SequencedMap;
+
+public final class IRCMessage254 extends IRCMessage {
+  public static final String COMMAND = "254";
+  private final String client;
+  private final Integer channels;
+
+  public IRCMessage254(
+      String rawMessage,
+      SequencedMap<String, String> tags,
+      String prefixName,
+      String prefixUser,
+      String prefixHost,
+      String client,
+      Integer channels) {
+    super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
+    this.client = client;
+    this.channels = channels;
+  }
+
+  public String getClient() {
+    return client;
+  }
+
+  public Integer getChannels() {
+    return channels;
+  }
+}
