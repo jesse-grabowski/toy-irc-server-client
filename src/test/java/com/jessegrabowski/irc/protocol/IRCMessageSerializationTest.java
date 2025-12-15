@@ -78,6 +78,7 @@ public class IRCMessageSerializationTest {
                 Arguments.of("KILL nick :you did bad", "KILL nick :you did bad"),
                 Arguments.of("MODE #chan", "MODE #chan"),
                 Arguments.of("MODE #chan +ov nick1 nick2", "MODE #chan +ov nick1 nick2"),
+                Arguments.of("NAMES #chan1,#chan2", "NAMES #chan1,#chan2"),
                 Arguments.of("OPER admin s3cr3tP@ssw0rd", "OPER admin s3cr3tP@ssw0rd"),
                 Arguments.of("PART #chan", "PART #chan"),
                 Arguments.of("PART #chan1,#chan2", "PART #chan1,#chan2"),
@@ -831,6 +832,7 @@ public class IRCMessageSerializationTest {
                 + "PREFIX=(qaohv)~&@%+ "
                 + "CHANLIMIT=#:50 "
                 + "FOO=bar=baz "
+                + "TARGMAX=PRIVMSG:3,WHOIS:1,JOIN: "
                 + ":are supported by this server";
 
         IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, raw);
@@ -850,9 +852,10 @@ public class IRCMessageSerializationTest {
         assertEquals("(qaohv)~&@%+", p.get("PREFIX"));
         assertEquals("#:50", p.get("CHANLIMIT"));
         assertEquals("bar=baz", p.get("FOO"));
+        assertEquals("PRIVMSG:3,WHOIS:1,JOIN:", p.get("TARGMAX"));
 
         assertEquals(
-                List.of("CHANTYPES", "EXCEPTS", "INVEX", "PREFIX", "CHANLIMIT", "FOO"),
+                List.of("CHANTYPES", "EXCEPTS", "INVEX", "PREFIX", "CHANLIMIT", "FOO", "TARGMAX"),
                 p.sequencedKeySet().stream().toList());
     }
 }

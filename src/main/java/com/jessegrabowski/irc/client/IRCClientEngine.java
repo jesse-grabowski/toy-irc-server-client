@@ -297,6 +297,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageKILL m ->
                 terminal.println(makeSystemTerminalMessage(s(f(m.getPrefixName()), " killed ", f(m.getNickname()))));
             case IRCMessageMODE m -> handle(m);
+            case IRCMessageNAMES m -> {
+                /* ignore */
+            }
             case IRCMessageNICK m -> handle(m);
             case IRCMessageNOTICE m -> handle(m);
             case IRCMessageOPER m -> {

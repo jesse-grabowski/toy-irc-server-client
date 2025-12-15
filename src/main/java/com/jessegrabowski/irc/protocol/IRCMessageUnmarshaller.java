@@ -117,6 +117,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);
                 case IRCMessageKILL.COMMAND -> parseExact(parameters, "nickname", "comment", IRCMessageKILL::new);
                 case IRCMessageMODE.COMMAND -> parseMode(parameters);
+                case IRCMessageNAMES.COMMAND -> parseNames(parameters);
                 case IRCMessageNICK.COMMAND -> parseNick(parameters);
                 case IRCMessageNOTICE.COMMAND -> parseNotice(parameters);
                 case IRCMessageOPER.COMMAND -> parseExact(parameters, "name", "password", IRCMessageOPER::new);
@@ -492,6 +493,10 @@ public class IRCMessageUnmarshaller {
     private IRCMessageMODE parseMode(Parameters parameters) throws Exception {
         return parameters.inject(
                 required("target"), optional("modestring"), greedyOptional("mode arguments"), IRCMessageMODE::new);
+    }
+
+    private IRCMessageNAMES parseNames(Parameters parameters) throws Exception {
+        return parameters.inject(required("channel", this::splitToList), IRCMessageNAMES::new);
     }
 
     private IRCMessageNICK parseNick(Parameters parameters) throws Exception {
