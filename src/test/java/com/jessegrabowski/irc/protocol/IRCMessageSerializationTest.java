@@ -36,7 +36,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.jessegrabowski.irc.IRCServerParameters;
 import com.jessegrabowski.irc.protocol.model.*;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.SequencedMap;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -817,5 +820,39 @@ public class IRCMessageSerializationTest {
         String messageTooLong = "A".repeat(8702);
 
         return Stream.of(Arguments.of(tagTooLong), Arguments.of(bodyTooLong), Arguments.of(messageTooLong));
+    }
+
+    @Test
+    void parses005IntoIRCMessage005WithParameters() {
+        String raw = ":irc.example.net 005 alice "
+                + "CHANTYPES=# "
+                + "EXCEPTS "
+                + "INVEX "
+                + "PREFIX=(qaohv)~&@%+ "
+                + "CHANLIMIT=#:50 "
+                + "FOO=bar=baz "
+                + ":are supported by this server";
+
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, raw);
+
+        assertFalse(parsed instanceof IRCMessageParseError);
+        assertFalse(parsed instanceof IRCMessageUnsupported);
+        IRCMessage005 m = assertInstanceOf(IRCMessage005.class, parsed);
+        assertEquals("alice", m.getClient());
+        assertEquals("are supported by this server", m.getText());
+        SequencedMap<String, String> p = m.getParameters();
+        assertNotNull(p);
+        assertEquals("#", p.get("CHANTYPES"));
+        assertTrue(p.containsKey("EXCEPTS"));
+        assertEquals(p.get("EXCEPTS"), "");
+        assertTrue(p.containsKey("INVEX"));
+        assertEquals(p.get("INVEX"), "");
+        assertEquals("(qaohv)~&@%+", p.get("PREFIX"));
+        assertEquals("#:50", p.get("CHANLIMIT"));
+        assertEquals("bar=baz", p.get("FOO"));
+
+        assertEquals(
+                List.of("CHANTYPES", "EXCEPTS", "INVEX", "PREFIX", "CHANLIMIT", "FOO"),
+                p.sequencedKeySet().stream().toList());
     }
 }

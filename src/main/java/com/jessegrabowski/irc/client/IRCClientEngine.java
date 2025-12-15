@@ -669,6 +669,7 @@ public class IRCClientEngine implements Closeable {
         }
 
         for (Map.Entry<String, String> capability : message.getCapabilities().sequencedEntrySet()) {
+            LOG.info("Server advertised capability: " + capability);
             IRCCapability.forName(capability.getKey())
                     .ifPresent(c -> capabilities.addServerCapability(c, capability.getValue()));
         }
@@ -682,7 +683,7 @@ public class IRCClientEngine implements Closeable {
                 requestedCapabilities.forEach(capabilities::addRequestedCapability);
                 send(new IRCMessageCAPREQ(
                         requestedCapabilities.stream()
-                                .map(IRCCapability::getName)
+                                .map(IRCCapability::getCapabilityName)
                                 .toList(),
                         List.of()));
             }
@@ -801,7 +802,10 @@ public class IRCClientEngine implements Closeable {
         if (!newCapabilities.stream().allMatch(capabilities::isActive)) {
             newCapabilities.forEach(capabilities::addRequestedCapability);
             send(new IRCMessageCAPREQ(
-                    newCapabilities.stream().map(IRCCapability::getName).toList(), List.of()));
+                    newCapabilities.stream()
+                            .map(IRCCapability::getCapabilityName)
+                            .toList(),
+                    List.of()));
         }
     }
 

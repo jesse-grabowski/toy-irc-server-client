@@ -6,5 +6,5 @@
 # terminates.
 
 mvn exec:java -Dexec.mainClass="com.jessegrabowski.irc.client.IRCClient" \
-              -Dexec.args="-P abc -L FINE localhost" \
+              -Dexec.args="-L FINE localhost" \
               -Dexec.cleanupDaemonThreads=false

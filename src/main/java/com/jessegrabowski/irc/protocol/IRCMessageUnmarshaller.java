@@ -425,7 +425,7 @@ public class IRCMessageUnmarshaller {
                         p -> p.inject(
                                 required("nick"),
                                 optional("*", s -> true, false),
-                                greedyRequiredMap("extensions", this::splitToEntry),
+                                required("extensions", splitToMapDelimited("\\s+")),
                                 IRCMessageCAPLSResponse::new))
                 .ifIndexEquals(
                         1,
@@ -449,7 +449,7 @@ public class IRCMessageUnmarshaller {
                         "NEW",
                         p -> p.inject(
                                 required("nick"),
-                                greedyRequiredMap("extensions", this::splitToEntry),
+                                required("extensions", splitToMapDelimited("\\s+")),
                                 IRCMessageCAPNEW::new))
                 .inject();
     }
@@ -857,6 +857,12 @@ public class IRCMessageUnmarshaller {
 
     private ThrowingFunction<String, List<String>> splitToListDelimited(String regex) {
         return raw -> Arrays.asList(raw.split(regex));
+    }
+
+    private ThrowingFunction<String, SequencedMap<String, String>> splitToMapDelimited(String regex) {
+        return raw -> Arrays.stream(raw.split(regex))
+                .map(this::splitToEntry)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
     private Map.Entry<String, String> splitToEntry(String raw) {

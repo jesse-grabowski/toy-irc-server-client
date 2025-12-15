@@ -46,18 +46,18 @@ public enum IRCCapability {
 
     static {
         for (IRCCapability capability : IRCCapability.values()) {
-            CAPABILITY_LOOKUP.put(capability.name, capability);
+            CAPABILITY_LOOKUP.put(capability.getCapabilityName(), capability);
         }
     }
 
-    private final String name;
+    private final String capabilityName;
 
-    IRCCapability(String name) {
-        this.name = name;
+    IRCCapability(String capabilityName) {
+        this.capabilityName = capabilityName;
     }
 
-    public String getName() {
-        return name;
+    public String getCapabilityName() {
+        return capabilityName;
     }
 
     public static Optional<IRCCapability> forName(String name) {

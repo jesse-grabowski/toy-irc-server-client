@@ -37,5 +37,10 @@ build/
 ### VS Code ###
 .vscode/
 
+### Ergo ###
+ergo/config/*
+!ergo/config/
+!ergo/config/ircd.yaml
+
 *.log
 *.log.*
