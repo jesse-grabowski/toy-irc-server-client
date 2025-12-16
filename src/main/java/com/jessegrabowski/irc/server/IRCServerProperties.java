@@ -29,68 +29,66 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.client.tui;
+package com.jessegrabowski.irc.server;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Consumer;
+import com.jessegrabowski.irc.args.ArgsProperties;
+import java.net.InetAddress;
+import java.nio.file.Paths;
+import java.util.logging.Level;
 
-public abstract class TerminalUI {
+public class IRCServerProperties implements ArgsProperties {
+    private InetAddress host;
+    private int port = 6667;
+    private String logFile = "irc-server.log";
+    private String logLevel = Level.INFO.getName();
 
-    private final List<Consumer<String>> inputHandlers = new ArrayList<>();
-
-    private volatile boolean running = false;
-    private volatile Thread thread;
-
-    public void addInputHandler(Consumer<String> handler) {
-        inputHandlers.add(handler);
-    }
-
-    protected void dispatchInput(String line) {
-        for (Consumer<String> handler : inputHandlers) {
-            handler.accept(line);
+    @Override
+    public void validate() {
+        if (port < 0 || port > 65535) {
+            throw new IllegalArgumentException("port must be between 0 and 65535");
+        }
+        try {
+            Paths.get(logFile);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("log file path must be a valid path");
+        }
+        try {
+            Level.parse(logLevel);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "invalid log level '%s': expected integer or valid jul level name".formatted(logLevel));
         }
     }
 
-    public synchronized void start() {
-        if (running) {
-            return;
-        }
-
-        running = true;
-
-        initialize();
-
-        thread = new Thread(
-                () -> {
-                    try {
-                        while (running) {
-                            process();
-                        }
-                    } finally {
-                        running = false;
-                    }
-                },
-                "TerminalUI-Loop");
-
-        thread.setDaemon(true);
-        thread.start();
+    public InetAddress getHost() {
+        return host;
     }
 
-    public synchronized void stop() {
-        running = false;
-        if (thread != null) {
-            thread.interrupt();
-        }
+    public void setHost(InetAddress host) {
+        this.host = host;
     }
 
-    public abstract void setPrompt(RichString prompt);
+    public int getPort() {
+        return port;
+    }
 
-    public abstract void setStatus(RichString status);
+    public void setPort(int port) {
+        this.port = port;
+    }
 
-    public abstract void println(TerminalMessage message);
+    public String getLogFile() {
+        return logFile;
+    }
 
-    protected abstract void initialize();
+    public void setLogFile(String logFile) {
+        this.logFile = logFile;
+    }
 
-    protected abstract void process();
+    public String getLogLevel() {
+        return logLevel;
+    }
+
+    public void setLogLevel(String logLevel) {
+        this.logLevel = logLevel;
+    }
 }

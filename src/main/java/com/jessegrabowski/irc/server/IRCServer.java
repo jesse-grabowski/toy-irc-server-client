@@ -29,83 +29,46 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.client;
+package com.jessegrabowski.irc.server;
 
 import com.jessegrabowski.irc.args.ArgsParser;
 import com.jessegrabowski.irc.args.ArgsParserHelpRequestedException;
 import com.jessegrabowski.irc.args.ArgsToken;
 import com.jessegrabowski.irc.args.ArgsTokenizer;
-import com.jessegrabowski.irc.client.command.model.ClientCommandDispatcher;
-import com.jessegrabowski.irc.client.tui.FancyTerminalUI;
-import com.jessegrabowski.irc.client.tui.STTY;
-import com.jessegrabowski.irc.client.tui.StdIOTerminalUI;
-import com.jessegrabowski.irc.client.tui.TerminalUI;
 import com.jessegrabowski.irc.util.LoggingConfigurer;
 import java.io.IOException;
 import java.util.List;
 import java.util.logging.Level;
 
-public class IRCClient {
-
+public class IRCServer {
     static void main(String[] args) throws IOException {
-        IRCClientProperties properties = parseArgs(args);
+        IRCServerProperties properties = parseArgs(args);
 
         LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()));
-
-        TerminalUI terminalUI =
-                STTY.isAvailable() && !properties.isUseSimpleTerminal() ? new FancyTerminalUI() : new StdIOTerminalUI();
-        terminalUI.start();
-
-        IRCClientEngine engine = new IRCClientEngine(properties, terminalUI);
-        ClientCommandDispatcher parser = new ClientCommandDispatcher(terminalUI, engine);
-        terminalUI.addInputHandler(parser::process);
-        engine.start();
     }
 
-    private static IRCClientProperties parseArgs(String[] args) {
-        ArgsParser<IRCClientProperties> argsParser = ArgsParser.builder(
-                        IRCClientProperties::new, true, "Pure-Java IRC Client")
-                .addUsageExample("java -cp [jarfile] com.jessegrabowski.irc.client.IRCClient [options] [args]")
-                .addInetAddressPositional(0, IRCClientProperties::setHost, "hostname of the IRC server", true)
+    private static IRCServerProperties parseArgs(String[] args) {
+        ArgsParser<IRCServerProperties> argsParser = ArgsParser.builder(
+                        IRCServerProperties::new, true, "Pure-Java IRC Server")
+                .addUsageExample("java -cp [jarfile] com.jessegrabowski.irc.server.IRCServer [options] [args]")
                 .addIntegerFlag(
-                        'p', "port", IRCClientProperties::setPort, "port of the IRC server (default 6667)", false)
-                .addIntegerFlag(
-                        'r',
-                        "read-timeout",
-                        IRCClientProperties::setReadTimeout,
-                        "idle timeout before closing connection (default 600000)",
+                        'p', "port", IRCServerProperties::setPort, "port of the IRC server (default 6667)", false)
+                .addInetAddressFlag(
+                        'H',
+                        "host",
+                        IRCServerProperties::setHost,
+                        "host name of the IRC server (default: auto-detected; not reliable behind NAT — configure explicitly for production)",
                         false)
-                .addIntegerFlag(
-                        'c',
-                        "connect-timeout",
-                        IRCClientProperties::setConnectTimeout,
-                        "timeout for establishing server connection (default 10000)",
-                        false)
-                .addCharsetFlag(
-                        'C',
-                        "charset",
-                        IRCClientProperties::setCharset,
-                        "charset used for communication with the server (default UTF-8)",
-                        false)
-                .addBooleanFlag(
-                        's',
-                        "simple-ui",
-                        IRCClientProperties::setUseSimpleTerminal,
-                        "use non-interactive mode (no cursor repositioning or dynamic updates; required on some terminals)",
-                        false)
-                .addStringFlag('n', "nickname", IRCClientProperties::setNickname, "nickname of the IRC user", false)
-                .addStringFlag('R', "real-name", IRCClientProperties::setRealName, "real name of the IRC user", false)
-                .addStringFlag('P', "password", IRCClientProperties::setPassword, "password for the IRC server", false)
                 .addStringFlag(
                         'l',
                         "log-file",
-                        IRCClientProperties::setLogFile,
+                        IRCServerProperties::setLogFile,
                         "log file pattern, supports %u and %g formats for rotation",
                         false)
                 .addStringFlag(
                         'L',
                         "log-level",
-                        IRCClientProperties::setLogLevel,
+                        IRCServerProperties::setLogLevel,
                         "log level, integer or j.u.l.Level well-known name",
                         false)
                 .build();

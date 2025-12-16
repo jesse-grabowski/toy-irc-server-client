@@ -116,6 +116,18 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     }
 
     @Override
+    public ArgsParserBuilder<T> addInetAddressFlag(
+            char shortKey,
+            String longKey,
+            BiConsumer<T, InetAddress> propertiesSetter,
+            String description,
+            boolean required) {
+        addFlagSpec(new FlagSpec<>(
+                shortKey, longKey, true, propertiesSetter, this::tryParseInetAddress, description, required));
+        return this;
+    }
+
+    @Override
     public ArgsParserBuilder<T> addIntegerFlag(
             char shortKey,
             String longKey,

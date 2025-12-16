@@ -54,6 +54,13 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
             String description,
             boolean required);
 
+    ArgsParserBuilder<T> addInetAddressFlag(
+            char shortKey,
+            String longKey,
+            BiConsumer<T, InetAddress> propertiesSetter,
+            String description,
+            boolean required);
+
     ArgsParserBuilder<T> addIntegerFlag(
             char shortKey,
             String longKey,
