@@ -37,7 +37,6 @@ import static com.jessegrabowski.irc.client.tui.RichString.f;
 import static com.jessegrabowski.irc.client.tui.RichString.j;
 import static com.jessegrabowski.irc.client.tui.RichString.s;
 
-import com.jessegrabowski.irc.*;
 import com.jessegrabowski.irc.client.command.model.*;
 import com.jessegrabowski.irc.client.tui.RichString;
 import com.jessegrabowski.irc.client.tui.TerminalMessage;
@@ -46,6 +45,9 @@ import com.jessegrabowski.irc.network.IRCClientConnectionFactory;
 import com.jessegrabowski.irc.network.IRCConnection;
 import com.jessegrabowski.irc.protocol.*;
 import com.jessegrabowski.irc.protocol.model.*;
+import com.jessegrabowski.irc.server.IRCServerParameters;
+import com.jessegrabowski.irc.server.IRCServerParametersUnmarshaller;
+import com.jessegrabowski.irc.util.StateGuard;
 import java.awt.Color;
 import java.io.Closeable;
 import java.time.Duration;
@@ -98,7 +100,7 @@ public class IRCClientEngine implements Closeable {
         ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
                 1,
                 Thread.ofPlatform()
-                        .name("irc-client-executor") // name the thread so it shows up nicely in our logs
+                        .name("IRCClient-Engine") // name the thread so it shows up nicely in our logs
                         .daemon(false) // we don't want the JVM to terminate until this thread dies so daemon =
                         // false
                         .uncaughtExceptionHandler((t, e) -> LOG.log(Level.SEVERE, "Error executing task", e))
@@ -1546,7 +1548,7 @@ public class IRCClientEngine implements Closeable {
 
     public void start() {
         if (!engineState.compareAndSet(IRCClientEngineState.NEW, IRCClientEngineState.INITIALIZING)) {
-            throw new IllegalStateException("com.jessegrabowski.irc.client.IRCClientEngine has already been started");
+            throw new IllegalStateException("IRCClientEngine has already been started");
         }
 
         try {
@@ -1554,12 +1556,12 @@ public class IRCClientEngine implements Closeable {
                 throw new IllegalStateException("inconsistent state in initialization");
             }
 
-            LOG.info("com.jessegrabowski.irc.client.IRCClientEngine started");
+            LOG.info("IRCClientEngine started");
 
             // automatically connect
             accept(new ClientCommandConnect());
         } catch (RuntimeException e) {
-            LOG.log(Level.WARNING, "failed to initialize com.jessegrabowski.irc.client.IRCClientEngine", e);
+            LOG.log(Level.WARNING, "failed to initialize IRCClientEngine", e);
             close();
             throw e;
         }
@@ -1585,36 +1587,6 @@ public class IRCClientEngine implements Closeable {
 
         executor.shutdownNow();
         terminal.stop();
-    }
-
-    private static final class StateGuard<T> {
-
-        private volatile Thread thread;
-
-        private T state;
-
-        public T getState() {
-            assertEngineThread();
-            return state;
-        }
-
-        public void setState(T state) {
-            assertEngineThread();
-            this.state = state;
-        }
-
-        public void bindToCurrentThread() {
-            if (this.thread != null && this.thread != Thread.currentThread()) {
-                throw new IllegalStateException("state has already been bound to a different thread");
-            }
-            this.thread = Thread.currentThread();
-        }
-
-        private void assertEngineThread() {
-            if (thread != Thread.currentThread()) {
-                throw new IllegalStateException("state can only be accessed from the engine thread");
-            }
-        }
     }
 
     private Runnable spy(Runnable runnable) {

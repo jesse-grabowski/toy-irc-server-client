@@ -29,18 +29,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc;
+package com.jessegrabowski.irc.protocol;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Optional;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class IRCCaseMappingTest {
 
     @Test
     void asciiNicknameLowercasesAsciiOnly() {
-        assertEquals("foo", IRCCaseMapping.ASCII.normalizeNickname("Foo"));
+        Assertions.assertEquals("foo", IRCCaseMapping.ASCII.normalizeNickname("Foo"));
         assertEquals("f", IRCCaseMapping.ASCII.normalizeNickname("F"));
         assertEquals("föÖ", IRCCaseMapping.ASCII.normalizeNickname("FöÖ"));
         assertNull(IRCCaseMapping.ASCII.normalizeNickname(null));

@@ -33,8 +33,8 @@ package com.jessegrabowski.irc.protocol;
 
 import static java.util.function.Predicate.not;
 
-import com.jessegrabowski.irc.IRCServerParameters;
 import com.jessegrabowski.irc.protocol.model.*;
+import com.jessegrabowski.irc.server.IRCServerParameters;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayList;

@@ -31,8 +31,8 @@
  */
 package com.jessegrabowski.irc.client;
 
-import com.jessegrabowski.irc.IRCCapability;
-import com.jessegrabowski.irc.IRCServerParameters;
+import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.server.IRCServerParameters;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;

@@ -29,13 +29,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc;
+package com.jessegrabowski.irc.server;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jessegrabowski.irc.client.IRCClientState;
+import com.jessegrabowski.irc.protocol.IRCCaseMapping;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class IRCServerParametersUnmarshallerTest {
@@ -59,7 +61,7 @@ public class IRCServerParametersUnmarshallerTest {
     void caseMappingEnableDisableAndUnknown() {
         IRCServerParameters p = newParameters();
         IRCServerParametersUnmarshaller.parse("CASEMAPPING", "rfc1459", p);
-        assertEquals(IRCCaseMapping.RFC1459, p.getCaseMapping());
+        Assertions.assertEquals(IRCCaseMapping.RFC1459, p.getCaseMapping());
         IRCServerParametersUnmarshaller.parse("CASEMAPPING", "unknown", p);
         assertEquals(IRCCaseMapping.RFC1459, p.getCaseMapping());
         IRCServerParametersUnmarshaller.parse("-CASEMAPPING", "ascii", p);

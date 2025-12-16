@@ -29,41 +29,46 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc;
+package com.jessegrabowski.irc.protocol;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
-public enum IRCChannelMode {
-    BAN,
-    EXCEPTION,
-    CLIENT_LIMIT,
-    INVITE_ONLY,
-    INVITE_EXCEPTION,
-    KEY,
-    MODERATED,
-    SECRET,
-    PROTECTED,
-    NO_EXTERNAL_MESSAGES;
+public enum IRCExtendedBanMode {
+    ALLOW_INVITE('A'),
+    BLOCK_CAPS('B'),
+    CTCP('C'),
+    CHANNEL('j'),
+    NICKS('N'),
+    OPERS('o'),
+    OPER_TYPES('O'),
+    PART('p'),
+    QUIET('q'),
+    BLOCK_KICKS('Q'),
+    REAL_NAME('r'),
+    SERVER('s'),
+    BLOCK_NOTICE('T'),
+    UNREGISTERED('U'),
+    TLS_CERT('z'),
+    AND('&'),
+    OR('|');
 
-    public static Optional<IRCChannelMode> forName(IRCServerParameters parameters, char name) {
-        return switch (name) {
-            case 'b' -> Optional.of(BAN);
-            case 'l' -> Optional.of(CLIENT_LIMIT);
-            case 'i' -> Optional.of(INVITE_ONLY);
-            case 'k' -> Optional.of(KEY);
-            case 'm' -> Optional.of(MODERATED);
-            case 's' -> Optional.of(SECRET);
-            case 't' -> Optional.of(PROTECTED);
-            case 'n' -> Optional.of(NO_EXTERNAL_MESSAGES);
-            default -> {
-                if (parameters.getExcepts() == name) {
-                    yield Optional.of(EXCEPTION);
-                } else if (parameters.getInviteExceptions() == name) {
-                    yield Optional.of(INVITE_EXCEPTION);
-                } else {
-                    yield Optional.empty();
-                }
-            }
-        };
+    private static final Map<Character, IRCExtendedBanMode> EXTENDED_BAN_MODES = new HashMap<>();
+
+    static {
+        for (IRCExtendedBanMode extendedBanModes : IRCExtendedBanMode.values()) {
+            EXTENDED_BAN_MODES.put(extendedBanModes.character, extendedBanModes);
+        }
+    }
+
+    private final char character;
+
+    IRCExtendedBanMode(char character) {
+        this.character = character;
+    }
+
+    public static Optional<IRCExtendedBanMode> forName(char name) {
+        return Optional.ofNullable(EXTENDED_BAN_MODES.get(name));
     }
 }
