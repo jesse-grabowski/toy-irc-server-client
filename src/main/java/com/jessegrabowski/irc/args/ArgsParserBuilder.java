@@ -31,6 +31,7 @@
  */
 package com.jessegrabowski.irc.args;
 
+import com.jessegrabowski.irc.util.Resource;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.List;
@@ -72,6 +73,13 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
             char shortKey,
             String longKey,
             BiConsumer<T, Charset> propertiesSetter,
+            String description,
+            boolean required);
+
+    ArgsParserBuilder<T> addResourceFlag(
+            char shortKey,
+            String longKey,
+            BiConsumer<T, Resource> propertiesSetter,
             String description,
             boolean required);
 

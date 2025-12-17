@@ -95,16 +95,16 @@ public class IRCCaseMappingTest {
     }
 
     @Test
-    void forNameResolvesKnownMappings() {
-        assertEquals(Optional.of(IRCCaseMapping.ASCII), IRCCaseMapping.forName("ascii"));
-        assertEquals(Optional.of(IRCCaseMapping.RFC1459), IRCCaseMapping.forName("rfc1459"));
-        assertEquals(Optional.of(IRCCaseMapping.RFC1459_STRICT), IRCCaseMapping.forName("rfc1459-strict"));
+    void forCasemappingResolvesKnownMappings() {
+        assertEquals(Optional.of(IRCCaseMapping.ASCII), IRCCaseMapping.forCasemapping("ascii"));
+        assertEquals(Optional.of(IRCCaseMapping.RFC1459), IRCCaseMapping.forCasemapping("rfc1459"));
+        assertEquals(Optional.of(IRCCaseMapping.RFC1459_STRICT), IRCCaseMapping.forCasemapping("rfc1459-strict"));
     }
 
     @Test
-    void forNameHandlesUnknownAndNull() {
-        assertEquals(Optional.empty(), IRCCaseMapping.forName("nope"));
-        assertEquals(Optional.empty(), IRCCaseMapping.forName(null));
+    void forCasemappingHandlesUnknownAndNull() {
+        assertEquals(Optional.empty(), IRCCaseMapping.forCasemapping("nope"));
+        assertEquals(Optional.empty(), IRCCaseMapping.forCasemapping(null));
     }
 
     @Test

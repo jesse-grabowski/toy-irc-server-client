@@ -32,6 +32,7 @@
 package com.jessegrabowski.irc.server;
 
 import com.jessegrabowski.irc.args.ArgsProperties;
+import com.jessegrabowski.irc.util.Resource;
 import java.net.InetAddress;
 import java.nio.file.Paths;
 import java.util.logging.Level;
@@ -41,6 +42,7 @@ public class IRCServerProperties implements ArgsProperties {
     private int port = 6667;
     private String logFile = "irc-server.log";
     private String logLevel = Level.INFO.getName();
+    private Resource isupportProperties = Resource.of("classpath:/isupport.properties");
 
     @Override
     public void validate() {
@@ -90,5 +92,13 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setLogLevel(String logLevel) {
         this.logLevel = logLevel;
+    }
+
+    public Resource getIsupportProperties() {
+        return isupportProperties;
+    }
+
+    public void setIsupportProperties(Resource isupportProperties) {
+        this.isupportProperties = isupportProperties;
     }
 }

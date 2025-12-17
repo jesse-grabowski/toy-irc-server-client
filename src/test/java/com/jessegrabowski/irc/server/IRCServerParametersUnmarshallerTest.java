@@ -49,40 +49,40 @@ public class IRCServerParametersUnmarshallerTest {
     @Test
     void awayLenEnableDisableAndError() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("AWAYLEN", "120", p);
+        IRCServerParametersUnmarshaller.unmarshal("AWAYLEN", "120", p);
         assertEquals(120, p.getAwayLength());
-        IRCServerParametersUnmarshaller.parse("-AWAYLEN", "0", p);
+        IRCServerParametersUnmarshaller.unmarshal("-AWAYLEN", "0", p);
         assertEquals(Integer.MAX_VALUE, p.getAwayLength());
-        IRCServerParametersUnmarshaller.parse("AWAYLEN", "x", p);
+        IRCServerParametersUnmarshaller.unmarshal("AWAYLEN", "x", p);
         assertEquals(Integer.MAX_VALUE, p.getAwayLength());
     }
 
     @Test
     void caseMappingEnableDisableAndUnknown() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("CASEMAPPING", "rfc1459", p);
+        IRCServerParametersUnmarshaller.unmarshal("CASEMAPPING", "rfc1459", p);
         Assertions.assertEquals(IRCCaseMapping.RFC1459, p.getCaseMapping());
-        IRCServerParametersUnmarshaller.parse("CASEMAPPING", "unknown", p);
+        IRCServerParametersUnmarshaller.unmarshal("CASEMAPPING", "unknown", p);
         assertEquals(IRCCaseMapping.RFC1459, p.getCaseMapping());
-        IRCServerParametersUnmarshaller.parse("-CASEMAPPING", "ascii", p);
+        IRCServerParametersUnmarshaller.unmarshal("-CASEMAPPING", "ascii", p);
         assertEquals(IRCCaseMapping.RFC1459, p.getCaseMapping());
     }
 
     @Test
     void chanLimitEnableDisableWithAndWithoutValues() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("CHANLIMIT", "#:10,&", p);
+        IRCServerParametersUnmarshaller.unmarshal("CHANLIMIT", "#:10,&", p);
         Map<Character, Integer> limits = p.getChannelLimits();
         assertEquals(10, limits.get('#'));
         assertEquals(Integer.MAX_VALUE, limits.get('&'));
-        IRCServerParametersUnmarshaller.parse("-CHANLIMIT", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-CHANLIMIT", "", p);
         assertEquals(Map.of(), p.getChannelLimits());
     }
 
     @Test
     void chanModesEnableAllPartsAndDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("CHANMODES", "ab,c,def,gh", p);
+        IRCServerParametersUnmarshaller.unmarshal("CHANMODES", "ab,c,def,gh", p);
         Set<Character> a = p.getTypeAChannelModes();
         Set<Character> b = p.getTypeBChannelModes();
         Set<Character> c = p.getTypeCChannelModes();
@@ -95,12 +95,12 @@ public class IRCServerParametersUnmarshallerTest {
         assertTrue(c.contains('f'));
         assertTrue(d.contains('g'));
         assertTrue(d.contains('h'));
-        IRCServerParametersUnmarshaller.parse("CHANMODES", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("CHANMODES", "", p);
         assertEquals(Set.of(), p.getTypeAChannelModes());
         assertEquals(Set.of(), p.getTypeBChannelModes());
         assertEquals(Set.of(), p.getTypeCChannelModes());
         assertEquals(Set.of(), p.getTypeDChannelModes());
-        IRCServerParametersUnmarshaller.parse("-CHANMODES", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-CHANMODES", "", p);
         assertEquals(Set.of(), p.getTypeAChannelModes());
         assertEquals(Set.of(), p.getTypeBChannelModes());
         assertEquals(Set.of(), p.getTypeCChannelModes());
@@ -110,42 +110,42 @@ public class IRCServerParametersUnmarshallerTest {
     @Test
     void channelLenEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("CHANNELLEN", "50", p);
+        IRCServerParametersUnmarshaller.unmarshal("CHANNELLEN", "50", p);
         assertEquals(50, p.getChannelLength());
-        IRCServerParametersUnmarshaller.parse("-CHANNELLEN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-CHANNELLEN", "", p);
         assertEquals(Integer.MAX_VALUE, p.getChannelLength());
     }
 
     @Test
     void chanTypesEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("CHANTYPES", "#&+!", p);
+        IRCServerParametersUnmarshaller.unmarshal("CHANTYPES", "#&+!", p);
         assertEquals(Set.of('#', '&', '+', '!'), p.getChannelTypes());
-        IRCServerParametersUnmarshaller.parse("-CHANTYPES", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-CHANTYPES", "", p);
         assertEquals(Set.of('#', '&'), p.getChannelTypes());
     }
 
     @Test
     void exceptsEnableDisableWithDefaultAndExplicit() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("EXCEPTS", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("EXCEPTS", "", p);
         assertEquals(Character.valueOf('e'), p.getExcepts());
-        IRCServerParametersUnmarshaller.parse("EXCEPTS", "x", p);
+        IRCServerParametersUnmarshaller.unmarshal("EXCEPTS", "x", p);
         assertEquals(Character.valueOf('x'), p.getExcepts());
-        IRCServerParametersUnmarshaller.parse("-EXCEPTS", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-EXCEPTS", "", p);
         assertNull(p.getExcepts());
     }
 
     @Test
     void extbanEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("EXTBAN", "~,cqnr", p);
+        IRCServerParametersUnmarshaller.unmarshal("EXTBAN", "~,cqnr", p);
         assertEquals(Character.valueOf('~'), p.getExtendedBanPrefix());
         assertTrue(p.getExtendedBanModes().contains('c'));
         assertTrue(p.getExtendedBanModes().contains('q'));
         assertTrue(p.getExtendedBanModes().contains('n'));
         assertTrue(p.getExtendedBanModes().contains('r'));
-        IRCServerParametersUnmarshaller.parse("-EXTBAN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-EXTBAN", "", p);
         assertEquals(Set.of(), p.getExtendedBanModes());
         assertNull(p.getExtendedBanPrefix());
     }
@@ -153,7 +153,7 @@ public class IRCServerParametersUnmarshallerTest {
     @Test
     void extbanEmptyPrefix() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("EXTBAN", ",cqnr", p);
+        IRCServerParametersUnmarshaller.unmarshal("EXTBAN", ",cqnr", p);
         assertNull(p.getExtendedBanPrefix());
         assertTrue(p.getExtendedBanModes().contains('c'));
         assertTrue(p.getExtendedBanModes().contains('q'));
@@ -164,129 +164,129 @@ public class IRCServerParametersUnmarshallerTest {
     @Test
     void hostLenEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("HOSTLEN", "64", p);
+        IRCServerParametersUnmarshaller.unmarshal("HOSTLEN", "64", p);
         assertEquals(64, p.getHostLength());
-        IRCServerParametersUnmarshaller.parse("-HOSTLEN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-HOSTLEN", "", p);
         assertEquals(Integer.MAX_VALUE, p.getHostLength());
     }
 
     @Test
     void invexEnableDisableWithDefaultAndExplicit() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("INVEX", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("INVEX", "", p);
         assertEquals(Character.valueOf('I'), p.getInviteExceptions());
-        IRCServerParametersUnmarshaller.parse("INVEX", "x", p);
+        IRCServerParametersUnmarshaller.unmarshal("INVEX", "x", p);
         assertEquals(Character.valueOf('x'), p.getInviteExceptions());
-        IRCServerParametersUnmarshaller.parse("-INVEX", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-INVEX", "", p);
         assertNull(p.getInviteExceptions());
     }
 
     @Test
     void kickLenEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("KICKLEN", "120", p);
+        IRCServerParametersUnmarshaller.unmarshal("KICKLEN", "120", p);
         assertEquals(120, p.getKickLength());
-        IRCServerParametersUnmarshaller.parse("-KICKLEN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-KICKLEN", "", p);
         assertEquals(Integer.MAX_VALUE, p.getKickLength());
     }
 
     @Test
     void maxListEnableDisableWithAndWithoutValues() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("MAXLIST", "beI:60,q", p);
+        IRCServerParametersUnmarshaller.unmarshal("MAXLIST", "beI:60,q", p);
         Map<Character, Integer> max = p.getMaxList();
         assertEquals(60, max.get('b'));
         assertEquals(60, max.get('e'));
         assertEquals(60, max.get('I'));
         assertEquals(Integer.MAX_VALUE, max.get('q'));
-        IRCServerParametersUnmarshaller.parse("-MAXLIST", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-MAXLIST", "", p);
         assertEquals(Map.of(), p.getMaxList());
     }
 
     @Test
     void maxTargetsEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("MAXTARGETS", "4", p);
+        IRCServerParametersUnmarshaller.unmarshal("MAXTARGETS", "4", p);
         assertEquals(4, p.getMaxTargets());
-        IRCServerParametersUnmarshaller.parse("-MAXTARGETS", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-MAXTARGETS", "", p);
         assertEquals(Integer.MAX_VALUE, p.getMaxTargets());
     }
 
     @Test
     void modesEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("MODES", "3", p);
+        IRCServerParametersUnmarshaller.unmarshal("MODES", "3", p);
         assertEquals(3, p.getModes());
-        IRCServerParametersUnmarshaller.parse("-MODES", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-MODES", "", p);
         assertEquals(Integer.MAX_VALUE, p.getModes());
     }
 
     @Test
     void networkEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("NETWORK", "TestNet", p);
+        IRCServerParametersUnmarshaller.unmarshal("NETWORK", "TestNet", p);
         assertEquals("TestNet", p.getNetwork());
-        IRCServerParametersUnmarshaller.parse("-NETWORK", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-NETWORK", "", p);
         assertEquals("", p.getNetwork());
     }
 
     @Test
     void nickLenEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("NICKLEN", "16", p);
+        IRCServerParametersUnmarshaller.unmarshal("NICKLEN", "16", p);
         assertEquals(16, p.getNickLength());
-        IRCServerParametersUnmarshaller.parse("-NICKLEN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-NICKLEN", "", p);
         assertEquals(Integer.MAX_VALUE, p.getNickLength());
     }
 
     @Test
     void prefixDisableInvalidValidAndException() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("-PREFIX", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-PREFIX", "", p);
         assertEquals(Map.of(), p.getPrefixes());
-        IRCServerParametersUnmarshaller.parse("PREFIX", "invalid", p);
+        IRCServerParametersUnmarshaller.unmarshal("PREFIX", "invalid", p);
         assertEquals(Map.of(), p.getPrefixes());
-        IRCServerParametersUnmarshaller.parse("PREFIX", "(ov)!@", p);
+        IRCServerParametersUnmarshaller.unmarshal("PREFIX", "(ov)!@", p);
         assertEquals(Map.of('o', '!', 'v', '@'), p.getPrefixes());
-        IRCServerParametersUnmarshaller.parse("PREFIX", "(ov)!@#", p);
+        IRCServerParametersUnmarshaller.unmarshal("PREFIX", "(ov)!@#", p);
         assertEquals(Map.of('o', '!', 'v', '@'), p.getPrefixes());
     }
 
     @Test
     void safeListEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("SAFELIST", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("SAFELIST", "", p);
         assertTrue(p.isSafeList());
-        IRCServerParametersUnmarshaller.parse("-SAFELIST", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-SAFELIST", "", p);
         assertFalse(p.isSafeList());
     }
 
     @Test
     void silenceEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("SILENCE", "5", p);
+        IRCServerParametersUnmarshaller.unmarshal("SILENCE", "5", p);
         assertEquals(5, p.getSilence());
-        IRCServerParametersUnmarshaller.parse("-SILENCE", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-SILENCE", "", p);
         assertEquals(Integer.MAX_VALUE, p.getSilence());
     }
 
     @Test
     void statusMsgEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("STATUSMSG", "@%+", p);
+        IRCServerParametersUnmarshaller.unmarshal("STATUSMSG", "@%+", p);
         assertEquals(Set.of('@', '%', '+'), p.getStatusMessage());
-        IRCServerParametersUnmarshaller.parse("-STATUSMSG", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-STATUSMSG", "", p);
         assertEquals(Set.of(), p.getStatusMessage());
     }
 
     @Test
     void targMaxEnableDisableEmptyAndWithValues() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("-TARGMAX", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-TARGMAX", "", p);
         assertEquals(Map.of(), p.getTargetMax());
-        IRCServerParametersUnmarshaller.parse("TARGMAX", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("TARGMAX", "", p);
         assertEquals(Map.of(), p.getTargetMax());
-        IRCServerParametersUnmarshaller.parse("TARGMAX", "PRIVMSG:4,NOTICE:3,JOIN", p);
+        IRCServerParametersUnmarshaller.unmarshal("TARGMAX", "PRIVMSG:4,NOTICE:3,JOIN", p);
         Map<String, Integer> max = p.getTargetMax();
         assertEquals(4, max.get("PRIVMSG"));
         assertEquals(3, max.get("NOTICE"));
@@ -296,25 +296,25 @@ public class IRCServerParametersUnmarshallerTest {
     @Test
     void topicLenEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("TOPICLEN", "200", p);
+        IRCServerParametersUnmarshaller.unmarshal("TOPICLEN", "200", p);
         assertEquals(200, p.getTopicLength());
-        IRCServerParametersUnmarshaller.parse("-TOPICLEN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-TOPICLEN", "", p);
         assertEquals(Integer.MAX_VALUE, p.getTopicLength());
     }
 
     @Test
     void userLenEnableDisable() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("USERLEN", "10", p);
+        IRCServerParametersUnmarshaller.unmarshal("USERLEN", "10", p);
         assertEquals(10, p.getUserLength());
-        IRCServerParametersUnmarshaller.parse("-USERLEN", "", p);
+        IRCServerParametersUnmarshaller.unmarshal("-USERLEN", "", p);
         assertEquals(Integer.MAX_VALUE, p.getUserLength());
     }
 
     @Test
     void unknownParameterIgnored() {
         IRCServerParameters p = newParameters();
-        IRCServerParametersUnmarshaller.parse("UNKNOWNPARAM", "value", p);
+        IRCServerParametersUnmarshaller.unmarshal("UNKNOWNPARAM", "value", p);
         assertNotNull(p);
     }
 }

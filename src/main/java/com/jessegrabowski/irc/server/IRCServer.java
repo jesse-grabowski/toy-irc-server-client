@@ -45,6 +45,10 @@ public class IRCServer {
         IRCServerProperties properties = parseArgs(args);
 
         LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()));
+
+        IRCServerParameters parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
+
+        System.out.println("IRC Server starting...");
     }
 
     private static IRCServerProperties parseArgs(String[] args) {
@@ -70,6 +74,12 @@ public class IRCServer {
                         "log-level",
                         IRCServerProperties::setLogLevel,
                         "log level, integer or j.u.l.Level well-known name",
+                        false)
+                .addResourceFlag(
+                        'I',
+                        "isupport-properties",
+                        IRCServerProperties::setIsupportProperties,
+                        "location of RPL_ISUPPORT definitions (default classpath:/isupport.properties)",
                         false)
                 .build();
 

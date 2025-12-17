@@ -31,6 +31,7 @@
  */
 package com.jessegrabowski.irc.args;
 
+import com.jessegrabowski.irc.util.Resource;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
@@ -148,6 +149,17 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             boolean required) {
         addFlagSpec(new FlagSpec<>(
                 shortKey, longKey, true, propertiesSetter, this::tryParseCharset, description, required));
+        return this;
+    }
+
+    @Override
+    public ArgsParserBuilder<T> addResourceFlag(
+            char shortKey,
+            String longKey,
+            BiConsumer<T, Resource> propertiesSetter,
+            String description,
+            boolean required) {
+        addFlagSpec(new FlagSpec<>(shortKey, longKey, true, propertiesSetter, Resource::of, description, required));
         return this;
     }
 

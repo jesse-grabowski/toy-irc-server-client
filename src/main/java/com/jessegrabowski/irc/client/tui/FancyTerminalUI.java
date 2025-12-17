@@ -244,12 +244,9 @@ public class FancyTerminalUI extends TerminalUI {
         int messageWidth = Math.max(cols - METADATA_WIDTH - 3, 1);
 
         // This is a bit tricky. We want to build a list of rows to display on the screen, but for the
-        // sake of
-        // efficiency we don't want to iterate over messages that aren't going to be displayed. To
-        // handle this,
-        // we iterate backwards. For each message, we split it into lines and append them to the front
-        // of the
-        // list (while maintaining their order).
+        // sake of efficiency we don't want to iterate over messages that aren't going to be displayed.
+        // To handle this, we iterate backwards. For each message, we split it into lines and append
+        // them to the front of the list (while maintaining their order).
         List<String> visualRows = new ArrayList<>();
         Iterator<TerminalMessage> messageIterator = messageBuffer.descendingIterator();
         while (messageIterator.hasNext() && visualRows.size() < maxMessageRows) {
@@ -447,7 +444,7 @@ public class FancyTerminalUI extends TerminalUI {
         // seeded random gives us a variety of colors w/
         // consistent results for the same input
         Random r = new Random(text.hashCode());
-        // This looks weird, but just cuts out the blue
+        // This looks weird but just cuts out the blue
         // range of hues (hard to read on black terminal)
         float hue = r.nextFloat();
         if (hue >= 0.62f) {

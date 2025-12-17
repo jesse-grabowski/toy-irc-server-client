@@ -1097,7 +1097,7 @@ public class IRCClientEngine implements Closeable {
         IRCServerParameters parameters = state.getParameters();
 
         for (Map.Entry<String, String> entry : message.getParameters().sequencedEntrySet()) {
-            IRCServerParametersUnmarshaller.parse(entry.getKey(), entry.getValue(), parameters);
+            IRCServerParametersUnmarshaller.unmarshal(entry.getKey(), entry.getValue(), parameters);
         }
     }
 

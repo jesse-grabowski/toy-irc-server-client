@@ -44,25 +44,36 @@ public enum IRCCaseMapping {
             IRCCaseMapping::casefoldRfc1459StrictNickname,
             IRCCaseMapping::casefoldRfc1459StrictChannel);
 
+    private static final char[] ASCII_CASEFOLD = initializeCasefold(128, Map.of());
+    private static final char[] RFC1459_CASEFOLD = initializeCasefold(
+            128, Map.ofEntries(Map.entry('[', '{'), Map.entry(']', '}'), Map.entry('\\', '|'), Map.entry('~', '^')));
+    private static final char[] RFC1459_STRICT_CASEFOLD =
+            initializeCasefold(128, Map.ofEntries(Map.entry('[', '{'), Map.entry(']', '}'), Map.entry('\\', '|')));
+
     private static final Map<String, IRCCaseMapping> CASE_MAPPINGS = new HashMap<>();
 
     static {
         for (IRCCaseMapping caseMapping : IRCCaseMapping.values()) {
-            CASE_MAPPINGS.put(caseMapping.name, caseMapping);
+            CASE_MAPPINGS.put(caseMapping.casemapping, caseMapping);
         }
     }
 
-    private final String name;
+    private final String casemapping;
     private final UnaryOperator<String> nicknameNormalizer;
     private final UnaryOperator<String> channelNormalizer;
 
-    IRCCaseMapping(String name, UnaryOperator<String> nicknameNormalizer, UnaryOperator<String> channelNormalizer) {
-        this.name = name;
+    IRCCaseMapping(
+            String casemapping, UnaryOperator<String> nicknameNormalizer, UnaryOperator<String> channelNormalizer) {
+        this.casemapping = casemapping;
         this.nicknameNormalizer = nicknameNormalizer;
         this.channelNormalizer = channelNormalizer;
     }
 
-    public static Optional<IRCCaseMapping> forName(String name) {
+    public String getCasemapping() {
+        return casemapping;
+    }
+
+    public static Optional<IRCCaseMapping> forCasemapping(String name) {
         if (name == null) {
             return Optional.empty();
         }
@@ -82,12 +93,6 @@ public enum IRCCaseMapping {
         }
         return channelNormalizer.apply(string);
     }
-
-    private static final char[] ASCII_CASEFOLD = initializeCasefold(128, Map.of());
-    private static final char[] RFC1459_CASEFOLD = initializeCasefold(
-            128, Map.ofEntries(Map.entry('[', '{'), Map.entry(']', '}'), Map.entry('\\', '|'), Map.entry('~', '^')));
-    private static final char[] RFC1459_STRICT_CASEFOLD =
-            initializeCasefold(128, Map.ofEntries(Map.entry('[', '{'), Map.entry(']', '}'), Map.entry('\\', '|')));
 
     private static char[] initializeCasefold(int size, Map<Character, Character> replacements) {
         char[] chars = new char[size];

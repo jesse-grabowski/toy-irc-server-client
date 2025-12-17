@@ -51,7 +51,7 @@ public final class IRCServerParametersUnmarshaller {
 
     private IRCServerParametersUnmarshaller() {}
 
-    public static void parse(String parameter, String value, IRCServerParameters parameters) {
+    public static void unmarshal(String parameter, String value, IRCServerParameters parameters) {
         boolean disable = parameter.startsWith("-");
         if (disable) {
             parameter = parameter.substring(1);
@@ -98,7 +98,7 @@ public final class IRCServerParametersUnmarshaller {
         if (disable) {
             parameters.setCaseMapping(IRCCaseMapping.RFC1459);
         } else {
-            parameters.setCaseMapping(IRCCaseMapping.forName(value).orElse(IRCCaseMapping.RFC1459));
+            parameters.setCaseMapping(IRCCaseMapping.forCasemapping(value).orElse(IRCCaseMapping.RFC1459));
         }
     }
 
