@@ -267,7 +267,7 @@ public class IRCServerParametersUnmarshallerTest {
         IRCServerParametersUnmarshaller.unmarshal("SILENCE", "5", p);
         assertEquals(5, p.getSilence());
         IRCServerParametersUnmarshaller.unmarshal("-SILENCE", "", p);
-        assertEquals(Integer.MAX_VALUE, p.getSilence());
+        assertEquals(null, p.getSilence());
     }
 
     @Test

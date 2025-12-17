@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
@@ -50,7 +51,7 @@ public final class LoggingConfigurer {
 
     private LoggingConfigurer() {}
 
-    public static void configure(String filename, Level level) throws IOException {
+    public static void configure(String filename, Level level, boolean mirrorToConsole) throws IOException {
         LogManager.getLogManager().reset();
 
         // FileHandler supports %u (unique) and %g (rotation index)
@@ -62,6 +63,14 @@ public final class LoggingConfigurer {
 
         Logger root = Logger.getLogger("");
         root.addHandler(fileHandler);
+
+        if (mirrorToConsole) {
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            consoleHandler.setFormatter(new LogbackishFormatter());
+            consoleHandler.setLevel(Level.ALL);
+            root.addHandler(consoleHandler);
+        }
+
         root.setLevel(level);
     }
 
@@ -85,7 +94,9 @@ public final class LoggingConfigurer {
         }
 
         private String padLevel(String level) {
-            if (level.length() >= 5) return level;
+            if (level.length() >= 5) {
+                return level;
+            }
             return String.format("%-5s", level);
         }
     }

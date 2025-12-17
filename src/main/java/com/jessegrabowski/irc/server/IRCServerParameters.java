@@ -65,7 +65,7 @@ public final class IRCServerParameters {
     private int nickLength = Integer.MAX_VALUE;
     private SequencedMap<Character, Character> prefixes = new LinkedHashMap<>();
     private boolean safeList;
-    private int silence = Integer.MAX_VALUE;
+    private Integer silence = null;
     private Set<Character> statusMessage = Set.of();
     private Map<String, Integer> targetMax = Map.of();
     private int topicLength = Integer.MAX_VALUE;
@@ -256,11 +256,11 @@ public final class IRCServerParameters {
         this.safeList = safeList;
     }
 
-    public int getSilence() {
+    public Integer getSilence() {
         return silence;
     }
 
-    public void setSilence(int silence) {
+    public void setSilence(Integer silence) {
         this.silence = silence;
     }
 

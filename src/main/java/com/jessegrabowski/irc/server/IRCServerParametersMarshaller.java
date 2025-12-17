@@ -31,13 +31,13 @@
  */
 package com.jessegrabowski.irc.server;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
-import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class IRCServerParametersMarshaller {
@@ -49,11 +49,13 @@ public class IRCServerParametersMarshaller {
         map.put("CHANLIMIT", marshalChanlimit(parameters.getChannelLimits()));
         map.put(
                 "CHANMODES",
-                marshalChanmodes(
-                        parameters.getTypeAChannelModes(),
-                        parameters.getTypeBChannelModes(),
-                        parameters.getTypeCChannelModes(),
-                        parameters.getTypeDChannelModes()));
+                join(
+                        ",",
+                        List.of(
+                                join("", parameters.getTypeAChannelModes()),
+                                join("", parameters.getTypeBChannelModes()),
+                                join("", parameters.getTypeCChannelModes()),
+                                join("", parameters.getTypeDChannelModes()))));
         map.put("CHANNELLEN", Integer.toString(parameters.getChannelLength()));
         map.put("CHANTYPES", join("", parameters.getChannelTypes()));
         map.put("EXCEPTS", String.valueOf(parameters.getExcepts()));
@@ -70,7 +72,7 @@ public class IRCServerParametersMarshaller {
         if (parameters.isSafeList()) {
             map.put("SAFELIST", null);
         }
-        map.put("SILENCE", Integer.toString(parameters.getSilence()));
+        map.put("SILENCE", marshalNonNull(parameters.getSilence(), Object::toString));
         map.put("STATUSMSG", join("", parameters.getStatusMessage()));
         map.put("TARGMAX", marshalTargmax(parameters.getTargetMax()));
         map.put("TOPICLEN", Integer.toString(parameters.getTopicLength()));
@@ -88,16 +90,15 @@ public class IRCServerParametersMarshaller {
                 .collect(Collectors.joining(","));
     }
 
-    private String marshalChanmodes(Set<?>... modes) {
-        return Arrays.stream(modes)
-                .map(type -> type.stream().map(String::valueOf).collect(Collectors.joining("")))
-                .collect(Collectors.joining(","));
-    }
-
     private <T> String join(String delimiter, Collection<T> collection) {
         StringBuilder sb = new StringBuilder();
+        boolean first = true;
         for (Object o : collection) {
+            if (!first) {
+                sb.append(delimiter);
+            }
             sb.append(o);
+            first = false;
         }
         return sb.toString();
     }
@@ -116,5 +117,9 @@ public class IRCServerParametersMarshaller {
         return limits.entrySet().stream()
                 .map(e -> e.getKey() + ":" + e.getValue())
                 .collect(Collectors.joining(","));
+    }
+
+    private <T> String marshalNonNull(T value, Function<T, String> marshaller) {
+        return value == null ? null : marshaller.apply(value);
     }
 }

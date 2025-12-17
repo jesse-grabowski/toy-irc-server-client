@@ -36,8 +36,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -60,29 +62,29 @@ public final class IRCServerParametersUnmarshaller {
         try {
             String finalParameter = parameter;
             switch (parameter) {
-                case "AWAYLEN" -> parseOptionalInteger(disable, value, parameters::setAwayLength);
+                case "AWAYLEN" -> parseRequiredInteger(disable, value, parameters::setAwayLength);
                 case "CASEMAPPING" -> parseCaseMapping(disable, value, parameters);
                 case "CHANLIMIT" -> parseChannelLimit(disable, value, parameters);
                 case "CHANMODES" -> parseChannelModes(disable, value, parameters);
-                case "CHANNELLEN" -> parseOptionalInteger(disable, value, parameters::setChannelLength);
+                case "CHANNELLEN" -> parseRequiredInteger(disable, value, parameters::setChannelLength);
                 case "CHANTYPES" -> parseChannelTypes(disable, value, parameters);
                 case "EXCEPTS" -> parseCharacterFlag(disable, value, 'e', parameters::setExcepts);
                 case "EXTBAN" -> parseExtendedBanModes(disable, value, parameters);
-                case "HOSTLEN" -> parseOptionalInteger(disable, value, parameters::setHostLength);
+                case "HOSTLEN" -> parseRequiredInteger(disable, value, parameters::setHostLength);
                 case "INVEX" -> parseCharacterFlag(disable, value, 'I', parameters::setInviteExceptions);
-                case "KICKLEN" -> parseOptionalInteger(disable, value, parameters::setKickLength);
+                case "KICKLEN" -> parseRequiredInteger(disable, value, parameters::setKickLength);
                 case "MAXLIST" -> parseMaxList(disable, value, parameters);
-                case "MAXTARGETS" -> parseOptionalInteger(disable, value, parameters::setMaxTargets);
-                case "MODES" -> parseOptionalInteger(disable, value, parameters::setModes);
+                case "MAXTARGETS" -> parseRequiredInteger(disable, value, parameters::setMaxTargets);
+                case "MODES" -> parseRequiredInteger(disable, value, parameters::setModes);
                 case "NETWORK" -> parseNetwork(disable, value, parameters);
-                case "NICKLEN" -> parseOptionalInteger(disable, value, parameters::setNickLength);
+                case "NICKLEN" -> parseRequiredInteger(disable, value, parameters::setNickLength);
                 case "PREFIX" -> parsePrefix(disable, value, parameters);
                 case "SAFELIST" -> parameters.setSafeList(!disable);
                 case "SILENCE" -> parseOptionalInteger(disable, value, parameters::setSilence);
                 case "STATUSMSG" -> parseStatusMessage(disable, value, parameters);
                 case "TARGMAX" -> parseTargMax(disable, value, parameters);
-                case "TOPICLEN" -> parseOptionalInteger(disable, value, parameters::setTopicLength);
-                case "USERLEN" -> parseOptionalInteger(disable, value, parameters::setUserLength);
+                case "TOPICLEN" -> parseRequiredInteger(disable, value, parameters::setTopicLength);
+                case "USERLEN" -> parseRequiredInteger(disable, value, parameters::setUserLength);
                 default -> LOG.fine(() -> "Ignored unknown server parameter " + finalParameter + "=" + value);
             }
         } catch (Exception e) {
@@ -90,8 +92,12 @@ public final class IRCServerParametersUnmarshaller {
         }
     }
 
-    private static void parseOptionalInteger(boolean disable, String value, java.util.function.IntConsumer setter) {
+    private static void parseRequiredInteger(boolean disable, String value, java.util.function.IntConsumer setter) {
         setter.accept(disable ? Integer.MAX_VALUE : Integer.parseInt(value));
+    }
+
+    private static void parseOptionalInteger(boolean disable, String value, Consumer<Integer> setter) {
+        setter.accept(disable || Objects.requireNonNullElse(value, "").isEmpty() ? null : Integer.parseInt(value));
     }
 
     private static void parseCaseMapping(boolean disable, String value, IRCServerParameters parameters) {

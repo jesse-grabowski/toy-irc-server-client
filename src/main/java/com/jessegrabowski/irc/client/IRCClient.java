@@ -50,7 +50,7 @@ public class IRCClient {
     static void main(String[] args) throws IOException {
         IRCClientProperties properties = parseArgs(args);
 
-        LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()));
+        LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()), false);
 
         TerminalUI terminalUI =
                 STTY.isAvailable() && !properties.isUseSimpleTerminal() ? new FancyTerminalUI() : new StdIOTerminalUI();

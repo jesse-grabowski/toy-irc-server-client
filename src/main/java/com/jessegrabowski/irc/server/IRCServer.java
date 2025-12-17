@@ -44,11 +44,11 @@ public class IRCServer {
     static void main(String[] args) throws IOException {
         IRCServerProperties properties = parseArgs(args);
 
-        LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()));
+        LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()), true);
 
-        IRCServerParameters parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
-
-        System.out.println("IRC Server starting...");
+        IRCServerEngine engine = new IRCServerEngine(properties);
+        IRCServerAcceptor acceptor = new IRCServerAcceptor(null, properties.getPort(), engine::accept);
+        acceptor.start();
     }
 
     private static IRCServerProperties parseArgs(String[] args) {
@@ -57,7 +57,7 @@ public class IRCServer {
                 .addUsageExample("java -cp [jarfile] com.jessegrabowski.irc.server.IRCServer [options] [args]")
                 .addIntegerFlag(
                         'p', "port", IRCServerProperties::setPort, "port of the IRC server (default 6667)", false)
-                .addInetAddressFlag(
+                .addStringFlag(
                         'H',
                         "host",
                         IRCServerProperties::setHost,

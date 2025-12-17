@@ -33,12 +33,11 @@ package com.jessegrabowski.irc.server;
 
 import com.jessegrabowski.irc.args.ArgsProperties;
 import com.jessegrabowski.irc.util.Resource;
-import java.net.InetAddress;
 import java.nio.file.Paths;
 import java.util.logging.Level;
 
 public class IRCServerProperties implements ArgsProperties {
-    private InetAddress host;
+    private String host;
     private int port = 6667;
     private String logFile = "irc-server.log";
     private String logLevel = Level.INFO.getName();
@@ -62,11 +61,11 @@ public class IRCServerProperties implements ArgsProperties {
         }
     }
 
-    public InetAddress getHost() {
+    public String getHost() {
         return host;
     }
 
-    public void setHost(InetAddress host) {
+    public void setHost(String host) {
         this.host = host;
     }
 
