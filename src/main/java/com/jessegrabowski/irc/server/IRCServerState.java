@@ -31,4 +31,104 @@
  */
 package com.jessegrabowski.irc.server;
 
-public class IRCServerState {}
+import com.jessegrabowski.irc.network.IRCConnection;
+import java.util.HashMap;
+import java.util.Map;
+
+public class IRCServerState {
+
+    private final Map<IRCConnection, Connection> connections = new HashMap<>();
+    private IRCServerParameters parameters;
+
+    public void addConnection(IRCConnection connection) {
+        connections.put(connection, new Connection(connection));
+    }
+
+    public void removeConnection(IRCConnection connection) {
+        connections.remove(connection);
+    }
+
+    public boolean isNicknameAvailable(String nickname) {
+        return connections.values().stream().noneMatch(c -> nickname.equals(c.getNickname()));
+    }
+
+    public void setConnectionNickname(IRCConnection connection, String nickname) {
+        connections.get(connection).setNickname(nickname);
+    }
+
+    public void setConnectionUser(IRCConnection connection, String user) {
+        connections.get(connection).setUser(user);
+    }
+
+    public void setConnectionRealName(IRCConnection connection, String realName) {
+        connections.get(connection).setRealName(realName);
+    }
+
+    public String getConnectionNickname(IRCConnection connection) {
+        return connections.get(connection).getNickname();
+    }
+
+    public void setConnectionPassword(IRCConnection connection, boolean password) {
+        connections.get(connection).setPassword(password);
+    }
+
+    public boolean isConnectionRegistered(IRCConnection connection, boolean expectsPassword) {
+        Connection c = connections.get(connection);
+        return c.getNickname() != null
+                && c.getUser() != null
+                && c.getRealName() != null
+                && (!expectsPassword || c.isPassword());
+    }
+
+    public IRCServerParameters getParameters() {
+        return parameters;
+    }
+
+    public void setParameters(IRCServerParameters parameters) {
+        this.parameters = parameters;
+    }
+
+    private static final class Connection {
+        private final IRCConnection connection;
+        private String nickname;
+        private boolean password;
+        private String user;
+        private String realName;
+
+        private Connection(IRCConnection connection) {
+            this.connection = connection;
+        }
+
+        private String getNickname() {
+            return nickname;
+        }
+
+        private void setNickname(String nickname) {
+            this.nickname = nickname;
+        }
+
+        private boolean isPassword() {
+            return password;
+        }
+
+        private void setPassword(boolean password) {
+            this.password = password;
+        }
+
+        private String getUser() {
+            return user;
+        }
+
+        private void setUser(String user) {
+            this.user = user;
+        }
+
+        private String getRealName() {
+            return realName;
+        }
+
+        private void setRealName(String realName) {
+            this.realName = realName;
+        }
+    }
+}

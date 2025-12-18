@@ -39,6 +39,7 @@ import java.util.logging.Level;
 public class IRCServerProperties implements ArgsProperties {
     private String host;
     private int port = 6667;
+    private String password;
     private String logFile = "irc-server.log";
     private String logLevel = Level.INFO.getName();
     private Resource isupportProperties = Resource.of("classpath:/isupport.properties");
@@ -75,6 +76,14 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setPort(int port) {
         this.port = port;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public String getLogFile() {

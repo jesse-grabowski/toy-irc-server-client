@@ -180,8 +180,13 @@ public final class IRCConnection implements Closeable {
             StringBuilder lineBuilder = new StringBuilder(MAX_LINE_LENGTH);
             while (state.get() != ConnectionState.CLOSED && readLine(bufferedReader, lineBuilder)) {
                 line = lineBuilder.toString();
-                LOG.log(Level.FINE, "Received IRC line: {0}", line);
                 lineBuilder.setLength(0);
+                if (state.get() == ConnectionState.CLOSING) {
+                    LOG.log(Level.FINE, "Received IRC line in closing: {0}", line);
+                    continue;
+                } else {
+                    LOG.log(Level.FINE, "Received IRC line: {0}", line);
+                }
 
                 for (Consumer<String> handler : ingressHandlers) {
                     try {
@@ -199,7 +204,7 @@ public final class IRCConnection implements Closeable {
         } catch (SocketTimeoutException e) {
             LOG.log(Level.WARNING, "read timeout", e);
         } catch (IOException e) {
-            if (state.get() != ConnectionState.CLOSED) {
+            if (state.get() != ConnectionState.CLOSED && state.get() != ConnectionState.CLOSING) {
                 LOG.log(Level.WARNING, "ingress socket exception", e);
             }
         } finally {
@@ -263,7 +268,7 @@ public final class IRCConnection implements Closeable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (IOException e) {
-            if (state.get() != ConnectionState.CLOSED) {
+            if (state.get() != ConnectionState.CLOSED && state.get() != ConnectionState.CLOSING) {
                 LOG.log(Level.WARNING, "egress socket exception", e);
             }
         } finally {
@@ -304,17 +309,6 @@ public final class IRCConnection implements Closeable {
         // force egress to wake up if it's stuck polling
         egressQueue.offer(WAKE_UP);
 
-        // interrupt the ingress half
-        Thread current = Thread.currentThread();
-        try {
-            socket.shutdownInput();
-        } catch (IOException e) {
-            LOG.log(Level.WARNING, "failed to shutdown socket input", e);
-        }
-        if (ingressThread != current) {
-            ingressThread.interrupt();
-        }
-
         FINALIZER_THREAD_FACTORY
                 .newThread(() -> {
                     try {
@@ -345,7 +339,11 @@ public final class IRCConnection implements Closeable {
             LOG.log(Level.WARNING, "Error closing socket", e);
         }
 
-        if (egressThread.isAlive()) {
+        Thread current = Thread.currentThread();
+        if (ingressThread != current && ingressThread.isAlive()) {
+            ingressThread.interrupt();
+        }
+        if (egressThread != current && egressThread.isAlive()) {
             egressThread.interrupt();
         }
 

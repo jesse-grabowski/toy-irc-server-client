@@ -75,6 +75,7 @@ public class IRCServer {
                         IRCServerProperties::setLogLevel,
                         "log level, integer or j.u.l.Level well-known name",
                         false)
+                .addStringFlag('P', "password", IRCServerProperties::setPassword, "password for the IRC server", false)
                 .addResourceFlag(
                         'I',
                         "isupport-properties",

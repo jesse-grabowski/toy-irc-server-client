@@ -29,43 +29,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.util;
+package com.jessegrabowski.irc.protocol;
 
-public final class StateGuard<T> {
+import com.jessegrabowski.irc.protocol.model.IRCMessage;
+import java.util.SequencedMap;
 
-    private volatile Thread thread;
-
-    private T state;
-
-    public StateGuard(T state) {
-        this.state = state;
-    }
-
-    public StateGuard() {
-        this(null);
-    }
-
-    public T getState() {
-        assertBoundThread();
-        return state;
-    }
-
-    public void setState(T state) {
-        assertBoundThread();
-        this.state = state;
-    }
-
-    public void bindToCurrentThread() {
-        if (this.thread != null && this.thread != Thread.currentThread()) {
-            throw new IllegalStateException("state has already been bound to a different thread");
-        }
-        this.thread = Thread.currentThread();
-    }
-
-    private void assertBoundThread() {
-        if (thread != Thread.currentThread()) {
-            throw new IllegalStateException(
-                    "state accessed from %s (expected %s)".formatted(Thread.currentThread(), thread));
-        }
-    }
+@FunctionalInterface
+public interface IRCMessageFactory2<T extends IRCMessage, A, B> {
+    T create(
+            String rawMessage,
+            SequencedMap<String, String> tags,
+            String prefixName,
+            String prefixUser,
+            String prefixHost,
+            A arg0,
+            B arg1);
 }

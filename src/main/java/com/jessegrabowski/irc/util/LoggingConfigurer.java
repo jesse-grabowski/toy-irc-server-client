@@ -32,6 +32,8 @@
 package com.jessegrabowski.irc.util;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -88,9 +90,19 @@ public final class LoggingConfigurer {
                 logger = "unknown";
             }
 
-            String msg = formatMessage(record).replace("\n", "\\n").replace("\r", "\\r");
+            String msg = formatMessage(record);
 
-            return String.format("%s %s [%s] %s - %s%n", timestamp, level, thread, logger, msg);
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("%s %s [%s] %s - %s", timestamp, level, thread, logger, escape(msg)));
+
+            Throwable thrown = record.getThrown();
+            if (thrown != null) {
+                sb.append(" | exception=");
+                sb.append(escape(formatThrowable(thrown)));
+            }
+
+            sb.append('\n');
+            return sb.toString();
         }
 
         private String padLevel(String level) {
@@ -98,6 +110,18 @@ public final class LoggingConfigurer {
                 return level;
             }
             return String.format("%-5s", level);
+        }
+
+        private String escape(String s) {
+            return s.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r");
+        }
+
+        private String formatThrowable(Throwable thrown) {
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            thrown.printStackTrace(pw);
+            pw.flush();
+            return sw.toString();
         }
     }
 }
