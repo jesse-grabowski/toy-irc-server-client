@@ -41,34 +41,48 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class IRCConnection implements Closeable {
+public final class IRCConnection implements Closeable {
 
     private static final Logger LOG = Logger.getLogger(IRCConnection.class.getName());
+
+    // token to force our egress thread to wake up during shutdown if we call close() without
+    // any messages enqueued. Value doesn't really matter as long as it's invalid by IRC.
+    private static final String WAKE_UP = "\u0000grababrushandputalittlemakeup\u0000";
+
+    // arbitrary cap on line length; this is a safeguard against malicious clients sending us
+    // a single line that's too long to parse.
+    private static final int MAX_LINE_LENGTH = 10000;
 
     private static final ThreadFactory INGRESS_THREAD_FACTORY =
             Thread.ofVirtual().name("irc-ingress-", 0).factory();
     private static final ThreadFactory EGRESS_THREAD_FACTORY =
             Thread.ofVirtual().name("irc-egress-", 0).factory();
+    private static final ThreadFactory FINALIZER_THREAD_FACTORY =
+            Thread.ofVirtual().name("irc-finalizer-", 0).factory();
 
-    // we'll use an arbitrarily high value of 100 here; in practice we really won't have more than ~10
-    // messages in this queue at any given time
-    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(100);
+    // arbitrary cap of 20; in practice this should almost always be empty unless there's
+    // an issue with the connection
+    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(20);
 
     private final List<Consumer<String>> ingressHandlers = new CopyOnWriteArrayList<>();
     private final List<Runnable> shutdownHandlers = new CopyOnWriteArrayList<>();
 
     private final AtomicReference<ConnectionState> state = new AtomicReference<>(ConnectionState.NEW);
+    private final CompletableFuture<Void> closeFuture = new CompletableFuture<>();
 
     private final Socket socket;
     private final Charset charset;
@@ -132,6 +146,7 @@ public class IRCConnection implements Closeable {
         if (state.get() != ConnectionState.ACTIVE) {
             return false;
         }
+
         return egressQueue.offer(Objects.requireNonNull(line));
     }
 
@@ -162,15 +177,20 @@ public class IRCConnection implements Closeable {
     private void doIngress() {
         try {
             String line;
-            while (state.get() != ConnectionState.CLOSED && (line = bufferedReader.readLine()) != null) {
+            StringBuilder lineBuilder = new StringBuilder(MAX_LINE_LENGTH);
+            while (state.get() != ConnectionState.CLOSED && readLine(bufferedReader, lineBuilder)) {
+                line = lineBuilder.toString();
                 LOG.log(Level.FINE, "Received IRC line: {0}", line);
+                lineBuilder.setLength(0);
+
                 for (Consumer<String> handler : ingressHandlers) {
                     try {
                         handler.accept(line);
                     } catch (Exception e) {
-                        // we control all the handler implementations, and they should be incapable of throwing
-                        // under normal operation, so we consider any error here to be fatal and kill the
-                        // connection
+                        // We don't have a meaningful way to deal with handler failures safely here
+                        // so we kill the connection and let the higher-level application decide what
+                        // to do (i.e., client prompts for reconnection, server just drops the client)
+                        // via a registered shutdownHandler
                         LOG.log(Level.SEVERE, "Error in IRC line consumer", e);
                         return;
                     }
@@ -183,18 +203,55 @@ public class IRCConnection implements Closeable {
                 LOG.log(Level.WARNING, "ingress socket exception", e);
             }
         } finally {
-            close();
+            closeDeferred();
         }
+    }
+
+    // We can't use reader.readLine() or we'll risk a malicious infinite length line running us out
+    // of memory. Instead we read character by character, considering \r\n as the only line delimiter
+    // and retaining solo \r and \n characters. If the line length limit is exceeded, we silently
+    // truncate the message and let the unmarshaller flag the error.
+    private boolean readLine(BufferedReader reader, StringBuilder lineBuilder) throws IOException {
+        int next;
+        boolean cr = false;
+        while (state.get() != ConnectionState.CLOSED && (next = reader.read()) != -1) {
+            char nextChar = (char) next;
+            if (cr && nextChar == '\r') {
+                lineBuilder.append('\r');
+                continue;
+            } else if (nextChar == '\r') {
+                cr = true;
+                continue;
+            } else if (nextChar == '\n' && cr) {
+                return true;
+            }
+            if (cr && lineBuilder.length() < MAX_LINE_LENGTH) {
+                lineBuilder.append('\r');
+            }
+            cr = false;
+            if (lineBuilder.length() < MAX_LINE_LENGTH) {
+                lineBuilder.append(nextChar);
+            }
+        }
+        if (cr) {
+            lineBuilder.append('\r');
+        }
+        if (!lineBuilder.isEmpty()) {
+            LOG.log(Level.FINE, "IRCConnection ingress closed with partial line: {0}", lineBuilder);
+        }
+        return false;
     }
 
     private void doEgress() {
         try {
             while (state.get() != ConnectionState.CLOSED
                     && !Thread.currentThread().isInterrupted()) {
-                String line = egressQueue.take();
-
-                if (state.get() == ConnectionState.CLOSED) {
+                if (state.get() == ConnectionState.CLOSING && egressQueue.isEmpty()) {
                     break;
+                }
+                String line = egressQueue.poll(250, TimeUnit.MILLISECONDS);
+                if (line == null || WAKE_UP.equals(line)) {
+                    continue;
                 }
 
                 bufferedWriter.write(line);
@@ -210,15 +267,74 @@ public class IRCConnection implements Closeable {
                 LOG.log(Level.WARNING, "egress socket exception", e);
             }
         } finally {
-            close();
+            closeDeferred();
         }
     }
 
+    /**
+     * Close the connection. The connection makes a best-effort attempt to drain the egress queue
+     * before closing - this method will wait until that completes. See {@link #closeDeferred()} for
+     * a non-blocking alternative.
+     */
     @Override
     public void close() {
-        ConnectionState oldState = state.getAndSet(ConnectionState.CLOSED);
-        if (oldState == ConnectionState.CLOSED) {
-            return;
+        try {
+            closeDeferred().get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Error closing IRC connection", e);
+        }
+    }
+
+    /**
+     * Close the connection asynchronously.
+     *
+     * @return a {@code java.util.concurrent.CompletableFuture} that will complete when the connection is fully closed.
+     */
+    public CompletableFuture<Void> closeDeferred() {
+        ConnectionState oldState = state.getAndUpdate(s -> switch (s) {
+            case CLOSED, CLOSING -> s;
+            default -> ConnectionState.CLOSING;
+        });
+        if (oldState == ConnectionState.CLOSED || oldState == ConnectionState.CLOSING) {
+            return closeFuture;
+        }
+
+        // force egress to wake up if it's stuck polling
+        egressQueue.offer(WAKE_UP);
+
+        // interrupt the ingress half
+        Thread current = Thread.currentThread();
+        try {
+            socket.shutdownInput();
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "failed to shutdown socket input", e);
+        }
+        if (ingressThread != current) {
+            ingressThread.interrupt();
+        }
+
+        FINALIZER_THREAD_FACTORY
+                .newThread(() -> {
+                    try {
+                        finalizeClose();
+                        closeFuture.complete(null);
+                    } catch (Throwable t) {
+                        closeFuture.completeExceptionally(t);
+                    }
+                })
+                .start();
+        return closeFuture;
+    }
+
+    // wait asynchronously up to 30 seconds for the egress queue
+    // to drain, then interrupt the thread and finish closing
+    private void finalizeClose() {
+        try {
+            egressThread.join(Duration.ofSeconds(30));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         try {
@@ -226,16 +342,14 @@ public class IRCConnection implements Closeable {
                 socket.close();
             }
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "failed to close socket", e);
+            LOG.log(Level.WARNING, "Error closing socket", e);
         }
 
-        Thread current = Thread.currentThread();
-        if (ingressThread != current) {
-            ingressThread.interrupt();
-        }
-        if (egressThread != current) {
+        if (egressThread.isAlive()) {
             egressThread.interrupt();
         }
+
+        state.set(ConnectionState.CLOSED);
 
         for (Runnable handler : shutdownHandlers) {
             try {
@@ -250,6 +364,7 @@ public class IRCConnection implements Closeable {
         NEW,
         INITIALIZING,
         ACTIVE,
+        CLOSING,
         CLOSED
     }
 }
