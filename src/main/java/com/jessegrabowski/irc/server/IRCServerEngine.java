@@ -32,27 +32,41 @@
 package com.jessegrabowski.irc.server;
 
 import com.jessegrabowski.irc.network.IRCConnection;
+import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
+import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
+import com.jessegrabowski.irc.protocol.IRCMessageFactory6;
 import com.jessegrabowski.irc.protocol.IRCMessageMarshaller;
 import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
 import com.jessegrabowski.irc.protocol.model.*;
+import com.jessegrabowski.irc.server.state.InvalidPasswordException;
+import com.jessegrabowski.irc.server.state.ServerState;
+import com.jessegrabowski.irc.server.state.StateInvariantException;
+import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.StateGuard;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Objects;
+import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Gatherers;
 
 public class IRCServerEngine implements Closeable {
+
+    private static final Instant START_TIME = Instant.now();
 
     private static final Logger LOG = Logger.getLogger(IRCServerEngine.class.getName());
 
@@ -62,7 +76,7 @@ public class IRCServerEngine implements Closeable {
     private final AtomicReference<IRCServerEngineState> engineState =
             new AtomicReference<>(IRCServerEngineState.ACTIVE);
 
-    private final StateGuard<IRCServerState> serverStateGuard;
+    private final StateGuard<ServerState> serverStateGuard;
     private final ScheduledExecutorService executor;
     private final IRCServerProperties properties;
 
@@ -72,7 +86,7 @@ public class IRCServerEngine implements Closeable {
 
         IRCServerParameters parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
 
-        IRCServerState state = new IRCServerState();
+        ServerState state = new ServerState(properties);
         state.setParameters(parameters);
 
         this.serverStateGuard = new StateGuard<>(state);
@@ -106,13 +120,14 @@ public class IRCServerEngine implements Closeable {
             connection.addIngressHandler(line -> executor.execute(() -> handle(connection, line)));
             connection.addShutdownHandler(() -> executor.execute(() -> handleDisconnect(connection)));
 
-            IRCServerState state = serverStateGuard.getState();
-            state.addConnection(connection);
+            ServerState state = serverStateGuard.getState();
+            state.connect(connection);
 
             try {
                 connection.start();
             } catch (IOException e) {
                 LOG.log(Level.WARNING, "Error starting connection", e);
+                connection.close();
             }
         }));
     }
@@ -153,6 +168,50 @@ public class IRCServerEngine implements Closeable {
         connection.offer(MARSHALLER.marshal(message));
     }
 
+    private <T extends IRCMessage, A, B, C> void send(
+            IRCConnection connection,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            IRCMessageFactory3<T, A, B, C> factory) {
+        T message = factory.create(
+                null,
+                makeTags(connection, initiator),
+                makePrefixName(connection, initiator),
+                makePrefixUser(connection, initiator),
+                makePrefixHost(connection, initiator),
+                arg0,
+                arg1,
+                arg2);
+        connection.offer(MARSHALLER.marshal(message));
+    }
+
+    private <T extends IRCMessage, A, B, C, D, E, F> void send(
+            IRCConnection connection,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            E arg4,
+            F arg5,
+            IRCMessageFactory6<T, A, B, C, D, E, F> factory) {
+        T message = factory.create(
+                null,
+                makeTags(connection, initiator),
+                makePrefixName(connection, initiator),
+                makePrefixUser(connection, initiator),
+                makePrefixHost(connection, initiator),
+                arg0,
+                arg1,
+                arg2,
+                arg3,
+                arg4,
+                arg5);
+        connection.offer(MARSHALLER.marshal(message));
+    }
+
     private SequencedMap<String, String> makeTags(IRCConnection connection, IRCMessage initiator) {
         return new LinkedHashMap<>();
     }
@@ -170,114 +229,190 @@ public class IRCServerEngine implements Closeable {
     }
 
     private void handleDisconnect(IRCConnection connection) {
-        IRCServerState state = serverStateGuard.getState();
-        state.removeConnection(connection);
+        ServerState state = serverStateGuard.getState();
+        state.disconnect(connection);
     }
 
     private void handle(IRCConnection client, String line) {
-        IRCServerState state = serverStateGuard.getState();
+        ServerState state = serverStateGuard.getState();
         IRCMessage message = UNMARSHALLER.unmarshal(state.getParameters(), StandardCharsets.UTF_8, line);
         handle(client, message);
     }
 
-    private void handle(IRCConnection client, IRCMessage message) {
-        switch (message) {
-            case IRCMessageAWAY m -> {}
-            case IRCMessageCAPEND m -> {}
-            case IRCMessageCAPLISTRequest m -> {}
-            case IRCMessageCAPLSRequest m -> {}
-            case IRCMessageCAPREQ m -> {}
-            case IRCMessageJOIN0 m -> {}
-            case IRCMessageJOINNormal m -> {}
-            case IRCMessageKICK m -> {}
-            case IRCMessageKILL m -> {}
-            case IRCMessageMODE m -> {}
-            case IRCMessageNAMES m -> {}
-            case IRCMessageNICK m -> handle(client, m);
-            case IRCMessageNOTICE m -> {}
-            case IRCMessageOPER m -> {}
-            case IRCMessagePART m -> {}
-            case IRCMessagePASS m -> handle(client, m);
-            case IRCMessagePONG m -> {}
-            case IRCMessagePRIVMSG m -> {}
-            case IRCMessageQUIT m -> {}
-            case IRCMessageTOPIC m -> {}
-            case IRCMessageUSER m -> handle(client, m);
-            default -> {
-                send(client, message, "NOT IMPLEMENTED", IRCMessageERROR::new);
+    private void handle(IRCConnection connection, IRCMessage message) {
+        try {
+            switch (message) {
+                case IRCMessageAWAY m -> {}
+                case IRCMessageCAPEND m -> handle(connection, m);
+                case IRCMessageCAPLISTRequest m -> {}
+                case IRCMessageCAPLSRequest m -> handle(connection, m);
+                case IRCMessageCAPREQ m -> handle(connection, m);
+                case IRCMessageJOIN0 m -> {}
+                case IRCMessageJOINNormal m -> {}
+                case IRCMessageKICK m -> {}
+                case IRCMessageKILL m -> {}
+                case IRCMessageMODE m -> {}
+                case IRCMessageNAMES m -> {}
+                case IRCMessageNICK m -> handle(connection, m);
+                case IRCMessageNOTICE m -> {}
+                case IRCMessageOPER m -> {}
+                case IRCMessagePART m -> {}
+                case IRCMessagePASS m -> handle(connection, m);
+                case IRCMessagePONG m -> {}
+                case IRCMessagePRIVMSG m -> {}
+                case IRCMessageQUIT m -> {}
+                case IRCMessageTOPIC m -> {}
+                case IRCMessageUSER m -> handle(connection, m);
+                default -> {
+                    send(connection, message, "NOT IMPLEMENTED", IRCMessageERROR::new);
+                }
             }
+        } catch (InvalidPasswordException e) {
+            send(connection, message, "*", IRCMessage464::new);
+            send(connection, message, "Invalid password", IRCMessageERROR::new);
+            connection.closeDeferred();
+        } catch (StateInvariantException e) {
+            send(connection, message, e.getFactory());
         }
     }
 
-    private void handle(IRCConnection client, IRCMessageNICK message) {
-        IRCServerState state = serverStateGuard.getState();
-        String nickname = message.getNick();
-        if (nickname.charAt(0) == ':'
-                || nickname.contains(" ")
-                || state.getParameters().getChannelTypes().stream().anyMatch(c -> nickname.charAt(0) == c)) {
-            send(client, message, "*", nickname, IRCMessage432::new);
-        } else if (!state.isNicknameAvailable(nickname)) {
-            send(client, message, "*", nickname, IRCMessage433::new);
-        } else {
-            send(client, message, nickname, IRCMessageNICK::new);
-            boolean registered = state.isConnectionRegistered(client, properties.getPassword() != null);
-            state.setConnectionNickname(client, nickname);
-            if (!registered && state.isConnectionRegistered(client, properties.getPassword() != null)) {
-                sendWelcome(client, message);
-            }
+    private void handle(IRCConnection connection, IRCMessageCAPEND message) {
+        ServerState state = serverStateGuard.getState();
+        state.endCapabilityNegotiation(connection);
+        if (state.tryFinishRegistration(connection)) {
+            sendWelcome(connection, message);
         }
     }
 
-    private void handle(IRCConnection client, IRCMessagePASS message) {
-        IRCServerState state = serverStateGuard.getState();
-        if (!Objects.equals(message.getPass(), properties.getPassword())) {
-            send(client, null, "Incorrect password", IRCMessage464::new);
-            send(client, null, "Incorrect password", IRCMessageERROR::new);
-            client.closeDeferred();
-        } else if (state.isConnectionRegistered(client, properties.getPassword() != null)) {
-            send(client, null, state.getConnectionNickname(client), IRCMessage462::new);
-        } else {
-            state.setConnectionPassword(client, true);
-            if (state.isConnectionRegistered(client, properties.getPassword() != null)) {
-                sendWelcome(client, message);
-            }
+    private void handle(IRCConnection connection, IRCMessageCAPLSRequest message) {
+        ServerState state = serverStateGuard.getState();
+        if (!state.isRegistered(connection)) {
+            state.startCapabilityNegotiation(connection);
+        }
+        LinkedHashMap<String, String> capabilities = new LinkedHashMap<>();
+        for (IRCCapability capability : IRCCapability.values()) {
+            capabilities.put(capability.getCapabilityName(), null);
+        }
+        send(connection, message, state.getNickname(connection), false, capabilities, IRCMessageCAPLSResponse::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessageCAPREQ message) {
+        ServerState state = serverStateGuard.getState();
+        List<IRCCapability> knownEnableCapabilities = new ArrayList<>();
+        List<IRCCapability> knownDisableCapabilities = new ArrayList<>();
+        List<String> unknownEnableCapabilities = new ArrayList<>();
+        List<String> unknownDisableCapabilities = new ArrayList<>();
+        for (String capability : message.getEnableCapabilities()) {
+            IRCCapability.forName(capability)
+                    .ifPresentOrElse(knownEnableCapabilities::add, () -> unknownEnableCapabilities.add(capability));
+        }
+        for (String capability : message.getDisableCapabilities()) {
+            IRCCapability.forName(capability)
+                    .ifPresentOrElse(knownDisableCapabilities::add, () -> unknownDisableCapabilities.add(capability));
+        }
+        knownEnableCapabilities.forEach(cap -> state.addCapability(connection, cap));
+        knownDisableCapabilities.forEach(cap -> state.removeCapability(connection, cap));
+        if (!knownEnableCapabilities.isEmpty() || !knownDisableCapabilities.isEmpty()) {
+            send(
+                    connection,
+                    message,
+                    state.getNickname(connection),
+                    knownEnableCapabilities.stream()
+                            .map(IRCCapability::getCapabilityName)
+                            .toList(),
+                    knownDisableCapabilities.stream()
+                            .map(IRCCapability::getCapabilityName)
+                            .toList(),
+                    IRCMessageCAPACK::new);
+        }
+        if (!unknownEnableCapabilities.isEmpty() || !unknownDisableCapabilities.isEmpty()) {
+            send(
+                    connection,
+                    message,
+                    state.getNickname(connection),
+                    unknownEnableCapabilities,
+                    unknownDisableCapabilities,
+                    IRCMessageCAPNAK::new);
         }
     }
 
-    private void handle(IRCConnection client, IRCMessageUSER message) {
-        IRCServerState state = serverStateGuard.getState();
-        String truncatedUser = message.getUser()
-                .substring(
-                        0,
-                        Math.min(
-                                message.getUser().length(),
-                                state.getParameters().getUserLength()));
-        if (state.isConnectionRegistered(client, properties.getPassword() != null)) {
-            send(client, null, state.getConnectionNickname(client), IRCMessage462::new);
-        } else {
-            state.setConnectionUser(client, truncatedUser);
-            state.setConnectionRealName(client, message.getRealName());
-            if (state.isConnectionRegistered(client, properties.getPassword() != null)) {
-                sendWelcome(client, message);
-            }
+    private void handle(IRCConnection connection, IRCMessageNICK message)
+            throws StateInvariantException, InvalidPasswordException {
+        ServerState state = serverStateGuard.getState();
+        Pair<String, String> result = state.setNickname(connection, message.getNick());
+        send(connection, message, result.right(), IRCMessageNICK::new);
+        if (state.tryFinishRegistration(connection)) {
+            sendWelcome(connection, message);
         }
     }
 
-    private void sendWelcome(IRCConnection client, IRCMessage initiator) {
-        IRCServerState state = serverStateGuard.getState();
-        send(client, null, state.getConnectionNickname(client), "Welcome to RitsIRC", IRCMessage001::new);
+    private void handle(IRCConnection connection, IRCMessagePASS message)
+            throws StateInvariantException, InvalidPasswordException {
+        ServerState state = serverStateGuard.getState();
+        state.checkPassword(connection, message.getPass());
+    }
+
+    private void handle(IRCConnection connection, IRCMessageUSER message)
+            throws StateInvariantException, InvalidPasswordException {
+        ServerState state = serverStateGuard.getState();
+        state.setUserInfo(connection, message.getUser(), message.getRealName());
+        if (state.tryFinishRegistration(connection)) {
+            sendWelcome(connection, message);
+        }
+    }
+
+    private void sendWelcome(IRCConnection connection, IRCMessage initiator) {
+        ServerState state = serverStateGuard.getState();
+        IRCServerParameters parameters = state.getParameters();
         send(
-                client,
-                null,
-                state.getConnectionNickname(client),
-                "Your host is RitsIRC, running version 1.0,0",
+                connection,
+                initiator,
+                state.getNickname(connection),
+                "Welcome to the %s Network, %s".formatted(parameters.getNetwork(), state.getNickname(connection)),
+                IRCMessage001::new);
+        send(
+                connection,
+                initiator,
+                state.getNickname(connection),
+                "Your host is RitsIRC, running version 1.0.0",
                 IRCMessage002::new);
         send(
-                client,
-                null,
-                state.getConnectionNickname(client),
-                "This server was created Wed Jan 01 00:00:00 1970",
+                connection,
+                initiator,
+                state.getNickname(connection),
+                "This server was created %s".formatted(DateTimeFormatter.ISO_INSTANT.format(START_TIME)),
                 IRCMessage003::new);
+        String availableUserModes = "io";
+        String availableChannelModes = "biklmnoprst";
+        send(
+                connection,
+                initiator,
+                state.getNickname(connection),
+                "RitsIRC",
+                "1.0.0",
+                availableUserModes,
+                availableChannelModes,
+                null,
+                IRCMessage004::new);
+        send005(connection, initiator);
+    }
+
+    private void send005(IRCConnection connection, IRCMessage initiator) {
+        ServerState state = serverStateGuard.getState();
+        var chunkedEntries = IRCServerParametersMarshaller.marshal(state.getParameters()).sequencedEntrySet().stream()
+                .gather(Gatherers.windowFixed(13))
+                .toList();
+        for (List<Map.Entry<String, String>> chunk : chunkedEntries) {
+            SequencedMap<String, String> map =
+                    chunk.stream().collect(LinkedHashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), Map::putAll);
+            send(
+                    connection,
+                    initiator,
+                    state.getNickname(connection),
+                    map,
+                    "are supported by this server",
+                    IRCMessage005::new);
+        }
     }
 
     @Override

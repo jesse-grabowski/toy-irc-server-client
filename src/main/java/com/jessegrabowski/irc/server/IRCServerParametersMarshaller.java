@@ -40,9 +40,9 @@ import java.util.SequencedMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class IRCServerParametersMarshaller {
+public final class IRCServerParametersMarshaller {
 
-    public SequencedMap<String, String> marshal(IRCServerParameters parameters) {
+    public static SequencedMap<String, String> marshal(IRCServerParameters parameters) {
         SequencedMap<String, String> map = new LinkedHashMap<>();
         map.put("AWAYLEN", Integer.toString(parameters.getAwayLength()));
         map.put("CASEMAPPING", parameters.getCaseMapping().getCasemapping());
@@ -80,7 +80,7 @@ public class IRCServerParametersMarshaller {
         return map;
     }
 
-    private String marshalChanlimit(Map<Character, Integer> limits) {
+    private static String marshalChanlimit(Map<Character, Integer> limits) {
         Map<Integer, String> results = new HashMap<>();
         for (Map.Entry<Character, Integer> entry : limits.entrySet()) {
             results.compute(entry.getValue(), (k, v) -> (v == null ? "" : v) + entry.getKey());
@@ -90,7 +90,7 @@ public class IRCServerParametersMarshaller {
                 .collect(Collectors.joining(","));
     }
 
-    private <T> String join(String delimiter, Collection<T> collection) {
+    private static <T> String join(String delimiter, Collection<T> collection) {
         StringBuilder sb = new StringBuilder();
         boolean first = true;
         for (Object o : collection) {
@@ -103,7 +103,7 @@ public class IRCServerParametersMarshaller {
         return sb.toString();
     }
 
-    private String marshalPrefix(Map<Character, Character> prefixes) {
+    private static String marshalPrefix(Map<Character, Character> prefixes) {
         StringBuilder m = new StringBuilder().append('(');
         StringBuilder p = new StringBuilder();
         for (Map.Entry<Character, Character> entry : prefixes.entrySet()) {
@@ -113,13 +113,13 @@ public class IRCServerParametersMarshaller {
         return m.append(')').append(p).toString();
     }
 
-    private String marshalTargmax(Map<String, Integer> limits) {
+    private static String marshalTargmax(Map<String, Integer> limits) {
         return limits.entrySet().stream()
                 .map(e -> e.getKey() + ":" + e.getValue())
                 .collect(Collectors.joining(","));
     }
 
-    private <T> String marshalNonNull(T value, Function<T, String> marshaller) {
+    private static <T> String marshalNonNull(T value, Function<T, String> marshaller) {
         return value == null ? null : marshaller.apply(value);
     }
 }

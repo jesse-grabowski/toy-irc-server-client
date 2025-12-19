@@ -35,6 +35,8 @@ import static java.util.function.Predicate.not;
 
 import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.IRCServerParameters;
+import com.jessegrabowski.irc.util.Pair;
+import com.jessegrabowski.irc.util.ThrowingFunction;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -1637,11 +1639,4 @@ public class IRCMessageUnmarshaller {
             }
         }
     }
-
-    @FunctionalInterface
-    interface ThrowingFunction<I, O> {
-        O apply(I input) throws Exception;
-    }
-
-    record Pair<L, R>(L left, R right) {}
 }
