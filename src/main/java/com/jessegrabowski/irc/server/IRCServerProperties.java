@@ -43,6 +43,8 @@ public class IRCServerProperties implements ArgsProperties {
     private String logFile = "irc-server.log";
     private String logLevel = Level.INFO.getName();
     private Resource isupportProperties = Resource.of("classpath:/isupport.properties");
+    private int pingFrequencyMilliseconds = 60000;
+    private int maxIdleMilliseconds = 300000;
 
     @Override
     public void validate() {
@@ -108,5 +110,21 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setIsupportProperties(Resource isupportProperties) {
         this.isupportProperties = isupportProperties;
+    }
+
+    public int getPingFrequencyMilliseconds() {
+        return pingFrequencyMilliseconds;
+    }
+
+    public void setPingFrequencyMilliseconds(int pingFrequencyMilliseconds) {
+        this.pingFrequencyMilliseconds = pingFrequencyMilliseconds;
+    }
+
+    public int getMaxIdleMilliseconds() {
+        return maxIdleMilliseconds;
+    }
+
+    public void setMaxIdleMilliseconds(int maxIdleMilliseconds) {
+        this.maxIdleMilliseconds = maxIdleMilliseconds;
     }
 }

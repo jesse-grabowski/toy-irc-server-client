@@ -44,6 +44,8 @@ public final class ServerUser {
     private final Set<Character> flags = new HashSet<>();
 
     private ServerConnectionState state = ServerConnectionState.NEW;
+    private long lastPinged = System.currentTimeMillis();
+    private long lastPonged = System.currentTimeMillis();
     private boolean passwordEntered;
     private boolean negotiatingCapabilities;
     private String nickname;
@@ -58,6 +60,22 @@ public final class ServerUser {
 
     public void setState(ServerConnectionState state) {
         this.state = state;
+    }
+
+    public long getLastPinged() {
+        return lastPinged;
+    }
+
+    public void setLastPinged(long lastPinged) {
+        this.lastPinged = lastPinged;
+    }
+
+    public long getLastPonged() {
+        return lastPonged;
+    }
+
+    public void setLastPonged(long lastPonged) {
+        this.lastPonged = lastPonged;
     }
 
     public boolean isPasswordEntered() {

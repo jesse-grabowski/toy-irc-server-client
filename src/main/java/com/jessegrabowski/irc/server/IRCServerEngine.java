@@ -57,8 +57,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -110,7 +112,11 @@ public class IRCServerEngine implements Closeable {
                         new Object[] {task, exec}));
         // bind the state guard to the current (executor) thread
         // any access from other threads will raise an exception
-        executor.execute(spy(serverStateGuard::bindToCurrentThread));
+        executor.execute(spy(() -> {
+            serverStateGuard.bindToCurrentThread();
+            executor.scheduleAtFixedRate(
+                    this::ping, 0, properties.getPingFrequencyMilliseconds(), TimeUnit.MILLISECONDS);
+        }));
         this.executor = executor;
     }
 
@@ -258,7 +264,8 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageOPER m -> {}
                 case IRCMessagePART m -> {}
                 case IRCMessagePASS m -> handle(connection, m);
-                case IRCMessagePONG m -> {}
+                case IRCMessagePING m -> handle(connection, m);
+                case IRCMessagePONG m -> handle(connection, m);
                 case IRCMessagePRIVMSG m -> {}
                 case IRCMessageQUIT m -> {}
                 case IRCMessageTOPIC m -> {}
@@ -352,6 +359,23 @@ public class IRCServerEngine implements Closeable {
         state.checkPassword(connection, message.getPass());
     }
 
+    private void handle(IRCConnection connection, IRCMessagePING message) {
+        send(connection, message, (String) null, message.getToken(), IRCMessagePONG::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessagePONG message) {
+        ServerState state = serverStateGuard.getState();
+        try {
+            long token = Long.parseLong(message.getToken());
+            long lastPing = state.getLastPing(connection);
+            if (token <= lastPing) {
+                state.setLastPong(connection, token);
+            }
+        } catch (NumberFormatException e) {
+            LOG.log(Level.FINE, "Invalid PONG token", e);
+        }
+    }
+
     private void handle(IRCConnection connection, IRCMessageUSER message)
             throws StateInvariantException, InvalidPasswordException {
         ServerState state = serverStateGuard.getState();
@@ -412,6 +436,27 @@ public class IRCServerEngine implements Closeable {
                     map,
                     "are supported by this server",
                     IRCMessage005::new);
+        }
+    }
+
+    private void ping() {
+        ServerState state = serverStateGuard.getState();
+        Set<IRCConnection> connections = state.getConnections();
+        long now = System.currentTimeMillis();
+        for (IRCConnection connection : connections) {
+            long lastPong = state.getLastPong(connection);
+            long lastPing = state.getLastPing(connection);
+            if (lastPing - lastPong > properties.getMaxIdleMilliseconds()) {
+                send(
+                        connection,
+                        null,
+                        "No PONG in %dms".formatted(properties.getMaxIdleMilliseconds()),
+                        IRCMessageERROR::new);
+                connection.closeDeferred();
+                continue;
+            }
+            state.setLastPing(connection, now);
+            send(connection, null, String.valueOf(now), IRCMessagePING::new);
         }
     }
 

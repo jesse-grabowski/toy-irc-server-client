@@ -43,6 +43,7 @@ import com.jessegrabowski.irc.util.Pair;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public final class ServerState {
 
@@ -57,6 +58,10 @@ public final class ServerState {
 
     public ServerState(IRCServerProperties properties) {
         this.properties = properties;
+    }
+
+    public Set<IRCConnection> getConnections() {
+        return Set.copyOf(users.keySet());
     }
 
     private ServerUser findUser(IRCConnection connection) {
@@ -119,6 +124,26 @@ public final class ServerState {
     public void endCapabilityNegotiation(IRCConnection connection) {
         ServerUser user = findUser(connection);
         user.setNegotiatingCapabilities(false);
+    }
+
+    public long getLastPing(IRCConnection connection) {
+        ServerUser user = findUser(connection);
+        return user.getLastPinged();
+    }
+
+    public void setLastPing(IRCConnection connection, long timestamp) {
+        ServerUser user = findUser(connection);
+        user.setLastPinged(timestamp);
+    }
+
+    public long getLastPong(IRCConnection connection) {
+        ServerUser user = findUser(connection);
+        return user.getLastPonged();
+    }
+
+    public void setLastPong(IRCConnection connection, long timestamp) {
+        ServerUser user = findUser(connection);
+        user.setLastPonged(timestamp);
     }
 
     public String getNickname(IRCConnection connection) {

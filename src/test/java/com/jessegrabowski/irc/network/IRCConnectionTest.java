@@ -315,7 +315,7 @@ class IRCConnectionTest {
         os.blockWrites();
 
         int ok = 0;
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 21; i++) {
             if (connection.offer("line" + i)) {
                 ok++;
             }
@@ -325,7 +325,10 @@ class IRCConnectionTest {
         os.unblockWrites();
         connection.close();
 
-        assertEquals(20, ok);
+        // we don't have a way to block queue consumption
+        // so we may enqueue up to 21 before it gets stuck
+        // on the blocking stream
+        assertTrue(ok == 20 || ok == 21);
         assertFalse(overflow);
     }
 
