@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public final class ServerState {
 
@@ -194,9 +195,6 @@ public final class ServerState {
     public Pair<String, String> setNickname(IRCConnection connection, String nickname)
             throws StateInvariantException, InvalidPasswordException {
         String newNickname = normalizeNickname(nickname);
-        if (newNickname.length() > parameters.getNickLength()) {
-            newNickname = newNickname.substring(0, parameters.getNickLength());
-        }
 
         ServerUser user = findUser(connection);
         if (user == null) {
@@ -329,6 +327,26 @@ public final class ServerState {
         return new MessageTarget(mask, Set.of(getConnectionForUser(targetUser)));
     }
 
+    public MessageTarget getWatchers(ServerChannel channel) {
+        return new MessageTarget(
+                channel.getName(),
+                channel.getMembers().stream().map(this::getConnectionForUser).collect(Collectors.toSet()));
+    }
+
+    public MessageTarget getWatchers(ServerUser user, boolean includeSelf) {
+        Set<IRCConnection> watchers = new HashSet<>();
+        watchers.add(getConnectionForUser(user));
+        for (ServerChannel channel : user.getChannels()) {
+            watchers.addAll(channel.getMembers().stream()
+                    .map(this::getConnectionForUser)
+                    .collect(Collectors.toSet()));
+        }
+        if (!includeSelf) {
+            watchers.remove(getConnectionForUser(user));
+        }
+        return new MessageTarget(user.getNickname(), watchers);
+    }
+
     public ServerChannel findChannel(String channelName) {
         return channels.get(normalizeChannelName(channelName));
     }
@@ -391,8 +409,31 @@ public final class ServerState {
         user.addChannel(channel);
     }
 
+    public void partChannel(IRCConnection connection, String channelName) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        String normalizedChannelName = normalizeChannelName(channelName);
+
+        validateChannelName(user.getNickname(), normalizedChannelName);
+
+        ServerChannel channel = channels.get(normalizedChannelName);
+        if (channel == null || !channel.getMembers().contains(user)) {
+            return;
+        }
+
+        channel.part(user);
+        user.removeChannel(channel);
+    }
+
     private String normalizeNickname(String nickname) {
-        return parameters.getCaseMapping().normalizeNickname(nickname);
+        String newNickname = parameters.getCaseMapping().normalizeNickname(nickname);
+        if (newNickname.length() > parameters.getNickLength()) {
+            newNickname = newNickname.substring(0, parameters.getNickLength());
+        }
+        return newNickname;
     }
 
     private void validateNickname(String client, String nickname) throws StateInvariantException {
