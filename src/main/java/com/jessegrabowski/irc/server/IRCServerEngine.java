@@ -373,9 +373,9 @@ public class IRCServerEngine implements Closeable {
             ServerState state = serverStateGuard.getState();
             ServerUser me = state.getUserForConnection(connection);
             switch (message) {
-                case IRCMessageAWAY m -> {}
+                case IRCMessageAWAY m -> handle(connection, m);
                 case IRCMessageCAPEND m -> handle(connection, m);
-                case IRCMessageCAPLISTRequest m -> {}
+                case IRCMessageCAPLISTRequest m -> handle(connection, m);
                 case IRCMessageCAPLSRequest m -> handle(connection, m);
                 case IRCMessageCAPREQ m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
@@ -432,12 +432,54 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
+    private void handle(IRCConnection connection, IRCMessageAWAY message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        if (message.getText() != null && !message.getText().isEmpty()) {
+            state.setAway(connection, message.getText());
+            send(connection, server(), message, state.getNickname(connection), "You are now away", IRCMessage306::new);
+        } else {
+            state.setAway(connection, null);
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    "You are no longer away",
+                    IRCMessage305::new);
+        }
+
+        ServerUser me = state.getUserForConnection(connection);
+        MessageTarget watchers = state.getWatchers(me, state.isRegistered(connection));
+        watchers.filter(c -> state.hasCapability(c, IRCCapability.AWAY_NOTIFY));
+        sendToTarget(
+                me,
+                message,
+                watchers,
+                (raw, tags, nick, user, host) -> new IRCMessageAWAY(raw, tags, nick, user, host, message.getText()));
+    }
+
     private void handle(IRCConnection connection, IRCMessageCAPEND message) {
         ServerState state = serverStateGuard.getState();
         state.endCapabilityNegotiation(connection);
         if (state.tryFinishRegistration(connection)) {
             sendWelcome(connection, message);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageCAPLISTRequest message) {
+        ServerState state = serverStateGuard.getState();
+        List<String> capabilities = new ArrayList<>();
+        for (IRCCapability capability : IRCCapability.values()) {
+            capabilities.add(capability.getCapabilityName());
+        }
+        send(
+                connection,
+                server(),
+                message,
+                state.getNickname(connection),
+                false,
+                capabilities,
+                IRCMessageCAPLISTResponse::new);
     }
 
     private void handle(IRCConnection connection, IRCMessageCAPLSRequest message) {
@@ -656,6 +698,10 @@ public class IRCServerEngine implements Closeable {
             targets.add(state.resolveMask(connection, target));
         }
         for (MessageTarget target : targets) {
+            String away = state.getAway(target.getMask());
+            if (away != null && !away.isEmpty()) {
+                send(connection, server(), message, me.getNickname(), target.getMask(), away, IRCMessage301::new);
+            }
             sendToTarget(
                     me,
                     message,

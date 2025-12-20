@@ -103,6 +103,20 @@ public final class ServerState {
         user.setState(ServerConnectionState.QUITTING);
     }
 
+    public void setAway(IRCConnection connection, String awayStatus) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        user.setAwayStatus(awayStatus);
+    }
+
+    public String getAway(String nickname) {
+        ServerUser user = findUser(nickname);
+        return user != null ? user.getAwayStatus() : null;
+    }
+
     private ServerUser findUser(IRCConnection connection) {
         return users.get(connection);
     }

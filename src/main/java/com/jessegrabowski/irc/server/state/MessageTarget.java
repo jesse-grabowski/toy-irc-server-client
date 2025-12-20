@@ -33,10 +33,13 @@ package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.network.IRCConnection;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public final class MessageTarget {
     private final String mask;
-    private final Set<IRCConnection> connections;
+
+    private Set<IRCConnection> connections;
 
     MessageTarget(String mask, Set<IRCConnection> connections) {
         this.mask = mask;
@@ -49,5 +52,9 @@ public final class MessageTarget {
 
     public Set<IRCConnection> getConnections() {
         return Set.copyOf(connections);
+    }
+
+    public void filter(Predicate<IRCConnection> predicate) {
+        this.connections = connections.stream().filter(predicate).collect(Collectors.toSet());
     }
 }
