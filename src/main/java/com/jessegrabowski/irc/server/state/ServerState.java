@@ -485,6 +485,9 @@ public final class ServerState {
     }
 
     private String normalizeNickname(String nickname) {
+        if (nickname == null) {
+            return null;
+        }
         String newNickname = parameters.getCaseMapping().normalizeNickname(nickname);
         if (newNickname.length() > parameters.getNickLength()) {
             newNickname = newNickname.substring(0, parameters.getNickLength());

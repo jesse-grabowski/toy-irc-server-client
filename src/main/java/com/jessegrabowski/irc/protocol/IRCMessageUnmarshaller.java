@@ -404,7 +404,7 @@ public class IRCMessageUnmarshaller {
         return parameters
                 .injectConditionally()
                 .ifIndexEquals(0, "END", p -> p.inject(IRCMessageCAPEND::new))
-                .ifIndexEquals(0, "LS", p -> p.inject(required("version"), IRCMessageCAPLSRequest::new))
+                .ifIndexEquals(0, "LS", p -> p.inject(optional("version"), IRCMessageCAPLSRequest::new))
                 .ifIndexEquals(0, "LIST", p -> p.inject(IRCMessageCAPLISTRequest::new))
                 .ifIndexEquals(0, "REQ", p -> {
                     SplittingParameterInjector<List<String>, List<String>> splitter =

@@ -508,137 +508,56 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage391 m -> {
                 /* ignore */
             }
-            case IRCMessage400 m -> {
-                /* ignore */
-            }
+            case IRCMessage400 m -> terminal.println(makeSystemErrorMessage(m.getInfo()));
             case IRCMessage401 m -> terminal.println(makeSystemErrorMessage(m.getText()));
-            case IRCMessage402 m -> {
-                /* ignore */
-            }
-            case IRCMessage403 m -> {
-                /* ignore */
-            }
-            case IRCMessage404 m -> {
-                /* ignore */
-            }
-            case IRCMessage405 m -> {
-                /* ignore */
-            }
-            case IRCMessage406 m -> {
-                /* ignore */
-            }
-            case IRCMessage409 m -> {
-                /* ignore */
-            }
-            case IRCMessage411 m -> {
-                /* ignore */
-            }
-            case IRCMessage412 m -> {
-                /* ignore */
-            }
-            case IRCMessage417 m -> {
-                /* ignore */
-            }
-            case IRCMessage421 m -> {
-                /* ignore */
-            }
+            case IRCMessage402 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage403 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage404 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage405 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage406 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage409 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage411 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage412 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage417 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage421 m ->
+                terminal.println(makeSystemErrorMessage(s("Unknown command ", m.getInvalidCommand())));
             case IRCMessage422 m -> makeSystemMessageOfTheDay("There is no Message of the Day");
-            case IRCMessage431 m -> {
-                /* ignore */
-            }
-            case IRCMessage432 m -> {
-                /* ignore */
-            }
-            case IRCMessage433 m -> {
-                /* ignore */
-            }
-            case IRCMessage436 m -> {
-                /* ignore */
-            }
-            case IRCMessage441 m -> {
-                /* ignore */
-            }
+            case IRCMessage431 m -> terminal.println(makeSystemErrorMessage("No nickname given"));
+            case IRCMessage432 m -> terminal.println(makeSystemErrorMessage(s("Erroneous nickname ", m.getNick())));
+            case IRCMessage433 m ->
+                terminal.println(makeSystemErrorMessage(s("Nickname ", m.getNick(), " is already in use")));
+            case IRCMessage436 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage441 m -> terminal.println(makeSystemErrorMessage("They're not on that channel"));
             case IRCMessage442 m -> handle(m);
-            case IRCMessage443 m -> {
-                /* ignore */
-            }
-            case IRCMessage451 m -> {
-                /* ignore */
-            }
-            case IRCMessage461 m -> {
-                /* ignore */
-            }
-            case IRCMessage462 m -> {
-                /* ignore */
-            }
+            case IRCMessage443 m ->
+                terminal.println(makeSystemErrorMessage(s(f(m.getNick()), " is already on that channel!")));
+            case IRCMessage451 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage461 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage462 m -> terminal.println(makeSystemErrorMessage("You are already registered"));
             case IRCMessage464 m -> terminal.println(makeSystemErrorMessage("Command failed -- Invalid password"));
-            case IRCMessage465 m -> {
-                /* ignore */
-            }
-            case IRCMessage471 m -> {
-                /* ignore */
-            }
-            case IRCMessage472 m -> {
-                /* ignore */
-            }
-            case IRCMessage473 m -> {
-                /* ignore */
-            }
-            case IRCMessage474 m -> {
-                /* ignore */
-            }
-            case IRCMessage475 m -> {
-                /* ignore */
-            }
-            case IRCMessage476 m -> {
-                /* ignore */
-            }
-            case IRCMessage481 m -> {
-                /* ignore */
-            }
-            case IRCMessage482 m -> {
-                /* ignore */
-            }
-            case IRCMessage483 m -> {
-                /* ignore */
-            }
+            case IRCMessage465 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage471 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage472 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage473 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage474 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage475 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage476 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage481 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage482 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage483 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage491 m -> terminal.println(makeSystemErrorMessage(m.getText()));
-            case IRCMessage501 m -> {
-                /* ignore */
-            }
-            case IRCMessage502 m -> {
-                /* ignore */
-            }
-            case IRCMessage524 m -> {
-                /* ignore */
-            }
-            case IRCMessage525 m -> {
-                /* ignore */
-            }
-            case IRCMessage670 m -> {
-                /* ignore */
-            }
-            case IRCMessage671 m -> {
-                /* ignore */
-            }
-            case IRCMessage691 m -> {
-                /* ignore */
-            }
-            case IRCMessage696 m -> {
-                /* ignore */
-            }
-            case IRCMessage704 m -> {
-                /* ignore */
-            }
-            case IRCMessage705 m -> {
-                /* ignore */
-            }
-            case IRCMessage706 m -> {
-                /* ignore */
-            }
-            case IRCMessage723 m -> {
-                /* ignore */
-            }
+            case IRCMessage501 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage502 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage524 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage525 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage670 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage671 m -> terminal.println(makeSystemTerminalMessage(s(f(m.getNick()), " ", m.getText())));
+            case IRCMessage691 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage696 m -> terminal.println(makeSystemErrorMessage("Invalid mode param"));
+            case IRCMessage704 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage705 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage706 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage723 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessageUnsupported m -> terminal.println(makeSystemErrorMessage("» " + m.getRawMessage()));
             case IRCMessageParseError m ->
                 terminal.println(makeSystemErrorMessage("(PARSE ERROR) » " + m.getRawMessage()));

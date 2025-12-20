@@ -468,8 +468,9 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessageCAPLISTRequest message) {
         ServerState state = serverStateGuard.getState();
+        ServerUser user = state.getUserForConnection(connection);
         List<String> capabilities = new ArrayList<>();
-        for (IRCCapability capability : IRCCapability.values()) {
+        for (IRCCapability capability : user.getCapabilities()) {
             capabilities.add(capability.getCapabilityName());
         }
         send(
@@ -563,6 +564,15 @@ public class IRCServerEngine implements Closeable {
                     watchers,
                     (raw, tags, nick, user, host) -> new IRCMessageJOINNormal(
                             raw, tags, nick, user, host, List.of(channel.getName()), List.of()));
+            if (me.getAwayStatus() != null) {
+                watchers.filter(c -> state.hasCapability(c, IRCCapability.AWAY_NOTIFY));
+                sendToTarget(
+                        me,
+                        message,
+                        watchers,
+                        (raw, tags, nick, user, host) ->
+                                new IRCMessageAWAY(raw, tags, nick, user, host, me.getAwayStatus()));
+            }
             sendTopic(connection, message, channelName, false);
             sendNames(connection, message, channelName);
         }

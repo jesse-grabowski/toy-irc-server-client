@@ -294,7 +294,7 @@ public class IRCMessageMarshaller {
                 message.getNick(),
                 "LIST",
                 when(message.isHasMore(), "*"),
-                trailing(delimited(" ", message.getCapabilities())));
+                trailing(delimited(" ", message.getCapabilities()), true));
     }
 
     private List<String> marshalCapLSRequest(IRCMessageCAPLSRequest message) {
@@ -996,6 +996,13 @@ public class IRCMessageMarshaller {
     private String trailing(String value) {
         if (value == null) {
             return null;
+        }
+        return ":" + value;
+    }
+
+    private String trailing(String value, boolean sendBlank) {
+        if (value == null && sendBlank) {
+            return ":";
         }
         return ":" + value;
     }
