@@ -31,39 +31,36 @@
  */
 package com.jessegrabowski.irc.server.state;
 
-import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
-import com.jessegrabowski.irc.protocol.model.IRCMessage;
+import java.util.Objects;
 
-public class StateInvariantException extends Exception {
+public sealed interface ServerSetBy {
+    String nickname();
 
-    private final IRCMessageFactory0<?> factory;
+    boolean isUser(ServerUser user);
 
-    public StateInvariantException(String message, IRCMessageFactory0<?> factory0) {
-        super(message);
-        this.factory = factory0;
+    record SetByNickname(String nickname) implements ServerSetBy {
+
+        @Override
+        public boolean isUser(ServerUser user) {
+            return Objects.equals(nickname, user.getNickname());
+        }
     }
 
-    public <A> StateInvariantException(String message, A arg0, IRCMessageFactory1<IRCMessage, A> factory1) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory1.create(raw, tags, name, user, host, arg0);
-    }
+    final class SetByUser implements ServerSetBy {
+        private final ServerUser user;
 
-    public <A, B> StateInvariantException(
-            String message, A arg0, B arg1, IRCMessageFactory2<IRCMessage, A, B> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1);
-    }
+        SetByUser(ServerUser user) {
+            this.user = user;
+        }
 
-    public <A, B, C> StateInvariantException(
-            String message, A arg0, B arg1, C arg2, IRCMessageFactory3<IRCMessage, A, B, C> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1, arg2);
-    }
+        @Override
+        public String nickname() {
+            return user.getNickname();
+        }
 
-    public IRCMessageFactory0<?> getFactory() {
-        return factory;
+        @Override
+        public boolean isUser(ServerUser user) {
+            return this.user == user;
+        }
     }
 }

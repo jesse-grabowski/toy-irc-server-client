@@ -31,4 +31,200 @@
  */
 package com.jessegrabowski.irc.server.state;
 
-public class ServerChannel {}
+import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.model.IRCMessage443;
+import com.jessegrabowski.irc.protocol.model.IRCMessage482;
+import com.jessegrabowski.irc.util.Transaction;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class ServerChannel {
+    private final String name;
+    private String topic;
+    private ServerSetBy topicSetBy;
+    private long topicSetAt;
+    private final Map<ServerUser, ServerChannelMembership> members = new HashMap<>();
+    private final Map<Character, List<String>> lists = new HashMap<>();
+    private final Map<Character, String> settings = new HashMap<>();
+    private final Set<Character> flags = new HashSet<>();
+
+    ServerChannel(String name) {
+        this.name = name;
+    }
+
+    public Set<ServerUser> getMembers() {
+        return Set.copyOf(members.keySet());
+    }
+
+    public boolean isEmpty() {
+        return members.isEmpty();
+    }
+
+    void join(ServerUser user, String key) {
+        if (members.containsKey(user)) {
+            return;
+        }
+        Transaction.putTransactionally(members, user, new ServerChannelMembership());
+        if (topicSetBy != null && topicSetBy.isUser(user)) {
+            ServerSetBy oldSetBy = topicSetBy;
+            Transaction.addCompensation(() -> topicSetBy = oldSetBy);
+            topicSetBy = new ServerSetBy.SetByUser(user);
+        }
+    }
+
+    void part(ServerUser user) {
+        Transaction.removeTransactionally(members, user);
+        if (topicSetBy != null && topicSetBy.isUser(user)) {
+            ServerSetBy oldSetBy = topicSetBy;
+            Transaction.addCompensation(() -> topicSetBy = oldSetBy);
+            topicSetBy = new ServerSetBy.SetByNickname(user.getNickname());
+        }
+    }
+
+    public ServerChannelMembership getMembership(ServerUser user) {
+        return members.get(user);
+    }
+
+    void addMemberMode(ServerUser caller, ServerUser target, IRCChannelMembershipMode memberMode)
+            throws StateInvariantException {
+        ServerChannelMembership callerMembership = members.get(caller);
+        if (callerMembership == null || !callerMembership.canGrant(memberMode)) {
+            throw new StateInvariantException(
+                    "User %s cannot grant mode %s".formatted(caller.getNickname(), memberMode),
+                    caller.getNickname(),
+                    name,
+                    "Insufficient permission to set mode '%s'".formatted(memberMode.getLetter()),
+                    IRCMessage482::new);
+        }
+
+        ServerChannelMembership targetMembership = members.get(target);
+        if (targetMembership == null) {
+            throw new StateInvariantException(
+                    "User %s not in channel %s".formatted(target.getNickname(), name),
+                    caller.getNickname(),
+                    target.getNickname(),
+                    name,
+                    IRCMessage443::new);
+        }
+
+        targetMembership.addMode(memberMode);
+    }
+
+    void addMemberModeAutomatic(ServerUser target, IRCChannelMembershipMode memberMode) throws StateInvariantException {
+        ServerChannelMembership targetMembership = members.get(target);
+        if (targetMembership == null) {
+            throw new StateInvariantException(
+                    "User %s not in channel %s".formatted(target.getNickname(), name),
+                    target.getNickname(),
+                    target.getNickname(),
+                    name,
+                    IRCMessage443::new);
+        }
+
+        targetMembership.addMode(memberMode);
+    }
+
+    void removeMemberMode(ServerUser caller, ServerUser target, IRCChannelMembershipMode memberMode)
+            throws StateInvariantException {
+        ServerChannelMembership callerMembership = members.get(caller);
+        if (callerMembership == null || !callerMembership.canGrant(memberMode)) {
+            throw new StateInvariantException(
+                    "User %s cannot remove mode %s".formatted(caller.getNickname(), memberMode),
+                    caller.getNickname(),
+                    name,
+                    "Insufficient permission to unset mode '%s'".formatted(memberMode.getLetter()),
+                    IRCMessage482::new);
+        }
+
+        ServerChannelMembership targetMembership = members.get(target);
+        if (targetMembership == null) {
+            throw new StateInvariantException(
+                    "User %s not in channel %s".formatted(target.getNickname(), name),
+                    caller.getNickname(),
+                    target.getNickname(),
+                    name,
+                    IRCMessage443::new);
+        }
+
+        targetMembership.removeMode(memberMode);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getTopic() {
+        return topic;
+    }
+
+    void setTopic(String topic) {
+        String previous = this.topic;
+        this.topic = topic;
+        Transaction.addCompensation(() -> this.topic = previous);
+    }
+
+    public ServerSetBy getTopicSetBy() {
+        return topicSetBy;
+    }
+
+    public long getTopicSetAt() {
+        return topicSetAt;
+    }
+
+    void setTopicSetAt(long topicSetAt) {
+        long oldTopicSetAt = this.topicSetAt;
+        this.topicSetAt = topicSetAt;
+        Transaction.addCompensation(() -> this.topicSetAt = oldTopicSetAt);
+    }
+
+    public List<String> getList(Character mode) {
+        return Collections.unmodifiableList(lists.getOrDefault(mode, List.of()));
+    }
+
+    void addToList(Character mode, String entry) {
+        List<String> list = Transaction.computeIfAbsentTransactionally(lists, mode, k -> new ArrayList<>());
+        if (list.contains(entry)) {
+            return;
+        }
+        Transaction.addTransactionally(list, entry);
+    }
+
+    void removeFromList(Character mode, String entry) {
+        List<String> list = lists.get(mode);
+        if (list != null) {
+            Transaction.removeTransactionally(list, entry);
+            if (list.isEmpty()) {
+                Transaction.removeTransactionally(lists, mode);
+            }
+        }
+    }
+
+    public String getSetting(Character mode) {
+        return settings.get(mode);
+    }
+
+    void setSetting(Character mode, String setting) {
+        Transaction.putTransactionally(settings, mode, setting);
+    }
+
+    void removeSetting(Character mode) {
+        Transaction.removeTransactionally(settings, mode);
+    }
+
+    public boolean checkFlag(Character mode) {
+        return flags.contains(mode);
+    }
+
+    void setFlag(Character mode) {
+        Transaction.addTransactionally(flags, mode);
+    }
+
+    void clearFlag(Character mode) {
+        Transaction.removeTransactionally(flags, mode);
+    }
+}

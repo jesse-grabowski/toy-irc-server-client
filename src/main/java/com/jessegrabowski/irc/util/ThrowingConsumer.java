@@ -29,41 +29,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.server.state;
+package com.jessegrabowski.irc.util;
 
-import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
-import com.jessegrabowski.irc.protocol.model.IRCMessage;
-
-public class StateInvariantException extends Exception {
-
-    private final IRCMessageFactory0<?> factory;
-
-    public StateInvariantException(String message, IRCMessageFactory0<?> factory0) {
-        super(message);
-        this.factory = factory0;
-    }
-
-    public <A> StateInvariantException(String message, A arg0, IRCMessageFactory1<IRCMessage, A> factory1) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory1.create(raw, tags, name, user, host, arg0);
-    }
-
-    public <A, B> StateInvariantException(
-            String message, A arg0, B arg1, IRCMessageFactory2<IRCMessage, A, B> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1);
-    }
-
-    public <A, B, C> StateInvariantException(
-            String message, A arg0, B arg1, C arg2, IRCMessageFactory3<IRCMessage, A, B, C> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1, arg2);
-    }
-
-    public IRCMessageFactory0<?> getFactory() {
-        return factory;
-    }
+@FunctionalInterface
+public interface ThrowingConsumer<I> {
+    void apply(I input) throws Exception;
 }

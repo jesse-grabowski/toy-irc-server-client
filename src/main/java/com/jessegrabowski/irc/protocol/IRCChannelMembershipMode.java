@@ -29,41 +29,49 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.server.state;
+package com.jessegrabowski.irc.protocol;
 
-import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
-import com.jessegrabowski.irc.protocol.model.IRCMessage;
+import java.util.Arrays;
+import java.util.Optional;
 
-public class StateInvariantException extends Exception {
+public enum IRCChannelMembershipMode {
+    FOUNDER('q', '~', 5),
+    PROTECTED('a', '&', 4),
+    OPERATOR('o', '@', 3),
+    HALFOP('h', '%', 2),
+    VOICE('v', '+', 1);
 
-    private final IRCMessageFactory0<?> factory;
+    private final Character letter;
+    private final Character prefix;
+    private final int power;
 
-    public StateInvariantException(String message, IRCMessageFactory0<?> factory0) {
-        super(message);
-        this.factory = factory0;
+    IRCChannelMembershipMode(Character letter, Character prefix, int power) {
+        this.letter = letter;
+        this.prefix = prefix;
+        this.power = power;
     }
 
-    public <A> StateInvariantException(String message, A arg0, IRCMessageFactory1<IRCMessage, A> factory1) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory1.create(raw, tags, name, user, host, arg0);
+    public Character getLetter() {
+        return letter;
     }
 
-    public <A, B> StateInvariantException(
-            String message, A arg0, B arg1, IRCMessageFactory2<IRCMessage, A, B> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1);
+    public Character getPrefix() {
+        return prefix;
     }
 
-    public <A, B, C> StateInvariantException(
-            String message, A arg0, B arg1, C arg2, IRCMessageFactory3<IRCMessage, A, B, C> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1, arg2);
+    public static Optional<IRCChannelMembershipMode> fromLetter(Character letter) {
+        return Arrays.stream(values())
+                .filter(mode -> mode.getLetter().equals(letter))
+                .findFirst();
     }
 
-    public IRCMessageFactory0<?> getFactory() {
-        return factory;
+    public static Optional<IRCChannelMembershipMode> fromPrefix(Character prefix) {
+        return Arrays.stream(values())
+                .filter(mode -> mode.getPrefix().equals(prefix))
+                .findFirst();
+    }
+
+    public boolean canGrant(IRCChannelMembershipMode other) {
+        return power >= other.power;
     }
 }

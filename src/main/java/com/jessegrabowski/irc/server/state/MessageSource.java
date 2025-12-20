@@ -31,39 +31,60 @@
  */
 package com.jessegrabowski.irc.server.state;
 
-import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
-import com.jessegrabowski.irc.protocol.model.IRCMessage;
+public sealed interface MessageSource
+        permits MessageSource.NamedMessageSource, MessageSource.ServerMessageSource, ServerUser {
+    String getNickname();
 
-public class StateInvariantException extends Exception {
+    String getUsername();
 
-    private final IRCMessageFactory0<?> factory;
+    boolean includeHostname();
 
-    public StateInvariantException(String message, IRCMessageFactory0<?> factory0) {
-        super(message);
-        this.factory = factory0;
+    final class NamedMessageSource implements MessageSource {
+        private final String nickname;
+        private final String username;
+
+        public NamedMessageSource(String nickname, String username) {
+            this.nickname = nickname;
+            this.username = username;
+        }
+
+        @Override
+        public String getNickname() {
+            return nickname;
+        }
+
+        @Override
+        public String getUsername() {
+            return username;
+        }
+
+        @Override
+        public boolean includeHostname() {
+            return true;
+        }
     }
 
-    public <A> StateInvariantException(String message, A arg0, IRCMessageFactory1<IRCMessage, A> factory1) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory1.create(raw, tags, name, user, host, arg0);
-    }
+    final class ServerMessageSource implements MessageSource {
 
-    public <A, B> StateInvariantException(
-            String message, A arg0, B arg1, IRCMessageFactory2<IRCMessage, A, B> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1);
-    }
+        private final String serverName;
 
-    public <A, B, C> StateInvariantException(
-            String message, A arg0, B arg1, C arg2, IRCMessageFactory3<IRCMessage, A, B, C> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1, arg2);
-    }
+        public ServerMessageSource(String serverName) {
+            this.serverName = serverName;
+        }
 
-    public IRCMessageFactory0<?> getFactory() {
-        return factory;
+        @Override
+        public String getNickname() {
+            return serverName;
+        }
+
+        @Override
+        public String getUsername() {
+            return null;
+        }
+
+        @Override
+        public boolean includeHostname() {
+            return false;
+        }
     }
 }

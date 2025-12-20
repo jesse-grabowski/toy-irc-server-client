@@ -62,7 +62,7 @@ public final class IRCServerParameters {
     private int maxTargets = Integer.MAX_VALUE;
     private int modes = Integer.MAX_VALUE;
     private String network;
-    private int nickLength = Integer.MAX_VALUE;
+    private int nickLength = 10;
     private SequencedMap<Character, Character> prefixes = new LinkedHashMap<>();
     private boolean safeList;
     private Integer silence = null;

@@ -33,35 +33,62 @@ package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.network.IRCConnection;
 import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.model.IRCMessage403;
 import com.jessegrabowski.irc.protocol.model.IRCMessage432;
 import com.jessegrabowski.irc.protocol.model.IRCMessage433;
 import com.jessegrabowski.irc.protocol.model.IRCMessage451;
 import com.jessegrabowski.irc.protocol.model.IRCMessage462;
+import com.jessegrabowski.irc.protocol.model.IRCMessage476;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.Pair;
+import com.jessegrabowski.irc.util.Transaction;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class ServerState {
+
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z]+[a-z0-9]*$");
 
     private static final int REAL_NAME_MAX_LENGTH = 50;
 
     private final Map<IRCConnection, ServerUser> users = new HashMap<>();
+    private final Map<ServerUser, IRCConnection> connectionsByUser = new HashMap<>();
     private final Map<String, ServerUser> usersByNickname = new HashMap<>();
+
+    private final Map<String, ServerChannel> channels = new HashMap<>();
 
     private final IRCServerProperties properties;
 
     private IRCServerParameters parameters;
 
-    public ServerState(IRCServerProperties properties) {
+    public ServerState(IRCServerProperties properties, IRCServerParameters parameters) {
         this.properties = properties;
+        this.parameters = parameters;
     }
 
     public Set<IRCConnection> getConnections() {
         return Set.copyOf(users.keySet());
+    }
+
+    public ServerUser getUserForConnection(IRCConnection connection) {
+        ServerUser user = findUser(connection);
+        if (user == null) {
+            throw new IllegalStateException("User not found for connection");
+        }
+        return user;
+    }
+
+    public IRCConnection getConnectionForUser(ServerUser user) {
+        IRCConnection connection = connectionsByUser.get(user);
+        if (connection == null) {
+            throw new IllegalStateException("Connection not found for user");
+        }
+        return connection;
     }
 
     private ServerUser findUser(IRCConnection connection) {
@@ -77,6 +104,8 @@ public final class ServerState {
     }
 
     public void setParameters(IRCServerParameters parameters) {
+        IRCServerParameters oldParameters = this.parameters;
+        Transaction.addCompensation(() -> this.parameters = oldParameters);
         this.parameters = parameters;
     }
 
@@ -87,18 +116,28 @@ public final class ServerState {
 
         ServerUser user = new ServerUser();
         user.setPasswordEntered(properties.getPassword() == null);
-        users.put(connection, user);
+        Transaction.putTransactionally(users, connection, user);
+        Transaction.putTransactionally(connectionsByUser, user, connection);
     }
 
-    public void disconnect(IRCConnection connection) {
+    public ServerUser disconnect(IRCConnection connection) {
         if (!users.containsKey(connection)) {
-            return;
+            return null;
         }
 
-        ServerUser user = users.remove(connection);
+        ServerUser user = Transaction.removeTransactionally(users, connection);
+        Transaction.removeTransactionally(connectionsByUser, user);
         if (user.getNickname() != null) {
-            usersByNickname.remove(user.getNickname());
+            Transaction.removeTransactionally(usersByNickname, user.getNickname());
         }
+        for (ServerChannel channel : user.getChannels()) {
+            channel.part(user);
+            if (channel.isEmpty()) {
+                Transaction.removeTransactionally(channels, channel.getName());
+            }
+        }
+
+        return user;
     }
 
     public void startCapabilityNegotiation(IRCConnection connection) {
@@ -181,10 +220,10 @@ public final class ServerState {
         }
 
         if (oldNickname != null) {
-            user = usersByNickname.remove(oldNickname);
+            Transaction.removeTransactionally(usersByNickname, oldNickname);
         }
         user.setNickname(newNickname);
-        usersByNickname.put(newNickname, user);
+        Transaction.putTransactionally(usersByNickname, newNickname, user);
 
         return new Pair<>(oldNickname, newNickname);
     }
@@ -251,6 +290,70 @@ public final class ServerState {
         return true;
     }
 
+    public ServerChannel getExistingChannel(IRCConnection connection, String channelName)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        String normalizedChannelName = parameters.getCaseMapping().normalizeChannel(channelName);
+        if (normalizedChannelName.length() > parameters.getChannelLength()) {
+            normalizedChannelName = normalizedChannelName.substring(0, parameters.getChannelLength());
+        }
+
+        ServerChannel channel = channels.get(normalizedChannelName);
+        if (channel == null) {
+            throw new StateInvariantException(
+                    "Channel '%s' does not exist".formatted(normalizedChannelName),
+                    user.getNickname(),
+                    normalizedChannelName,
+                    "Channel '%s' does not exist".formatted(normalizedChannelName),
+                    IRCMessage403::new);
+        }
+
+        return channel;
+    }
+
+    public void joinChannel(IRCConnection connection, String channelName, String key) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        String normalizedChannelName = parameters.getCaseMapping().normalizeChannel(channelName);
+        if (normalizedChannelName.length() > parameters.getChannelLength()) {
+            normalizedChannelName = normalizedChannelName.substring(0, parameters.getChannelLength());
+        }
+
+        validateChannelName(user.getNickname(), normalizedChannelName);
+
+        char prefix = normalizedChannelName.charAt(0);
+        int limit = parameters.getChannelLimits().getOrDefault(prefix, Integer.MAX_VALUE);
+        if (user.getChannels().stream()
+                        .filter(c -> c.getName().charAt(0) == prefix)
+                        .count()
+                >= limit) {
+            throw new StateInvariantException(
+                    "User is already in too many channels",
+                    user.getNickname(),
+                    normalizedChannelName,
+                    "Channel limit (%s:%d) exceeded".formatted(prefix, limit),
+                    IRCMessage476::new);
+        }
+
+        ServerChannel channel = channels.get(normalizedChannelName);
+        if (channel == null) {
+            channel = new ServerChannel(normalizedChannelName);
+            Transaction.putTransactionally(channels, normalizedChannelName, channel);
+            channel.join(user, key);
+            channel.addMemberModeAutomatic(user, IRCChannelMembershipMode.OPERATOR);
+        } else {
+            channel.join(user, key);
+        }
+        user.addChannel(channel);
+    }
+
     private void validateNickname(String client, String nickname) throws StateInvariantException {
         if (parameters.getChannelTypes().stream().anyMatch(c -> nickname.charAt(0) == c)) {
             throw new StateInvariantException(
@@ -258,18 +361,33 @@ public final class ServerState {
                     client != null ? client : nickname,
                     nickname,
                     IRCMessage432::new);
-        } else if (nickname.charAt(0) == ':') {
+        } else if (!NAME_PATTERN.matcher(nickname).matches()) {
             throw new StateInvariantException(
-                    "Nickname '%s' starts with colon".formatted(nickname),
+                    "Nickname '%s' should be only ascii".formatted(nickname),
                     client != null ? client : nickname,
                     nickname,
                     IRCMessage432::new);
-        } else if (nickname.contains(" ")) {
+        }
+    }
+
+    private void validateChannelName(String client, String channel) throws StateInvariantException {
+        char prefix = channel.charAt(0);
+        if (!parameters.getChannelTypes().contains(prefix)) {
             throw new StateInvariantException(
-                    "Nickname '%s' contains ASCII space".formatted(nickname),
-                    client != null ? client : nickname,
-                    nickname,
-                    IRCMessage432::new);
+                    "Channel '%s' mask not valid".formatted(channel),
+                    client,
+                    channel,
+                    "Channel name must start with one of '%s'".formatted(parameters.getChannelTypes()),
+                    IRCMessage476::new);
+        }
+        String name = channel.substring(1);
+        if (!NAME_PATTERN.matcher(name).matches()) {
+            throw new StateInvariantException(
+                    "Channel '%s' mask not valid".formatted(channel),
+                    client,
+                    channel,
+                    "Channel name can only contain letters and numbers",
+                    IRCMessage476::new);
         }
     }
 }

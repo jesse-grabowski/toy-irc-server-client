@@ -31,39 +31,37 @@
  */
 package com.jessegrabowski.irc.server.state;
 
-import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
-import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
-import com.jessegrabowski.irc.protocol.model.IRCMessage;
+import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.util.Transaction;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
-public class StateInvariantException extends Exception {
+public class ServerChannelMembership {
+    private final Set<IRCChannelMembershipMode> modes = new HashSet<>();
 
-    private final IRCMessageFactory0<?> factory;
+    ServerChannelMembership() {}
 
-    public StateInvariantException(String message, IRCMessageFactory0<?> factory0) {
-        super(message);
-        this.factory = factory0;
+    public Set<IRCChannelMembershipMode> getModes() {
+        return Collections.unmodifiableSet(modes);
     }
 
-    public <A> StateInvariantException(String message, A arg0, IRCMessageFactory1<IRCMessage, A> factory1) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory1.create(raw, tags, name, user, host, arg0);
+    void addMode(IRCChannelMembershipMode mode) {
+        Transaction.addTransactionally(modes, mode);
     }
 
-    public <A, B> StateInvariantException(
-            String message, A arg0, B arg1, IRCMessageFactory2<IRCMessage, A, B> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1);
+    void removeMode(IRCChannelMembershipMode mode) {
+        Transaction.removeTransactionally(modes, mode);
     }
 
-    public <A, B, C> StateInvariantException(
-            String message, A arg0, B arg1, C arg2, IRCMessageFactory3<IRCMessage, A, B, C> factory2) {
-        super(message);
-        this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1, arg2);
+    public boolean canGrant(IRCChannelMembershipMode other) {
+        return modes.stream().anyMatch(mode -> mode.canGrant(other));
     }
 
-    public IRCMessageFactory0<?> getFactory() {
-        return factory;
+    public Character getHighestPowerPrefix() {
+        return modes.stream()
+                .max(IRCChannelMembershipMode::compareTo)
+                .map(IRCChannelMembershipMode::getPrefix)
+                .orElse(null);
     }
 }

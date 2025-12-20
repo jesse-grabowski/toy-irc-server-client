@@ -32,13 +32,14 @@
 package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.util.Transaction;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.SequencedSet;
 import java.util.Set;
 
-public final class ServerUser {
+public final class ServerUser implements MessageSource {
     private final Set<IRCCapability> capabilities = new HashSet<>();
     private final SequencedSet<ServerChannel> channels = new LinkedHashSet<>();
     private final Set<Character> flags = new HashSet<>();
@@ -54,11 +55,15 @@ public final class ServerUser {
     private String awayStatus;
     private boolean operator;
 
+    ServerUser() {}
+
     public ServerConnectionState getState() {
         return state;
     }
 
-    public void setState(ServerConnectionState state) {
+    void setState(ServerConnectionState state) {
+        ServerConnectionState oldState = this.state;
+        Transaction.addCompensation(() -> this.state = oldState);
         this.state = state;
     }
 
@@ -66,7 +71,9 @@ public final class ServerUser {
         return lastPinged;
     }
 
-    public void setLastPinged(long lastPinged) {
+    void setLastPinged(long lastPinged) {
+        long oldLastPinged = this.lastPinged;
+        Transaction.addCompensation(() -> this.lastPinged = oldLastPinged);
         this.lastPinged = lastPinged;
     }
 
@@ -74,7 +81,9 @@ public final class ServerUser {
         return lastPonged;
     }
 
-    public void setLastPonged(long lastPonged) {
+    void setLastPonged(long lastPonged) {
+        long oldLastPonged = this.lastPonged;
+        Transaction.addCompensation(() -> this.lastPonged = oldLastPonged);
         this.lastPonged = lastPonged;
     }
 
@@ -82,7 +91,9 @@ public final class ServerUser {
         return passwordEntered;
     }
 
-    public void setPasswordEntered(boolean passwordEntered) {
+    void setPasswordEntered(boolean passwordEntered) {
+        boolean oldPasswordEntered = this.passwordEntered;
+        Transaction.addCompensation(() -> this.passwordEntered = oldPasswordEntered);
         this.passwordEntered = passwordEntered;
     }
 
@@ -90,7 +101,9 @@ public final class ServerUser {
         return negotiatingCapabilities;
     }
 
-    public void setNegotiatingCapabilities(boolean negotiatingCapabilities) {
+    void setNegotiatingCapabilities(boolean negotiatingCapabilities) {
+        boolean oldNegotiatingCapabilities = this.negotiatingCapabilities;
+        Transaction.addCompensation(() -> this.negotiatingCapabilities = oldNegotiatingCapabilities);
         this.negotiatingCapabilities = negotiatingCapabilities;
     }
 
@@ -99,6 +112,8 @@ public final class ServerUser {
     }
 
     void setNickname(String nickname) {
+        String oldNickname = this.nickname;
+        Transaction.addCompensation(() -> this.nickname = oldNickname);
         this.nickname = nickname;
     }
 
@@ -106,7 +121,14 @@ public final class ServerUser {
         return username;
     }
 
-    public void setUsername(String username) {
+    @Override
+    public boolean includeHostname() {
+        return true;
+    }
+
+    void setUsername(String username) {
+        String oldUsername = this.username;
+        Transaction.addCompensation(() -> this.username = oldUsername);
         this.username = username;
     }
 
@@ -114,7 +136,9 @@ public final class ServerUser {
         return realName;
     }
 
-    public void setRealName(String realName) {
+    void setRealName(String realName) {
+        String oldRealName = this.realName;
+        Transaction.addCompensation(() -> this.realName = oldRealName);
         this.realName = realName;
     }
 
@@ -122,7 +146,9 @@ public final class ServerUser {
         return awayStatus;
     }
 
-    public void setAwayStatus(String awayStatus) {
+    void setAwayStatus(String awayStatus) {
+        String oldAwayStatus = this.awayStatus;
+        Transaction.addCompensation(() -> this.awayStatus = oldAwayStatus);
         this.awayStatus = awayStatus;
     }
 
@@ -130,16 +156,18 @@ public final class ServerUser {
         return operator;
     }
 
-    public void setOperator(boolean operator) {
+    void setOperator(boolean operator) {
+        boolean oldOperator = this.operator;
+        Transaction.addCompensation(() -> this.operator = oldOperator);
         this.operator = operator;
     }
 
-    public void addCapability(IRCCapability capability) {
-        capabilities.add(capability);
+    void addCapability(IRCCapability capability) {
+        Transaction.addTransactionally(capabilities, capability);
     }
 
-    public void removeCapability(IRCCapability capability) {
-        capabilities.remove(capability);
+    void removeCapability(IRCCapability capability) {
+        Transaction.removeTransactionally(capabilities, capability);
     }
 
     public boolean hasCapability(IRCCapability capability) {
@@ -148,5 +176,17 @@ public final class ServerUser {
 
     public Set<IRCCapability> getCapabilities() {
         return Collections.unmodifiableSet(capabilities);
+    }
+
+    void addChannel(ServerChannel channel) {
+        Transaction.addTransactionally(channels, channel);
+    }
+
+    void removeChannel(ServerChannel channel) {
+        Transaction.removeTransactionally(channels, channel);
+    }
+
+    public Set<ServerChannel> getChannels() {
+        return Set.copyOf(channels);
     }
 }

@@ -50,6 +50,18 @@ public final class StateGuard<T> {
         return state;
     }
 
+    public void doTransactionally(ThrowingConsumer<T> consumer) throws Exception {
+        T state = getState();
+        try {
+            Transaction.start();
+            consumer.apply(state);
+            Transaction.commit();
+        } catch (Exception e) {
+            Transaction.rollback();
+            throw e;
+        }
+    }
+
     public void setState(T state) {
         assertBoundThread();
         this.state = state;
