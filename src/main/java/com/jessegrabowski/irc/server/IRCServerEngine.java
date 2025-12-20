@@ -46,6 +46,7 @@ import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.state.InvalidPasswordException;
 import com.jessegrabowski.irc.server.state.MessageSource;
 import com.jessegrabowski.irc.server.state.MessageTarget;
+import com.jessegrabowski.irc.server.state.NoOpException;
 import com.jessegrabowski.irc.server.state.ServerChannel;
 import com.jessegrabowski.irc.server.state.ServerChannelMembership;
 import com.jessegrabowski.irc.server.state.ServerState;
@@ -417,6 +418,8 @@ public class IRCServerEngine implements Closeable {
                     send(connection, server(), message, "NOT IMPLEMENTED", IRCMessageERROR::new);
                 }
             }
+        } catch (NoOpException e) {
+            LOG.log(Level.FINE, "Ignoring no-op message", e);
         } catch (InvalidPasswordException e) {
             send(connection, server(), message, "*", IRCMessage464::new);
             send(connection, server(), message, "Invalid password", IRCMessageERROR::new);
@@ -524,13 +527,13 @@ public class IRCServerEngine implements Closeable {
     }
 
     private void handle(IRCConnection connection, IRCMessageNICK message)
-            throws StateInvariantException, InvalidPasswordException {
+            throws StateInvariantException, InvalidPasswordException, NoOpException {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
         MessageSource sender = state.isRegistered(connection)
                 ? new MessageSource.NamedMessageSource(me.getNickname(), me.getUsername())
                 : server();
-        MessageTarget watchers = state.getWatchers(me, true);
+        MessageTarget watchers = state.getWatchers(me, state.isRegistered(connection));
         Pair<String, String> result = state.setNickname(connection, message.getNick());
         sendToTarget(
                 sender,
@@ -678,9 +681,14 @@ public class IRCServerEngine implements Closeable {
             return;
         }
 
+        String topic = message.getTopic();
+        if (topic.isEmpty()) {
+            topic = null;
+        }
+
         ServerState state = serverStateGuard.getState();
         ServerChannel channel = state.getExistingChannel(connection, message.getChannel());
-        state.setChannelTopic(connection, channel, message.getTopic());
+        state.setChannelTopic(connection, channel, topic);
         ServerUser me = state.getUserForConnection(connection);
         MessageTarget target = state.getWatchers(channel);
         sendToTarget(

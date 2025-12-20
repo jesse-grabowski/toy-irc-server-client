@@ -545,7 +545,7 @@ public class IRCMessageUnmarshaller {
     }
 
     private IRCMessageTOPIC parseTopic(Parameters parameters) throws Exception {
-        return parameters.inject(required("channel"), optional("topic"), IRCMessageTOPIC::new);
+        return parameters.inject(required("channel"), optionalAllowEmpty("topic"), IRCMessageTOPIC::new);
     }
 
     private IRCMessage004 parse004(Parameters parameters) throws Exception {
@@ -1325,6 +1325,10 @@ public class IRCMessageUnmarshaller {
 
     private ParameterExtractor<String> optional(String name) {
         return new SingleParameterExtractor<>(x -> x, false, false, null, name);
+    }
+
+    private ParameterExtractor<String> optionalAllowEmpty(String name) {
+        return new SingleParameterExtractor<>(x -> x, false, true, null, name);
     }
 
     private <T> ParameterExtractor<T> optional(String name, ThrowingFunction<String, T> mapper) {

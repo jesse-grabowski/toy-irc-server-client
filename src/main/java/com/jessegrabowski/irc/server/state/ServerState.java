@@ -202,7 +202,7 @@ public final class ServerState {
     }
 
     public Pair<String, String> setNickname(IRCConnection connection, String nickname)
-            throws StateInvariantException, InvalidPasswordException {
+            throws StateInvariantException, InvalidPasswordException, NoOpException {
         String newNickname = normalizeNickname(nickname);
 
         ServerUser user = findUser(connection);
@@ -218,7 +218,11 @@ public final class ServerState {
 
         String oldNickname = user.getNickname();
 
-        if (usersByNickname.containsKey(newNickname)) {
+        if (Objects.equals(oldNickname, nickname)) {
+            throw new NoOpException();
+        }
+
+        if (usersByNickname.containsKey(newNickname) && !Objects.equals(normalizeNickname(oldNickname), newNickname)) {
             throw new StateInvariantException(
                     "NICK %s already in use".formatted(newNickname),
                     oldNickname != null ? oldNickname : newNickname,
@@ -229,10 +233,10 @@ public final class ServerState {
         if (oldNickname != null) {
             Transaction.removeTransactionally(usersByNickname, oldNickname);
         }
-        user.setNickname(newNickname);
+        user.setNickname(nickname);
         Transaction.putTransactionally(usersByNickname, newNickname, user);
 
-        return new Pair<>(oldNickname, newNickname);
+        return new Pair<>(oldNickname, nickname);
     }
 
     public void setUserInfo(IRCConnection connection, String username, String realName)

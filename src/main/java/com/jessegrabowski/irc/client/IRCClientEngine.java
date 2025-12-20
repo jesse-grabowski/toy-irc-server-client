@@ -1060,19 +1060,30 @@ public class IRCClientEngine implements Closeable {
         }
 
         String oldTopic = state.getChannelTopic(message.getChannel());
-        state.setChannelTopic(message.getChannel(), message.getTopic());
+
+        String newTopic = message.getTopic();
+        if (newTopic != null && newTopic.isBlank()) {
+            newTopic = null;
+        }
+
+        state.setChannelTopic(message.getChannel(), newTopic);
         state.setChannelTopicUpdater(
                 message.getChannel(),
                 message.getPrefixName(),
                 getMessageInstant(message).toEpochMilli());
-        terminal.println(makeSystemTerminalMessage(s(
-                f(message.getPrefixName()),
-                " changed the topic of ",
-                f(message.getChannel()),
-                oldTopic != null && !oldTopic.isBlank() ? s(" from \"", f(Color.DARK_GRAY, oldTopic), "\"") : "",
-                " to \"",
-                f(Color.ORANGE, message.getTopic()),
-                "\"")));
+        if (newTopic != null) {
+            terminal.println(makeSystemTerminalMessage(s(
+                    f(message.getPrefixName()),
+                    " changed the topic of ",
+                    f(message.getChannel()),
+                    oldTopic != null && !oldTopic.isBlank() ? s(" from \"", f(Color.DARK_GRAY, oldTopic), "\"") : "",
+                    " to \"",
+                    f(Color.ORANGE, message.getTopic()),
+                    "\"")));
+        } else {
+            terminal.println(makeSystemTerminalMessage(
+                    s(f(message.getPrefixName()), " unset the topic of ", f(message.getChannel()))));
+        }
     }
 
     private void handle(IRCMessage001 message) {
