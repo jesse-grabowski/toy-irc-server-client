@@ -86,6 +86,8 @@ public class IRCMessageUnmarshaller {
     public IRCMessage unmarshal(IRCServerParameters serverParameters, Charset charset, String message) {
         try {
             enforceLength(charset, message);
+        } catch (MessageTooLongException e) {
+            return new IRCMessageTooLong(null, message, new LinkedHashMap<>(), null, null, null);
         } catch (IllegalArgumentException e) {
             return new IRCMessageUnsupported(null, message, new LinkedHashMap<>(), null, null, null, e.getMessage());
         }
@@ -266,6 +268,9 @@ public class IRCMessageUnmarshaller {
                             prefix.host(),
                             "command not recognized");
             };
+        } catch (NotEnoughParametersException e) {
+            return new IRCMessageNotEnoughParameters(
+                    command, message, tags, prefix.name(), prefix.user(), prefix.host());
         } catch (Exception e) {
             return new IRCMessageParseError(
                     command,
@@ -279,14 +284,14 @@ public class IRCMessageUnmarshaller {
         }
     }
 
-    private void enforceLength(Charset charset, String message) {
+    private void enforceLength(Charset charset, String message) throws MessageTooLongException {
         // empty methods can't be valid, no need to even check
         if (message.isEmpty()) {
             throw new IllegalArgumentException("message is empty");
         }
-        // 8191 (tags) + 510 (body), quick sanity check before we get more involved
-        if (message.length() > 8701) {
-            throw new IllegalArgumentException("message is too long");
+        // 4095 (tags) + 510 (body), quick sanity check before we get more involved
+        if (message.length() > 4605) {
+            throw new MessageTooLongException();
         }
         int i = 0;
         if (message.charAt(0) == '@') {
@@ -297,12 +302,12 @@ public class IRCMessageUnmarshaller {
             while (i < message.length() && message.charAt(i) == ' ') {
                 i++;
             }
-            if (message.substring(0, i).getBytes(charset).length > 8191) {
-                throw new IllegalArgumentException("tag part is too long");
+            if (message.substring(0, i).getBytes(charset).length > 4095) {
+                throw new MessageTooLongException();
             }
         }
         if (message.substring(i).getBytes(charset).length > 510) {
-            throw new IllegalArgumentException("message body is too long");
+            throw new MessageTooLongException();
         }
     }
 
@@ -519,7 +524,7 @@ public class IRCMessageUnmarshaller {
     }
 
     private IRCMessagePING parsePing(Parameters parameters) throws Exception {
-        return parameters.inject(required("token"), IRCMessagePING::new);
+        return parameters.inject(requiredAllowEmpty("token"), IRCMessagePING::new);
     }
 
     private IRCMessagePONG parsePong(Parameters parameters) throws Exception {

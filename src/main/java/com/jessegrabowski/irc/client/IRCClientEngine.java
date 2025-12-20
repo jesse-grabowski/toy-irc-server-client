@@ -642,6 +642,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageUnsupported m -> terminal.println(makeSystemErrorMessage("» " + m.getRawMessage()));
             case IRCMessageParseError m ->
                 terminal.println(makeSystemErrorMessage("(PARSE ERROR) » " + m.getRawMessage()));
+            case IRCMessageTooLong m -> terminal.println(makeSystemErrorMessage("(TOO LONG) » " + m.getRawMessage()));
+            case IRCMessageNotEnoughParameters m ->
+                terminal.println(makeSystemErrorMessage("(MISSING PARAMS) » " + m.getRawMessage()));
         }
         updateStatusAndPrompt();
     }

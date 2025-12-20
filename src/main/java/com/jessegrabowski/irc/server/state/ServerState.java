@@ -36,6 +36,7 @@ import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
 import com.jessegrabowski.irc.protocol.model.IRCMessage401;
 import com.jessegrabowski.irc.protocol.model.IRCMessage403;
+import com.jessegrabowski.irc.protocol.model.IRCMessage405;
 import com.jessegrabowski.irc.protocol.model.IRCMessage432;
 import com.jessegrabowski.irc.protocol.model.IRCMessage433;
 import com.jessegrabowski.irc.protocol.model.IRCMessage442;
@@ -57,7 +58,7 @@ import java.util.stream.Collectors;
 
 public final class ServerState {
 
-    private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z]+[a-z0-9]*$");
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z]+[a-z0-9_-]*$");
 
     private static final int REAL_NAME_MAX_LENGTH = 50;
 
@@ -304,7 +305,7 @@ public final class ServerState {
                         user.getNickname(),
                         mask,
                         "No such channel '%s'".formatted(mask),
-                        IRCMessage401::new);
+                        IRCMessage403::new);
             }
 
             Set<IRCConnection> connections = new HashSet<>();
@@ -375,7 +376,8 @@ public final class ServerState {
         return channel;
     }
 
-    public void setChannelTopic(IRCConnection connection, ServerChannel channel, String topic) throws StateInvariantException {
+    public void setChannelTopic(IRCConnection connection, ServerChannel channel, String topic)
+            throws StateInvariantException {
         ServerUser user = findUser(connection);
         if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
@@ -424,7 +426,7 @@ public final class ServerState {
                     user.getNickname(),
                     normalizedChannelName,
                     "Channel limit (%s:%d) exceeded".formatted(prefix, limit),
-                    IRCMessage476::new);
+                    IRCMessage405::new);
         }
 
         ServerChannel channel = channels.get(normalizedChannelName);

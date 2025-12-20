@@ -199,6 +199,8 @@ public class IRCMessageMarshaller {
             case IRCMessage723 m -> marshal(m, this::marshal723);
             case IRCMessageUnsupported m -> m.getRawMessage();
             case IRCMessageParseError m -> m.getRawMessage();
+            case IRCMessageTooLong m -> m.getRawMessage();
+            case IRCMessageNotEnoughParameters m -> m.getRawMessage();
         };
     }
 

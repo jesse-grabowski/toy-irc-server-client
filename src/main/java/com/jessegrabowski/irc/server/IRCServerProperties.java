@@ -38,6 +38,7 @@ import java.util.logging.Level;
 
 public class IRCServerProperties implements ArgsProperties {
     private String host = "127.0.0.1";
+    private String server = "ritsirc";
     private int port = 6667;
     private String password;
     private String logFile = "irc-server.log";
@@ -70,6 +71,14 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setHost(String host) {
         this.host = host;
+    }
+
+    public String getServer() {
+        return server;
+    }
+
+    public void setServer(String server) {
+        this.server = server;
     }
 
     public int getPort() {

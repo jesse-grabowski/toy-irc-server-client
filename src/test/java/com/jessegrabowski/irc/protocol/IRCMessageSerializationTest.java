@@ -65,6 +65,7 @@ public class IRCMessageSerializationTest {
                 Arguments.of("AWAY", "AWAY"),
                 Arguments.of("AWAY :I'll be right back", "AWAY :I'll be right back"),
                 Arguments.of("PING :12345", "PING :12345"),
+                Arguments.of("PING :", "PING :"),
                 Arguments.of("PONG :12345", "PONG :12345"),
                 Arguments.of("PONG irc.example.com :12345", "PONG irc.example.com :12345"),
                 Arguments.of(
@@ -691,30 +692,13 @@ public class IRCMessageSerializationTest {
 
     static Stream<Arguments> parseErrorMessages() {
         return Stream.of(
-                Arguments.of("PING"),
-                Arguments.of("PONG"),
-                Arguments.of("JOIN"),
-                Arguments.of("KICK #chan"),
-                Arguments.of("MODE"),
-                Arguments.of("NOTICE #chan"),
-                Arguments.of("PRIVMSG #chan"),
-                Arguments.of("PASS"),
-                Arguments.of("NICK"),
-                Arguments.of("USER myuser 0 *"),
                 Arguments.of(":irc.example.net 010 alice irc.backup.example.net notaport :Please connect"),
                 Arguments.of(":irc.example.net 265 alice notInt 50 :Current local users"),
                 Arguments.of(":irc.example.net 329 alice #chat notATimestamp"),
                 Arguments.of(":irc.example.net 333 alice #chat bob notATimestamp"),
                 Arguments.of(":irc.example.net 317 alice bob notInt 1700000000 :seconds idle, signon time"),
                 Arguments.of(":irc.example.net 317 alice bob 120 notALong :seconds idle, signon time"),
-                Arguments.of(":irc.example.net 472 alice :missing modechar"),
-                Arguments.of(":irc.example.net 696 alice #chat k :missing parameter and description"),
-                Arguments.of("CAP LS"),
-                Arguments.of("CAP REQ"),
-                Arguments.of("CAP nick ACK"),
                 Arguments.of("CAP nick ACK :"),
-                Arguments.of("CAP nick LS"),
-                Arguments.of("CAP nick DEL"),
                 Arguments.of("CAP nick FOO :bar"),
                 Arguments.of(":nick! PRIVMSG #c :hi"),
                 Arguments.of(":nick! PRIVMSG #c :hi"),
@@ -722,7 +706,6 @@ public class IRCMessageSerializationTest {
                 Arguments.of(":nick!user@ PRIVMSG #c :hi"),
                 Arguments.of(":nick!user@host@extra PRIVMSG #c :hi"),
                 Arguments.of(":@host PRIVMSG #c :hi"),
-                Arguments.of("PING :"),
                 Arguments.of("ERROR :"),
                 Arguments.of("PASS :"),
                 Arguments.of("NICK :"),
@@ -741,16 +724,44 @@ public class IRCMessageSerializationTest {
                 Arguments.of("CAP nick ACK :"),
                 Arguments.of("JOIN :"),
                 Arguments.of("PART :"),
+                Arguments.of("PONG :"),
+                Arguments.of("CAP"),
+                Arguments.of("CAP nick"));
+    }
+
+    @ParameterizedTest(name = "{index}: parse error for \"{0}\"")
+    @MethodSource("notEnoughParametersMessages")
+    void unmarshalProducesNotEnoughParameters(String input) {
+        IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
+        assertInstanceOf(IRCMessageNotEnoughParameters.class, parsed);
+    }
+
+    static Stream<Arguments> notEnoughParametersMessages() {
+        return Stream.of(
+                Arguments.of("PING"),
+                Arguments.of("PONG"),
+                Arguments.of("JOIN"),
+                Arguments.of("KICK #chan"),
+                Arguments.of("MODE"),
+                Arguments.of("NOTICE #chan"),
+                Arguments.of("PRIVMSG #chan"),
+                Arguments.of("PASS"),
+                Arguments.of("NICK"),
+                Arguments.of("USER myuser 0 *"),
+                Arguments.of(":irc.example.net 472 alice :missing modechar"),
+                Arguments.of(":irc.example.net 696 alice #chat k :missing parameter and description"),
+                Arguments.of("CAP LS"),
+                Arguments.of("CAP REQ"),
+                Arguments.of("CAP nick ACK"),
+                Arguments.of("CAP nick LS"),
+                Arguments.of("CAP nick DEL"),
                 Arguments.of("PRIVMSG :hi"),
                 Arguments.of("NOTICE :hi"),
-                Arguments.of("PONG :"),
                 Arguments.of("PRIVMSG #c\t:hi"),
                 Arguments.of("PING  "),
                 Arguments.of("PRIVMSG #c"),
                 Arguments.of("NOTICE #c"),
                 Arguments.of("ERROR"),
-                Arguments.of("CAP"),
-                Arguments.of("CAP nick"),
                 Arguments.of("CAP nick ACK"));
     }
 
@@ -806,8 +817,7 @@ public class IRCMessageSerializationTest {
     @MethodSource("lengthInvalidMessages")
     void lengthInvalidMessages(String input) {
         IRCMessage parsed = unmarshaller.unmarshal(new IRCServerParameters(), StandardCharsets.UTF_8, input);
-        assertInstanceOf(IRCMessageUnsupported.class, parsed);
-        assertFalse(parsed instanceof IRCMessageParseError);
+        assertInstanceOf(IRCMessageTooLong.class, parsed);
     }
 
     static Stream<Arguments> lengthInvalidMessages() {
