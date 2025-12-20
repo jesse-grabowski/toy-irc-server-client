@@ -64,4 +64,8 @@ public class ServerChannelMembership {
                 .map(IRCChannelMembershipMode::getPrefix)
                 .orElse(null);
     }
+
+    public boolean hasAtLeast(IRCChannelMembershipMode mode) {
+        return modes.stream().anyMatch(m -> m.isAtLeast(mode));
+    }
 }

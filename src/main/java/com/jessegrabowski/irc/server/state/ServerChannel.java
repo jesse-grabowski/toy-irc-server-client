@@ -172,6 +172,12 @@ public final class ServerChannel {
         return topicSetBy;
     }
 
+    void setTopicSetBy(ServerSetBy topicSetBy) {
+        ServerSetBy oldTopicSetBy = this.topicSetBy;
+        this.topicSetBy = topicSetBy;
+        Transaction.addCompensation(() -> this.topicSetBy = oldTopicSetBy);
+    }
+
     public long getTopicSetAt() {
         return topicSetAt;
     }

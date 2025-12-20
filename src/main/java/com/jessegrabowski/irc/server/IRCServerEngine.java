@@ -366,7 +366,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessagePONG m -> handle(connection, m);
                 case IRCMessagePRIVMSG m -> handle(connection, m);
                 case IRCMessageQUIT m -> {}
-                case IRCMessageTOPIC m -> {}
+                case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
                 default -> {
                     send(connection, server(), message, "NOT IMPLEMENTED", IRCMessageERROR::new);
@@ -596,6 +596,21 @@ public class IRCServerEngine implements Closeable {
                 send(connection, me, message, List.of(target.getMask()), message.getMessage(), IRCMessagePRIVMSG::new);
             }
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageTOPIC message) throws StateInvariantException {
+        if (message.getTopic() == null) {
+            sendTopic(connection, message, message.getChannel());
+            return;
+        }
+
+        ServerState state = serverStateGuard.getState();
+        ServerChannel channel = state.getExistingChannel(connection, message.getChannel());
+        state.setChannelTopic(connection, channel, message.getTopic());
+        ServerUser me = state.getUserForConnection(connection);
+        MessageTarget target = state.getWatchers(channel);
+        sendToTarget(me, message, target, (raw, tags, nick, user, host)
+                -> new IRCMessageTOPIC(raw, tags, nick, user, host, channel.getName(), message.getTopic()));
     }
 
     private void handle(IRCConnection connection, IRCMessageUSER message)

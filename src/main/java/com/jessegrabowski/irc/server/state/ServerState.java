@@ -38,9 +38,11 @@ import com.jessegrabowski.irc.protocol.model.IRCMessage401;
 import com.jessegrabowski.irc.protocol.model.IRCMessage403;
 import com.jessegrabowski.irc.protocol.model.IRCMessage432;
 import com.jessegrabowski.irc.protocol.model.IRCMessage433;
+import com.jessegrabowski.irc.protocol.model.IRCMessage442;
 import com.jessegrabowski.irc.protocol.model.IRCMessage451;
 import com.jessegrabowski.irc.protocol.model.IRCMessage462;
 import com.jessegrabowski.irc.protocol.model.IRCMessage476;
+import com.jessegrabowski.irc.protocol.model.IRCMessage482;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.Pair;
@@ -371,6 +373,34 @@ public final class ServerState {
         }
 
         return channel;
+    }
+
+    public void setChannelTopic(IRCConnection connection, ServerChannel channel, String topic) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        if (!channel.getMembers().contains(user)) {
+            throw new StateInvariantException(
+                    "Not a member of channel '%s'".formatted(channel.getName()),
+                    user.getNickname(),
+                    channel.getName(),
+                    IRCMessage442::new);
+        }
+
+        if (channel.checkFlag('t') && !channel.getMembership(user).hasAtLeast(IRCChannelMembershipMode.HALFOP)) {
+            throw new StateInvariantException(
+                    "User does not have permission to set topic",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Protected topic mode enabled, halfop required to set topic",
+                    IRCMessage482::new);
+        }
+
+        channel.setTopic(topic);
+        channel.setTopicSetAt(System.currentTimeMillis());
+        channel.setTopicSetBy(new ServerSetBy.SetByUser(user));
     }
 
     public void joinChannel(IRCConnection connection, String channelName, String key) throws StateInvariantException {
