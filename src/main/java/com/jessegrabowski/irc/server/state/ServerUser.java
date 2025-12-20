@@ -54,6 +54,7 @@ public final class ServerUser implements MessageSource {
     private String realName;
     private String awayStatus;
     private boolean operator;
+    private String quitMessage;
 
     ServerUser() {}
 
@@ -188,5 +189,15 @@ public final class ServerUser implements MessageSource {
 
     public Set<ServerChannel> getChannels() {
         return Set.copyOf(channels);
+    }
+
+    void setQuitMessage(String value) {
+        String oldQuitMessage = this.quitMessage;
+        Transaction.addCompensation(() -> this.quitMessage = oldQuitMessage);
+        this.quitMessage = value;
+    }
+
+    public String getQuitMessage() {
+        return quitMessage;
     }
 }

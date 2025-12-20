@@ -348,8 +348,13 @@ public class IRCServerEngine implements Closeable {
                     me,
                     null,
                     target,
-                    (raw, tags, nick, user, host) ->
-                            new IRCMessageQUIT(raw, tags, nick, user, host, "user disconnected"));
+                    (raw, tags, nick, user, host) -> new IRCMessageQUIT(
+                            raw,
+                            tags,
+                            nick,
+                            user,
+                            host,
+                            Objects.requireNonNullElse(me.getQuitMessage(), "user disconnected")));
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Error sending QUIT message during disconnect", e);
         }
@@ -386,7 +391,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessagePING m -> handle(connection, m);
                 case IRCMessagePONG m -> handle(connection, m);
                 case IRCMessagePRIVMSG m -> handle(connection, m);
-                case IRCMessageQUIT m -> {}
+                case IRCMessageQUIT m -> handle(connection, m);
                 case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
                 case IRCMessageTooLong m -> {
@@ -658,6 +663,13 @@ public class IRCServerEngine implements Closeable {
                 echo(connection, me, message, List.of(target.getMask()), message.getMessage(), IRCMessagePRIVMSG::new);
             }
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageQUIT message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        state.markQuit(connection, "Quit: " + Objects.requireNonNullElse(message.getReason(), "client requested QUIT"));
+        send(connection, server(), message, "Exiting due to QUIT", IRCMessageERROR::new);
+        connection.closeDeferred();
     }
 
     private void handle(IRCConnection connection, IRCMessageTOPIC message) throws StateInvariantException {

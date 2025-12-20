@@ -34,5 +34,5 @@ package com.jessegrabowski.irc.server.state;
 public enum ServerConnectionState {
     NEW,
     REGISTERED,
-    DISCONNECTED
+    QUITTING
 }

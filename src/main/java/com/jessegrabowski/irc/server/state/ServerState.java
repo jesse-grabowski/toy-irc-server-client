@@ -97,6 +97,12 @@ public final class ServerState {
         return connection;
     }
 
+    public void markQuit(IRCConnection connection, String quitMessage) {
+        ServerUser user = findUser(connection);
+        user.setQuitMessage(quitMessage);
+        user.setState(ServerConnectionState.QUITTING);
+    }
+
     private ServerUser findUser(IRCConnection connection) {
         return users.get(connection);
     }
