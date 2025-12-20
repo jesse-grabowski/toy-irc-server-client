@@ -511,9 +511,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage400 m -> {
                 /* ignore */
             }
-            case IRCMessage401 m -> {
-                /* ignore */
-            }
+            case IRCMessage401 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage402 m -> {
                 /* ignore */
             }

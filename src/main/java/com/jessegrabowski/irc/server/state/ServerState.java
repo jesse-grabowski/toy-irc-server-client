@@ -34,6 +34,7 @@ package com.jessegrabowski.irc.server.state;
 import com.jessegrabowski.irc.network.IRCConnection;
 import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.model.IRCMessage401;
 import com.jessegrabowski.irc.protocol.model.IRCMessage403;
 import com.jessegrabowski.irc.protocol.model.IRCMessage432;
 import com.jessegrabowski.irc.protocol.model.IRCMessage433;
@@ -45,6 +46,7 @@ import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -96,7 +98,7 @@ public final class ServerState {
     }
 
     private ServerUser findUser(String nickname) {
-        return usersByNickname.get(nickname);
+        return usersByNickname.get(normalizeNickname(nickname));
     }
 
     public IRCServerParameters getParameters() {
@@ -120,9 +122,9 @@ public final class ServerState {
         Transaction.putTransactionally(connectionsByUser, user, connection);
     }
 
-    public ServerUser disconnect(IRCConnection connection) {
+    public void disconnect(IRCConnection connection) {
         if (!users.containsKey(connection)) {
-            return null;
+            return;
         }
 
         ServerUser user = Transaction.removeTransactionally(users, connection);
@@ -136,8 +138,6 @@ public final class ServerState {
                 Transaction.removeTransactionally(channels, channel.getName());
             }
         }
-
-        return user;
     }
 
     public void startCapabilityNegotiation(IRCConnection connection) {
@@ -193,7 +193,7 @@ public final class ServerState {
 
     public Pair<String, String> setNickname(IRCConnection connection, String nickname)
             throws StateInvariantException, InvalidPasswordException {
-        String newNickname = parameters.getCaseMapping().normalizeNickname(nickname);
+        String newNickname = normalizeNickname(nickname);
         if (newNickname.length() > parameters.getNickLength()) {
             newNickname = newNickname.substring(0, parameters.getNickLength());
         }
@@ -290,6 +290,49 @@ public final class ServerState {
         return true;
     }
 
+    public MessageTarget resolveMask(IRCConnection connection, String mask) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        if (parameters.getChannelTypes().stream().anyMatch(c -> mask.charAt(0) == c)) {
+            ServerChannel channel = findChannel(mask);
+            if (channel == null) {
+                throw new StateInvariantException(
+                        "Could not find channel '%s'".formatted(mask),
+                        user.getNickname(),
+                        mask,
+                        "No such channel '%s'".formatted(mask),
+                        IRCMessage401::new);
+            }
+
+            Set<IRCConnection> connections = new HashSet<>();
+            for (ServerUser channelUser : channel.getMembers()) {
+                if (channelUser != user) {
+                    connections.add(getConnectionForUser(channelUser));
+                }
+            }
+            return new MessageTarget(mask, connections);
+        }
+
+        ServerUser targetUser = findUser(mask);
+        if (targetUser == null || targetUser.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException(
+                    "Could not find user '%s'".formatted(mask),
+                    user.getNickname(),
+                    mask,
+                    "No such nick '%s'".formatted(mask),
+                    IRCMessage401::new);
+        }
+
+        return new MessageTarget(mask, Set.of(getConnectionForUser(targetUser)));
+    }
+
+    public ServerChannel findChannel(String channelName) {
+        return channels.get(normalizeChannelName(channelName));
+    }
+
     public ServerChannel getExistingChannel(IRCConnection connection, String channelName)
             throws StateInvariantException {
         ServerUser user = findUser(connection);
@@ -297,10 +340,7 @@ public final class ServerState {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
 
-        String normalizedChannelName = parameters.getCaseMapping().normalizeChannel(channelName);
-        if (normalizedChannelName.length() > parameters.getChannelLength()) {
-            normalizedChannelName = normalizedChannelName.substring(0, parameters.getChannelLength());
-        }
+        String normalizedChannelName = normalizeChannelName(channelName);
 
         ServerChannel channel = channels.get(normalizedChannelName);
         if (channel == null) {
@@ -321,10 +361,7 @@ public final class ServerState {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
 
-        String normalizedChannelName = parameters.getCaseMapping().normalizeChannel(channelName);
-        if (normalizedChannelName.length() > parameters.getChannelLength()) {
-            normalizedChannelName = normalizedChannelName.substring(0, parameters.getChannelLength());
-        }
+        String normalizedChannelName = normalizeChannelName(channelName);
 
         validateChannelName(user.getNickname(), normalizedChannelName);
 
@@ -354,6 +391,10 @@ public final class ServerState {
         user.addChannel(channel);
     }
 
+    private String normalizeNickname(String nickname) {
+        return parameters.getCaseMapping().normalizeNickname(nickname);
+    }
+
     private void validateNickname(String client, String nickname) throws StateInvariantException {
         if (parameters.getChannelTypes().stream().anyMatch(c -> nickname.charAt(0) == c)) {
             throw new StateInvariantException(
@@ -368,6 +409,14 @@ public final class ServerState {
                     nickname,
                     IRCMessage432::new);
         }
+    }
+
+    private String normalizeChannelName(String channelName) {
+        String normalizedChannelName = parameters.getCaseMapping().normalizeChannel(channelName);
+        if (normalizedChannelName.length() > parameters.getChannelLength()) {
+            normalizedChannelName = normalizedChannelName.substring(0, parameters.getChannelLength());
+        }
+        return normalizedChannelName;
     }
 
     private void validateChannelName(String client, String channel) throws StateInvariantException {

@@ -37,7 +37,7 @@ import java.nio.file.Paths;
 import java.util.logging.Level;
 
 public class IRCServerProperties implements ArgsProperties {
-    private String host;
+    private String host = "127.0.0.1";
     private int port = 6667;
     private String password;
     private String logFile = "irc-server.log";

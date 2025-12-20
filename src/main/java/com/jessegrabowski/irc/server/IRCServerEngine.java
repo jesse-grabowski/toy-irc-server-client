@@ -45,6 +45,7 @@ import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
 import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.state.InvalidPasswordException;
 import com.jessegrabowski.irc.server.state.MessageSource;
+import com.jessegrabowski.irc.server.state.MessageTarget;
 import com.jessegrabowski.irc.server.state.ServerChannel;
 import com.jessegrabowski.irc.server.state.ServerChannelMembership;
 import com.jessegrabowski.irc.server.state.ServerState;
@@ -290,6 +291,11 @@ public class IRCServerEngine implements Closeable {
         if (state.hasCapability(connection, IRCCapability.SERVER_TIME)) {
             tags.put("time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()));
         }
+
+        if (initiator == null) {
+            return tags;
+        }
+
         for (Map.Entry<String, String> entry : initiator.getTags().entrySet()) {
             if (entry.getKey().startsWith("+")) {
                 tags.put(entry.getKey(), entry.getValue());
@@ -316,6 +322,18 @@ public class IRCServerEngine implements Closeable {
 
     private void handleDisconnect(IRCConnection connection) {
         ServerState state = serverStateGuard.getState();
+        try {
+            ServerUser me = state.getUserForConnection(connection);
+            sendToWatchers(
+                    connection,
+                    me,
+                    null,
+                    false,
+                    (raw, tags, nick, user, host) ->
+                            new IRCMessageQUIT(raw, tags, nick, user, host, "user disconnected"));
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Error sending QUIT message during disconnect", e);
+        }
         state.disconnect(connection);
     }
 
@@ -340,13 +358,13 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageMODE m -> {}
                 case IRCMessageNAMES m -> {}
                 case IRCMessageNICK m -> handle(connection, m);
-                case IRCMessageNOTICE m -> {}
+                case IRCMessageNOTICE m -> handle(connection, m);
                 case IRCMessageOPER m -> {}
                 case IRCMessagePART m -> {}
                 case IRCMessagePASS m -> handle(connection, m);
                 case IRCMessagePING m -> handle(connection, m);
                 case IRCMessagePONG m -> handle(connection, m);
-                case IRCMessagePRIVMSG m -> {}
+                case IRCMessagePRIVMSG m -> handle(connection, m);
                 case IRCMessageQUIT m -> {}
                 case IRCMessageTOPIC m -> {}
                 case IRCMessageUSER m -> handle(connection, m);
@@ -481,6 +499,26 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
+    private void handle(IRCConnection connection, IRCMessageNOTICE message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        List<MessageTarget> targets = new ArrayList<>();
+        for (String target : message.getTargets()) {
+            targets.add(state.resolveMask(connection, target));
+        }
+        for (MessageTarget target : targets) {
+            sendToTarget(
+                    me,
+                    message,
+                    target,
+                    (raw, tags, nick, user, host) -> new IRCMessageNOTICE(
+                            raw, tags, nick, user, host, List.of(target.getMask()), message.getMessage()));
+            if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
+                send(connection, me, message, List.of(target.getMask()), message.getMessage(), IRCMessageNOTICE::new);
+            }
+        }
+    }
+
     private void handle(IRCConnection connection, IRCMessagePASS message)
             throws StateInvariantException, InvalidPasswordException {
         ServerState state = serverStateGuard.getState();
@@ -496,11 +534,32 @@ public class IRCServerEngine implements Closeable {
         try {
             long token = Long.parseLong(message.getToken());
             long lastPing = state.getLastPing(connection);
-            if (token <= lastPing) {
+            long lastPong = state.getLastPong(connection);
+            if (token <= lastPing && token >= lastPong) {
                 state.setLastPong(connection, token);
             }
         } catch (NumberFormatException e) {
             LOG.log(Level.FINE, "Invalid PONG token", e);
+        }
+    }
+
+    private void handle(IRCConnection connection, IRCMessagePRIVMSG message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        List<MessageTarget> targets = new ArrayList<>();
+        for (String target : message.getTargets()) {
+            targets.add(state.resolveMask(connection, target));
+        }
+        for (MessageTarget target : targets) {
+            sendToTarget(
+                    me,
+                    message,
+                    target,
+                    (raw, tags, nick, user, host) -> new IRCMessagePRIVMSG(
+                            raw, tags, nick, user, host, List.of(target.getMask()), message.getMessage()));
+            if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
+                send(connection, me, message, List.of(target.getMask()), message.getMessage(), IRCMessagePRIVMSG::new);
+            }
         }
     }
 
@@ -686,14 +745,23 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
+    private <T extends IRCMessage> void sendToTarget(
+            MessageSource messageSource,
+            IRCMessage initiator,
+            MessageTarget target,
+            IRCMessageFactory0<T> factory) {
+        for (IRCConnection targetConnection : target.getConnections()) {
+            send(targetConnection, messageSource, initiator, factory);
+        }
+    }
+
     private void ping() {
         ServerState state = serverStateGuard.getState();
         Set<IRCConnection> connections = state.getConnections();
         long now = System.currentTimeMillis();
         for (IRCConnection connection : connections) {
             long lastPong = state.getLastPong(connection);
-            long lastPing = state.getLastPing(connection);
-            if (lastPing - lastPong > properties.getMaxIdleMilliseconds()) {
+            if (now - lastPong > properties.getMaxIdleMilliseconds()) {
                 send(
                         connection,
                         server(),
