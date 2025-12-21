@@ -35,6 +35,7 @@ import com.jessegrabowski.irc.args.ArgsParser;
 import com.jessegrabowski.irc.args.ArgsParserHelpRequestedException;
 import com.jessegrabowski.irc.args.ArgsToken;
 import com.jessegrabowski.irc.args.ArgsTokenizer;
+import com.jessegrabowski.irc.network.Acceptor;
 import com.jessegrabowski.irc.util.LoggingConfigurer;
 import java.io.IOException;
 import java.util.List;
@@ -47,7 +48,7 @@ public class IRCServer {
         LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()), true);
 
         IRCServerEngine engine = new IRCServerEngine(properties);
-        IRCServerAcceptor acceptor = new IRCServerAcceptor(null, properties.getPort(), engine::accept);
+        Acceptor acceptor = new Acceptor(null, properties.getPort(), engine::accept);
         acceptor.start();
     }
 

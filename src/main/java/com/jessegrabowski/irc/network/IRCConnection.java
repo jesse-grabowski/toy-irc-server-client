@@ -68,11 +68,11 @@ public final class IRCConnection implements Closeable {
     private static final int MAX_LINE_LENGTH = 10000;
 
     private static final ThreadFactory INGRESS_THREAD_FACTORY =
-            Thread.ofVirtual().name("irc-ingress-", 0).factory();
+            Thread.ofVirtual().name("IRCConnection-Ingress-", 0).factory();
     private static final ThreadFactory EGRESS_THREAD_FACTORY =
-            Thread.ofVirtual().name("irc-egress-", 0).factory();
+            Thread.ofVirtual().name("IRCConnection-Egress-", 0).factory();
     private static final ThreadFactory FINALIZER_THREAD_FACTORY =
-            Thread.ofVirtual().name("irc-finalizer-", 0).factory();
+            Thread.ofVirtual().name("IRCConnection-Finalizer-", 0).factory();
 
     // arbitrary cap of 20; in practice this should almost always be empty unless there's
     // an issue with the connection
@@ -326,7 +326,7 @@ public final class IRCConnection implements Closeable {
     // to drain, then interrupt the thread and finish closing
     private void finalizeClose() {
         try {
-            egressThread.join(Duration.ofSeconds(30));
+            egressThread.join(Duration.ofSeconds(5));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

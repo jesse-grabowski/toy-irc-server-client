@@ -29,7 +29,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.server;
+package com.jessegrabowski.irc.network;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -43,9 +43,9 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 // somewhat based on Tomcat's acceptor, but simpler
-public class IRCServerAcceptor implements Closeable {
+public class Acceptor implements Closeable {
 
-    private final Logger LOG = Logger.getLogger(IRCServerAcceptor.class.getName());
+    private final Logger LOG = Logger.getLogger(Acceptor.class.getName());
 
     private final InetSocketAddress address;
     private final Consumer<Socket> dispatcher;
@@ -66,7 +66,7 @@ public class IRCServerAcceptor implements Closeable {
      *                   based on the server configuration and then dispatch it to a
      *                   separate thread for processing.
      */
-    public IRCServerAcceptor(InetAddress host, int port, Consumer<Socket> dispatcher) {
+    public Acceptor(InetAddress host, int port, Consumer<Socket> dispatcher) {
         this.address = new InetSocketAddress(host, port);
         this.dispatcher = dispatcher;
     }
@@ -89,8 +89,7 @@ public class IRCServerAcceptor implements Closeable {
 
         state = State.RUNNING;
 
-        thread =
-                new Thread(this::run, "IRCServer-Acceptor-%s:%d".formatted(address.getHostString(), address.getPort()));
+        thread = new Thread(this::run, "Acceptor-%s:%d".formatted(address.getHostString(), address.getPort()));
         thread.setDaemon(false); // block shutdown until fully closed
         thread.start();
     }

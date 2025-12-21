@@ -61,7 +61,7 @@ public class ClientCommandParser {
                         .addUsageExample("/afk [<message>]")
                         .addUsageExample("/afk")
                         .addUsageExample("/afk I'll be right back")
-                        .addStringPositional(
+                        .addGreedyStringPositional(
                                 0, ClientCommandAfk::setText, "message shown as reason for being away", false)
                         .build());
         parsers.put(

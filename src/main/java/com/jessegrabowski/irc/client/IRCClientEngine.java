@@ -155,7 +155,7 @@ public class IRCClientEngine implements Closeable {
                     properties.getCharset(),
                     properties.getConnectTimeout(),
                     properties.getReadTimeout());
-            connection.addShutdownHandler(this::afterDisconnect);
+            connection.addShutdownHandler(this::onDisconnect);
             connection.addIngressHandler(this::receive);
             connection.start();
 
@@ -211,7 +211,7 @@ public class IRCClientEngine implements Closeable {
     }
 
     // called by IRC connection as it closes
-    private void afterDisconnect() {
+    private void onDisconnect() {
         if (engineState.get() == IRCClientEngineState.CLOSED) {
             return;
         }
@@ -1408,8 +1408,7 @@ public class IRCClientEngine implements Closeable {
         IRCClientEngineState ies = engineState.get();
         RichString prompt =
                 switch (ies) {
-                    case NEW, INITIALIZING, DISCONNECTED, CONNECTING, CLOSED ->
-                        s("[", f(properties.getNickname()), "]:");
+                    case NEW, DISCONNECTED, CONNECTING, CLOSED -> s("[", f(properties.getNickname()), "]:");
                     case CONNECTED, REGISTERED ->
                         s(
                                 "[",
@@ -1420,7 +1419,7 @@ public class IRCClientEngine implements Closeable {
                 };
         RichString status =
                 switch (ies) {
-                    case NEW, INITIALIZING -> s("Initializing client, please wait...");
+                    case NEW -> s("Initializing client, please wait...");
                     case DISCONNECTED ->
                         s("Disconnected: Reconnect using `/connect` or view more options with `/help`");
                     case CONNECTING -> s("Establishing connection, please wait...");
@@ -1478,15 +1477,11 @@ public class IRCClientEngine implements Closeable {
     }
 
     public void start() {
-        if (!engineState.compareAndSet(IRCClientEngineState.NEW, IRCClientEngineState.INITIALIZING)) {
+        if (!engineState.compareAndSet(IRCClientEngineState.NEW, IRCClientEngineState.DISCONNECTED)) {
             throw new IllegalStateException("IRCClientEngine has already been started");
         }
 
         try {
-            if (!engineState.compareAndSet(IRCClientEngineState.INITIALIZING, IRCClientEngineState.DISCONNECTED)) {
-                throw new IllegalStateException("inconsistent state in initialization");
-            }
-
             LOG.info("IRCClientEngine started");
 
             // automatically connect
@@ -1533,7 +1528,6 @@ public class IRCClientEngine implements Closeable {
 
     private enum IRCClientEngineState {
         NEW,
-        INITIALIZING,
         DISCONNECTED,
         CONNECTING,
         CONNECTED,
