@@ -140,7 +140,7 @@ public final class ServerState {
             return;
         }
 
-        ServerUser user = new ServerUser();
+        ServerUser user = new ServerUser(connection.getHostAddress());
         user.setPasswordEntered(properties.getPassword() == null);
         Transaction.putTransactionally(users, connection, user);
         Transaction.putTransactionally(connectionsByUser, user, connection);

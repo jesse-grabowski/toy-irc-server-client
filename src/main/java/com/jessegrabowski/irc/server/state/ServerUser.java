@@ -43,6 +43,7 @@ public final class ServerUser implements MessageSource {
     private final Set<IRCCapability> capabilities = new HashSet<>();
     private final SequencedSet<ServerChannel> channels = new LinkedHashSet<>();
     private final Set<Character> flags = new HashSet<>();
+    private final String hostAddress;
 
     private ServerConnectionState state = ServerConnectionState.NEW;
     private long lastPinged = System.currentTimeMillis();
@@ -56,7 +57,9 @@ public final class ServerUser implements MessageSource {
     private boolean operator;
     private String quitMessage;
 
-    ServerUser() {}
+    ServerUser(String hostAddress) {
+        this.hostAddress = hostAddress;
+    }
 
     public ServerConnectionState getState() {
         return state;
@@ -123,8 +126,8 @@ public final class ServerUser implements MessageSource {
     }
 
     @Override
-    public boolean includeHostname() {
-        return true;
+    public String getHostAddress() {
+        return hostAddress;
     }
 
     void setUsername(String username) {

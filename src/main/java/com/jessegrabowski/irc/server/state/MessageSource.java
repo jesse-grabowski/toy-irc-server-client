@@ -37,15 +37,17 @@ public sealed interface MessageSource
 
     String getUsername();
 
-    boolean includeHostname();
+    String getHostAddress();
 
     final class NamedMessageSource implements MessageSource {
         private final String nickname;
         private final String username;
+        private final String hostAddress;
 
-        public NamedMessageSource(String nickname, String username) {
+        public NamedMessageSource(String nickname, String username, String hostAddress) {
             this.nickname = nickname;
             this.username = username;
+            this.hostAddress = hostAddress;
         }
 
         @Override
@@ -59,8 +61,8 @@ public sealed interface MessageSource
         }
 
         @Override
-        public boolean includeHostname() {
-            return true;
+        public String getHostAddress() {
+            return hostAddress;
         }
     }
 
@@ -83,8 +85,8 @@ public sealed interface MessageSource
         }
 
         @Override
-        public boolean includeHostname() {
-            return false;
+        public String getHostAddress() {
+            return null;
         }
     }
 }

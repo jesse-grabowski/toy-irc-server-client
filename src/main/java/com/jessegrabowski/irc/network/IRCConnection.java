@@ -365,4 +365,8 @@ public final class IRCConnection implements Closeable {
         CLOSING,
         CLOSED
     }
+
+    public String getHostAddress() {
+        return socket.getInetAddress().getHostAddress();
+    }
 }

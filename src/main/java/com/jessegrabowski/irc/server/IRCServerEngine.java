@@ -333,7 +333,7 @@ public class IRCServerEngine implements Closeable {
     }
 
     private String makePrefixHost(MessageSource sender) {
-        return sender.includeHostname() ? properties.getHost() : null;
+        return sender.getHostAddress();
     }
 
     private MessageSource server() {
@@ -583,7 +583,7 @@ public class IRCServerEngine implements Closeable {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
         MessageSource sender = state.isRegistered(connection)
-                ? new MessageSource.NamedMessageSource(me.getNickname(), me.getUsername())
+                ? new MessageSource.NamedMessageSource(me.getNickname(), me.getUsername(), me.getHostAddress())
                 : server();
         MessageTarget watchers = state.getWatchers(me, state.isRegistered(connection));
         Pair<String, String> result = state.setNickname(connection, message.getNick());
