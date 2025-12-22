@@ -66,8 +66,7 @@ public class IRCMessageUnmarshaller {
     private static final Logger LOG = Logger.getLogger(IRCMessageUnmarshaller.class.getName());
 
     // This is really hard to read, but it's just splitting out the tags/prefix/command/params parts
-    // as defined
-    // in the modern IRC grammar (but not processing individual tags/params yet)
+    // as defined in the modern IRC grammar (but not processing individual tags/params yet)
     private static final Pattern MESSAGE_PATTERN = Pattern.compile(
             "^(?:@(?<tags>[^\\s\\u0000]+)\\x20+)?(?::(?<prefix>[^\\s\\u0000]+)\\x20+)?(?<command>(?:[A-Za-z]+)|(?:\\d{3}))(?:\\x20+(?<params>[^\\u0000\\r\\n]+))?\\x20*$");
 
@@ -816,10 +815,6 @@ public class IRCMessageUnmarshaller {
     }
 
     // generic functions to parse the majority of numerics, which are rather simple
-    private <T extends IRCMessage> T parseExact(Parameters parameters, IRCMessageFactory0<T> factory) {
-        return parameters.inject(factory);
-    }
-
     private <T extends IRCMessage> T parseExact(
             Parameters parameters, String arg0, IRCMessageFactory1<T, String> factory) throws Exception {
         return parameters.inject(required(arg0), factory);
