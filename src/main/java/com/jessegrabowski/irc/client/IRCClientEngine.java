@@ -575,6 +575,13 @@ public class IRCClientEngine implements Closeable {
         }
 
         state.setAway(message.getPrefixName(), message.getText());
+        if (message.getText() != null) {
+            terminal.println(makeSystemTerminalMessage(
+                    f(Color.GRAY, s(f(message.getPrefixName()), " is now away: ", message.getText()))));
+        } else {
+            terminal.println(
+                    makeSystemTerminalMessage(f(Color.GRAY, s(f(message.getPrefixName()), " is no longer away"))));
+        }
     }
 
     private void handle(IRCMessageCAPLSResponse message) {
