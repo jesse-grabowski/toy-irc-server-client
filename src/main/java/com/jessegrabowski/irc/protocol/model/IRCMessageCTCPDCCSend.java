@@ -43,6 +43,7 @@ public final class IRCMessageCTCPDCCSend extends IRCMessage {
     private final String filename;
     private final String host;
     private final int port;
+    private final Integer fileSize;
 
     public IRCMessageCTCPDCCSend(
             String rawMessage,
@@ -53,16 +54,18 @@ public final class IRCMessageCTCPDCCSend extends IRCMessage {
             List<String> targets,
             String filename,
             String host,
-            int port) {
+            int port,
+            Integer fileSize) {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
         this.targets = targets;
         this.filename = filename;
         this.host = host;
         this.port = port;
+        this.fileSize = fileSize;
     }
 
-    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port) {
-        this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port);
+    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port, Integer fileSize) {
+        this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port, fileSize);
     }
 
     public List<String> getTargets() {
@@ -79,5 +82,9 @@ public final class IRCMessageCTCPDCCSend extends IRCMessage {
 
     public int getPort() {
         return port;
+    }
+
+    public Integer getFileSize() {
+        return fileSize;
     }
 }

@@ -113,8 +113,8 @@ public class IRCMessageUnmarshaller {
         } catch (Exception e) {
             return new IRCMessageParseError(command, message, tags, null, null, null, e.getMessage());
         }
-        Parameters parameters =
-                new Parameters(new HashSet<>(serverParameters.getPrefixes().values()), message, tags, prefix, params);
+        Parameters parameters = new Parameters(
+                new HashSet<>(serverParameters.getPrefixes().values()), message, command, tags, prefix, params);
 
         try {
             return switch (command) {
@@ -320,6 +320,7 @@ public class IRCMessageUnmarshaller {
             if (kv[0].isEmpty()) {
                 continue;
             }
+            // per IRCv3 duplicates are clobbered (last wins)
             if (kv.length == 1) {
                 map.put(kv[0], "");
             } else {
@@ -370,27 +371,34 @@ public class IRCMessageUnmarshaller {
         return new PrefixParts(name, user, host);
     }
 
-    private List<String> parseParams(String params) {
-        if (params == null || params.isBlank()) {
+    private List<String> parseParams(String paramString) {
+        if (paramString == null || paramString.isBlank()) {
             return List.of();
         }
 
-        // params starts with a :
-        if (params.startsWith(":")) {
-            if (params.length() > 1) {
-                return List.of(params.substring(1));
-            } else {
-                return List.of("");
+        int length = paramString.length();
+        if (paramString.charAt(0) == ':') {
+            return List.of(paramString.substring(1));
+        }
+
+        int i = 0;
+        List<String> params = new ArrayList<>();
+        while (i < length) {
+            int start = i;
+            while (i < length && paramString.charAt(i) != ' ') {
+                i++;
+            }
+            params.add(paramString.substring(start, i));
+            while (i < length && paramString.charAt(i) == ' ') {
+                i++;
+            }
+            if (i < length && paramString.charAt(i) == ':') {
+                params.add(paramString.substring(i + 1));
+                break;
             }
         }
 
-        // otherwise we need to handle middle params
-        String[] parts = params.split("\\x20+:", 2);
-        List<String> results = new ArrayList<>(Arrays.asList(parts[0].split("\\x20+")));
-        if (parts.length > 1) {
-            results.add(parts[1]);
-        }
-        return results;
+        return params;
     }
 
     private IRCMessageAWAY parseAway(Parameters parameters) throws Exception {
@@ -827,19 +835,122 @@ public class IRCMessageUnmarshaller {
     private IRCMessage parseCTCP(Parameters parameters) throws Exception {
         return parameters
                 .injectConditionally(false)
-                .ifIndex(1, s -> s.startsWith("\u0001ACTION"), this::parseCTCPAction)
+                .ifIndex(1, isCTCPCommand("ACTION"), this::parseCTCPAction)
+                .ifIndex(1, isCTCPCommand("CLIENTINFO"), this::parseCTCPClientInfo)
+                .ifIndex(1, isCTCPCommand("DCC SEND"), this::parseCTCPDCCSend)
+                .ifIndex(1, isCTCPCommand("PING"), this::parseCTCPPing)
+                .ifIndex(1, isCTCPCommand("VERSION"), this::parseCTCPVersion)
+                .ifNoneMatch(p -> p.inject(
+                        required("target", this::splitToList),
+                        requiredAllowEmpty("message"),
+                        "PRIVMSG".equals(p.command) ? IRCMessagePRIVMSG::new : IRCMessageNOTICE::new))
                 .inject();
     }
 
     private IRCMessage parseCTCPAction(Parameters parameters) throws Exception {
-        throw new UnsupportedOperationException("CTCP ACTION is not supported");
+        return parameters
+                .hoist(1, tokenizeCTCP(2))
+                .discard(1) // drop ACTION
+                .inject(required("target", this::splitToList), required("text"), IRCMessageCTCPAction::new);
     }
 
-    private ThrowingFunction<String, List<String>> splitCTCP(int limit) {
+    private IRCMessage parseCTCPClientInfo(Parameters parameters) throws Exception {
+        return parameters
+                .hoist(1, tokenizeCTCP(Integer.MAX_VALUE))
+                .discard(1) // drop CLIENTINFO
+                .injectConditionally(false)
+                .ifIndex(
+                        1,
+                        _ -> true,
+                        p -> p.inject(
+                                required("target", this::splitToList),
+                                greedyRequired("token"),
+                                IRCMessageCTCPClientInfoResponse::new))
+                .ifNoneMatch(p -> p.inject(required("target", this::splitToList), IRCMessageCTCPClientInfoRequest::new))
+                .inject();
+    }
+
+    private IRCMessage parseCTCPDCCSend(Parameters parameters) throws Exception {
+        return parameters
+                .hoist(1, this::tokenizeDCCSend)
+                .discard(1, 2) // drop DCC SEND
+                .inject(
+                        required("target", this::splitToList),
+                        required("filename"),
+                        required("host"),
+                        required("port", Integer::parseInt),
+                        optional("filesize", Integer::parseInt, null),
+                        IRCMessageCTCPDCCSend::new);
+    }
+
+    private IRCMessage parseCTCPPing(Parameters parameters) throws Exception {
+        return parameters
+                .hoist(1, tokenizeCTCP(2))
+                .discard(1) // drop PING
+                .inject(
+                        required("target", this::splitToList),
+                        required("args"),
+                        "PRIVMSG".equals(parameters.command)
+                                ? IRCMessageCTCPPingRequest::new
+                                : IRCMessageCTCPPingResponse::new);
+    }
+
+    private IRCMessage parseCTCPVersion(Parameters parameters) throws Exception {
+        return parameters
+                .hoist(1, tokenizeCTCP(2))
+                .discard(1) // drop VERSION
+                .injectConditionally(false)
+                .ifIndex(
+                        1,
+                        _ -> true,
+                        p -> p.inject(
+                                required("target", this::splitToList),
+                                required("arg"),
+                                IRCMessageCTCPVersionResponse::new))
+                .ifNoneMatch(p -> p.inject(required("target", this::splitToList), IRCMessageCTCPVersionRequest::new))
+                .inject();
+    }
+
+    private Predicate<String> isCTCPCommand(String command) {
+        return s -> s.startsWith("\u0001" + command + " ")
+                || s.startsWith("\u0001" + command + "\u0001")
+                || s.equals("\u0001" + command);
+    }
+
+    private ThrowingFunction<String, List<String>> tokenizeCTCP(int limit) {
         return body -> {
             String stripped = body.replaceAll("^\u0001|\u0001$", "");
             return Arrays.asList(stripped.split("\\s+", limit));
         };
+    }
+
+    private List<String> tokenizeDCCSend(String body) {
+        String stripped = body.replaceAll("^\u0001|\u0001$", "");
+        List<String> tokens = new ArrayList<>();
+
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+
+        for (int i = 0; i < stripped.length(); i++) {
+            char c = stripped.charAt(i);
+
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (Character.isWhitespace(c) && !inQuotes) {
+                if (!current.isEmpty()) {
+                    tokens.add(current.toString());
+                    current.setLength(0);
+                }
+            } else {
+                current.append(c);
+            }
+        }
+
+        if (!current.isEmpty()) {
+            tokens.add(current.toString());
+        }
+
+        return tokens;
     }
 
     // generic functions to parse the majority of numerics, which are rather simple
@@ -948,6 +1059,7 @@ public class IRCMessageUnmarshaller {
 
         private final Set<Character> channelMembershipPrefixes;
         private final String raw;
+        private final String command;
         private final SequencedMap<String, String> tags;
         private final PrefixParts prefix;
         private final List<String> params;
@@ -955,11 +1067,13 @@ public class IRCMessageUnmarshaller {
         public Parameters(
                 Set<Character> channelMembershipPrefixes,
                 String raw,
+                String command,
                 SequencedMap<String, String> tags,
                 PrefixParts prefix,
                 List<String> params) {
             this.channelMembershipPrefixes = channelMembershipPrefixes;
             this.raw = raw;
+            this.command = command;
             this.tags = tags;
             this.prefix = prefix;
             this.params = params;
@@ -982,7 +1096,20 @@ public class IRCMessageUnmarshaller {
                 }
                 filteredParameters.remove(i);
             }
-            return new Parameters(channelMembershipPrefixes, raw, tags, prefix, filteredParameters);
+            return new Parameters(channelMembershipPrefixes, raw, command, tags, prefix, filteredParameters);
+        }
+
+        public Parameters hoist(int index, ThrowingFunction<String, List<String>> tokenizer) throws Exception {
+            if (index >= params.size()) {
+                throw new NotEnoughParametersException("expected at least %d parameters".formatted(index));
+            }
+            List<String> results = new ArrayList<>();
+            results.addAll(params.subList(0, index));
+            results.addAll(tokenizer.apply(params.get(index)));
+            if (index + 1 < params.size()) {
+                results.addAll(params.subList(index + 1, params.size()));
+            }
+            return new Parameters(channelMembershipPrefixes, raw, command, tags, prefix, results);
         }
 
         public ConditionalInjectionBuilder injectConditionally() {
@@ -1241,6 +1368,7 @@ public class IRCMessageUnmarshaller {
                                 .apply(new Parameters(
                                         parameters.channelMembershipPrefixes,
                                         parameters.raw,
+                                        parameters.command,
                                         parameters.tags,
                                         parameters.prefix,
                                         newParams));

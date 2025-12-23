@@ -93,6 +93,28 @@ public class IRCMessageSerializationTest {
                 Arguments.of("USER myuser 0 * :Real Name", "USER myuser 0 * :Real Name"),
                 Arguments.of("USER myuser x y :Real Name", "USER myuser 0 * :Real Name"),
                 Arguments.of(
+                        "PRIVMSG #chat :\u0001ACTION waves hello\u0001",
+                        "PRIVMSG #chat :\u0001ACTION waves hello\u0001"),
+                Arguments.of("PRIVMSG nick :\u0001CLIENTINFO\u0001", "PRIVMSG nick :\u0001CLIENTINFO\u0001"),
+                Arguments.of(
+                        "NOTICE nick :\u0001CLIENTINFO ACTION CLIENTINFO PING VERSION DCC\u0001",
+                        "NOTICE nick :\u0001CLIENTINFO ACTION CLIENTINFO PING VERSION DCC\u0001"),
+                Arguments.of("PRIVMSG nick :\u0001PING 1692981123\u0001", "PRIVMSG nick :\u0001PING 1692981123\u0001"),
+                Arguments.of("NOTICE nick :\u0001PING 1692981123\u0001", "NOTICE nick :\u0001PING 1692981123\u0001"),
+                Arguments.of("PRIVMSG nick :\u0001VERSION\u0001", "PRIVMSG nick :\u0001VERSION\u0001"),
+                Arguments.of(
+                        "NOTICE nick :\u0001VERSION MyIRC 1.2.3 (Linux x86_64)\u0001",
+                        "NOTICE nick :\u0001VERSION MyIRC 1.2.3 (Linux x86_64)\u0001"),
+                Arguments.of(
+                        "PRIVMSG nick :\u0001DCC SEND example.txt 3232235777 5000 12345\u0001",
+                        "PRIVMSG nick :\u0001DCC SEND example.txt 3232235777 5000 12345\u0001"),
+                Arguments.of(
+                        "PRIVMSG nick :\u0001DCC SEND \"my file.txt\" 3232235777 5000 12345\u0001",
+                        "PRIVMSG nick :\u0001DCC SEND \"my file.txt\" 3232235777 5000 12345\u0001"),
+                Arguments.of(
+                        "PRIVMSG nick :\u0001DCC SEND \"my file.txt\" 3232235777 5000\u0001",
+                        "PRIVMSG nick :\u0001DCC SEND \"my file.txt\" 3232235777 5000\u0001"),
+                Arguments.of(
                         ":irc.example.net 001 alice :Welcome to the Example IRC Network alice!alice@host",
                         ":irc.example.net 001 alice :Welcome to the Example IRC Network alice!alice@host"),
                 Arguments.of(
@@ -529,6 +551,20 @@ public class IRCMessageSerializationTest {
                 Arguments.of("CAP nick LS * :multi-prefix sasl", IRCMessageCAPLSResponse.class),
                 Arguments.of("CAP nick LIST :multi-prefix sasl", IRCMessageCAPLISTResponse.class),
                 Arguments.of("CAP nick LIST * :multi-prefix sasl", IRCMessageCAPLISTResponse.class),
+                Arguments.of("PRIVMSG #chat :\u0001ACTION waves hello\u0001", IRCMessageCTCPAction.class),
+                Arguments.of("PRIVMSG nick :\u0001CLIENTINFO\u0001", IRCMessageCTCPClientInfoRequest.class),
+                Arguments.of(
+                        "NOTICE nick :\u0001CLIENTINFO ACTION CLIENTINFO PING VERSION DCC\u0001",
+                        IRCMessageCTCPClientInfoResponse.class),
+                Arguments.of("PRIVMSG nick :\u0001PING 1692981123\u0001", IRCMessageCTCPPingRequest.class),
+                Arguments.of("NOTICE nick :\u0001PING 1692981123\u0001", IRCMessageCTCPPingResponse.class),
+                Arguments.of("PRIVMSG nick :\u0001VERSION\u0001", IRCMessageCTCPVersionRequest.class),
+                Arguments.of(
+                        "NOTICE nick :\u0001VERSION MyIRC 1.2.3 (Linux x86_64)\u0001",
+                        IRCMessageCTCPVersionResponse.class),
+                Arguments.of(
+                        "PRIVMSG nick :\u0001DCC SEND example.txt 3232235777 5000 12345\u0001",
+                        IRCMessageCTCPDCCSend.class),
                 Arguments.of(
                         ":irc.example.net 001 alice :Welcome to the Example IRC Network alice!alice@host",
                         IRCMessage001.class),
