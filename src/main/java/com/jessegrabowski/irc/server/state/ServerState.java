@@ -232,11 +232,11 @@ public final class ServerState {
 
         String oldNickname = user.getNickname();
 
-        if (Objects.equals(oldNickname, nickname)) {
+        if (Objects.equals(oldNickname, newNickname)) {
             throw new NoOpException();
         }
 
-        if (usersByNickname.containsKey(newNickname) && !Objects.equals(normalizeNickname(oldNickname), newNickname)) {
+        if (usersByNickname.containsKey(newNickname)) {
             throw new StateInvariantException(
                     "NICK %s already in use".formatted(newNickname),
                     oldNickname != null ? oldNickname : newNickname,
@@ -247,10 +247,10 @@ public final class ServerState {
         if (oldNickname != null) {
             Transaction.removeTransactionally(usersByNickname, oldNickname);
         }
-        user.setNickname(nickname);
+        user.setNickname(newNickname);
         Transaction.putTransactionally(usersByNickname, newNickname, user);
 
-        return new Pair<>(oldNickname, nickname);
+        return new Pair<>(oldNickname, newNickname);
     }
 
     public void setUserInfo(IRCConnection connection, String username, String realName)

@@ -378,6 +378,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageCAPLISTRequest m -> handle(connection, m);
                 case IRCMessageCAPLSRequest m -> handle(connection, m);
                 case IRCMessageCAPREQ m -> handle(connection, m);
+                case IRCMessageCTCPAction m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
                 case IRCMessageKICK m -> {}
@@ -541,6 +542,30 @@ public class IRCServerEngine implements Closeable {
                     unknownEnableCapabilities,
                     unknownDisableCapabilities,
                     IRCMessageCAPNAK::new);
+        }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageCTCPAction message) throws Exception {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        List<MessageTarget> targets = new ArrayList<>();
+        for (String target : message.getTargets()) {
+            targets.add(state.resolveMask(connection, target));
+        }
+        for (MessageTarget target : targets) {
+            String away = state.getAway(target.getMask());
+            if (away != null && !away.isEmpty()) {
+                send(connection, server(), message, me.getNickname(), target.getMask(), away, IRCMessage301::new);
+            }
+            sendToTarget(
+                    me,
+                    message,
+                    target,
+                    (raw, tags, nick, user, host) -> new IRCMessageCTCPAction(
+                            raw, tags, nick, user, host, List.of(target.getMask()), message.getText()));
+            if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
+                echo(connection, me, message, List.of(target.getMask()), message.getText(), IRCMessageCTCPAction::new);
+            }
         }
     }
 

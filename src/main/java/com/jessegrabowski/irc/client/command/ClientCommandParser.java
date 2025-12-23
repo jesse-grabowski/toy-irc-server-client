@@ -123,6 +123,13 @@ public class ClientCommandParser {
                         .addGreedyStringPositional(1, ClientCommandKill::setReason, "reason", true)
                         .build());
         parsers.put(
+                "/me",
+                ArgsParser.builder(ClientCommandAction::new, false, "send a CTCP action to the current channel")
+                        .addUsageExample("/me <action>")
+                        .addUsageExample("/me waves")
+                        .addGreedyStringPositional(0, ClientCommandAction::setText, "message to send", true)
+                        .build());
+        parsers.put(
                 "/mode",
                 ArgsParser.builder(ClientCommandMode::new, false, "update modes on a user or channel")
                         .setFlagParsingEnabled(false)

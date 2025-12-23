@@ -290,9 +290,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageCAPREQ m -> {
                 /* ignore */
             }
-            case IRCMessageCTCPAction m -> {
-                /* ignore */
-            }
+            case IRCMessageCTCPAction m -> handle(m);
             case IRCMessageCTCPClientInfoRequest m -> {
                 /* ignore */
             }
@@ -765,6 +763,24 @@ public class IRCClientEngine implements Closeable {
         }
     }
 
+    private void handle(IRCMessageCTCPAction message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        LocalTime time = getMessageTime(message);
+        for (String target : message.getTargets()) {
+            terminal.println(new TerminalMessage(
+                    time,
+                    f(message.getPrefixName()),
+                    f(target),
+                    s("* ", B(f(message.getPrefixName())), " ", message.getText())));
+        }
+
+        state.touch(message.getPrefixName());
+    }
+
     private void handle(IRCMessageERROR message) {
         terminal.println(makeSystemErrorMessage(message.getReason()));
     }
@@ -1220,6 +1236,7 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommand command) {
         switch (command) {
+            case ClientCommandAction c -> handle(c);
             case ClientCommandAfk c -> handle(c);
             case ClientCommandBack c -> handle(c);
             case ClientCommandConnect c -> handle(c);
@@ -1241,6 +1258,21 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandTopic c -> handle(c);
         }
         updateStatusAndPrompt();
+    }
+
+    private void handle(ClientCommandAction command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
+        if (channel == null) {
+            terminal.println(makeSystemErrorMessage("Failed to send message -- no channel focused"));
+            return;
+        }
+
+        send(new IRCMessageCTCPAction(List.of(channel.getName()), command.getText()));
     }
 
     private void handle(ClientCommandAfk command) {
