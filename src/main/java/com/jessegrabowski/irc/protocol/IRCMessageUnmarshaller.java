@@ -135,6 +135,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessagePONG.COMMAND -> parsePong(parameters);
                 case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(parameters);
                 case IRCMessageUSER.COMMAND -> parseUser(parameters);
+                case IRCMessageUSERHOST.COMMAND -> parseUserHost(parameters);
                 case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
                 case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
                 case IRCMessage001.COMMAND -> parseExact(parameters, "client", "message", IRCMessage001::new);
@@ -555,6 +556,10 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageUSER parseUser(Parameters parameters) throws Exception {
         return parameters.discard(1, 2).inject(required("username"), required("realname"), IRCMessageUSER::new);
+    }
+
+    private IRCMessageUSERHOST parseUserHost(Parameters parameters) throws Exception {
+        return parameters.inject(greedyRequired("nickname"), IRCMessageUSERHOST::new);
     }
 
     private IRCMessageQUIT parseQuit(Parameters parameters) throws Exception {

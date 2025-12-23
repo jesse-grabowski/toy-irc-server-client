@@ -108,6 +108,12 @@ public class IRCClient {
                         IRCClientProperties::setLogLevel,
                         "log level, integer or j.u.l.Level well-known name",
                         false)
+                .addInetAddressFlag(
+                        'm',
+                        "my-address",
+                        IRCClientProperties::setMyAddress,
+                        "public address to use for CTCP DCC",
+                        false)
                 .build();
 
         ArgsTokenizer tokenizer = new ArgsTokenizer();

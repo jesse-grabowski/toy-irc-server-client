@@ -52,6 +52,7 @@ public class IRCClientProperties implements ArgsProperties {
     private String password;
     private String logFile = "irc-client.log";
     private String logLevel = Level.INFO.getName();
+    private InetAddress myAddress;
 
     @Override
     public void validate() {
@@ -163,5 +164,13 @@ public class IRCClientProperties implements ArgsProperties {
 
     public void setLogLevel(String logLevel) {
         this.logLevel = logLevel;
+    }
+
+    public InetAddress getMyAddress() {
+        return myAddress;
+    }
+
+    public void setMyAddress(InetAddress myAddress) {
+        this.myAddress = myAddress;
     }
 }

@@ -117,6 +117,32 @@ public final class ServerState {
         return user != null ? user.getAwayStatus() : null;
     }
 
+    public boolean isOperator(String nickname) {
+        ServerUser user = findUser(nickname);
+        return user != null && user.isOperator();
+    }
+
+    public void setOperator(IRCConnection connection) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+        user.setOperator(true);
+    }
+
+    public String getHost(IRCConnection connection, String nickname) throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        if (Objects.equals(user.getNickname(), normalizeNickname(nickname))) {
+            return user.getHostAddress();
+        } else {
+            return properties.getHost();
+        }
+    }
+
     private ServerUser findUser(IRCConnection connection) {
         return users.get(connection);
     }

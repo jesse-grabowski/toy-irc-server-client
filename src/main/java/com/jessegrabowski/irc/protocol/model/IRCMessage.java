@@ -171,8 +171,8 @@ public abstract sealed class IRCMessage
                 IRCMessageCTCPDCCSend,
                 IRCMessageCTCPPingRequest,
                 IRCMessageCTCPPingResponse,
-                IRCMessageCTCPVersionResponse,
                 IRCMessageCTCPVersionRequest,
+                IRCMessageCTCPVersionResponse,
                 IRCMessageERROR,
                 IRCMessageJOIN0,
                 IRCMessageJOINNormal,
@@ -194,6 +194,7 @@ public abstract sealed class IRCMessage
                 IRCMessageTOPIC,
                 IRCMessageTooLong,
                 IRCMessageUSER,
+                IRCMessageUSERHOST,
                 IRCMessageUnsupported {
 
     private final String rawMessage;

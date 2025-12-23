@@ -91,12 +91,13 @@ public class IRCServerEngine implements Closeable {
     private final StateGuard<ServerState> serverStateGuard;
     private final ScheduledExecutorService executor;
     private final IRCServerProperties properties;
+    private final IRCServerParameters parameters;
 
     // there's a lot going on here but I'll try to call out the important bits
     public IRCServerEngine(IRCServerProperties properties) throws IOException {
         this.properties = properties;
 
-        IRCServerParameters parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
+        this.parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
         ServerState state = new ServerState(properties, parameters);
 
         this.serverStateGuard = new StateGuard<>(state);
@@ -131,7 +132,7 @@ public class IRCServerEngine implements Closeable {
     public void accept(Socket socket) {
         executor.execute(spy(() -> {
             IRCConnection connection = new IRCConnection(socket);
-            connection.addIngressHandler(line -> executor.execute(() -> handle(connection, line)));
+            connection.addIngressHandler(line -> parseAndHandleAsync(connection, line));
             connection.addShutdownHandler(() -> executor.execute(() -> handleDisconnect(connection)));
 
             ServerState state = serverStateGuard.getState();
@@ -153,7 +154,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender));
+                makePrefixHost(receiver, sender));
         receiver.offer(MARSHALLER.marshal(message));
     }
 
@@ -168,7 +169,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0);
         receiver.offer(MARSHALLER.marshal(message));
     }
@@ -185,7 +186,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0,
                 arg1);
         receiver.offer(MARSHALLER.marshal(message));
@@ -203,7 +204,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, true, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0,
                 arg1);
         receiver.offer(MARSHALLER.marshal(message));
@@ -222,7 +223,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0,
                 arg1,
                 arg2);
@@ -243,7 +244,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0,
                 arg1,
                 arg2,
@@ -266,7 +267,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0,
                 arg1,
                 arg2,
@@ -291,7 +292,7 @@ public class IRCServerEngine implements Closeable {
                 makeTags(receiver, false, initiator),
                 makePrefixName(sender),
                 makePrefixUser(sender),
-                makePrefixHost(sender),
+                makePrefixHost(receiver, sender),
                 arg0,
                 arg1,
                 arg2,
@@ -332,8 +333,19 @@ public class IRCServerEngine implements Closeable {
         return sender.getUsername();
     }
 
-    private String makePrefixHost(MessageSource sender) {
-        return sender.getHostAddress();
+    private String makePrefixHost(IRCConnection connection, MessageSource sender) {
+        String host = sender.getHostAddress();
+        if (host == null) {
+            return null;
+        }
+
+        ServerState state = serverStateGuard.getState();
+        ServerUser user = state.getUserForConnection(connection);
+        if (Objects.equals(user.getNickname(), sender.getNickname())) {
+            return sender.getHostAddress();
+        } else {
+            return properties.getServer();
+        }
     }
 
     private MessageSource server() {
@@ -362,10 +374,9 @@ public class IRCServerEngine implements Closeable {
         state.disconnect(connection);
     }
 
-    private void handle(IRCConnection client, String line) {
-        ServerState state = serverStateGuard.getState();
-        IRCMessage message = UNMARSHALLER.unmarshal(state.getParameters(), StandardCharsets.UTF_8, line);
-        handle(client, message);
+    private void parseAndHandleAsync(IRCConnection client, String line) {
+        IRCMessage message = UNMARSHALLER.unmarshal(parameters, StandardCharsets.UTF_8, line);
+        executor.execute(() -> handle(client, message));
     }
 
     private void handle(IRCConnection connection, IRCMessage message) {
@@ -396,6 +407,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageQUIT m -> handle(connection, m);
                 case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
+                case IRCMessageUSERHOST m -> handle(connection, m);
                 case IRCMessageTooLong m -> {
                     send(
                             connection,
@@ -787,6 +799,20 @@ public class IRCServerEngine implements Closeable {
         if (state.tryFinishRegistration(connection)) {
             sendWelcome(connection, message);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageUSERHOST message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        List<String> userHosts = new ArrayList<>();
+        for (String nickname : message.getNicknames()) {
+            boolean isOp = state.isOperator(nickname);
+            boolean isAway = state.getAway(nickname) != null;
+            String host = state.getHost(connection, nickname);
+
+            userHosts.add("%s%s=%s%s".formatted(nickname, isOp ? "*" : "", isAway ? "-" : "+", host));
+        }
+
+        send(connection, server(), message, state.getNickname(connection), userHosts, IRCMessage302::new);
     }
 
     private void sendWelcome(IRCConnection connection, IRCMessage initiator) {

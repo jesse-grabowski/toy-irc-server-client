@@ -166,6 +166,13 @@ public class IRCClientEngine implements Closeable {
 
             clientStateGuard.setState(new IRCClientState());
 
+            if (properties.getMyAddress() != null) {
+                terminal.println(makeSystemTerminalMessage(s(
+                        "Using pre-configured public address `",
+                        f(properties.getMyAddress().getHostAddress()),
+                        "` for CTCP DCC")));
+            }
+
             String nick = NicknameGenerator.generate(properties.getNickname());
             send(new IRCMessageCAPLSRequest("302"));
             if (properties.getPassword() != null && !properties.getPassword().isBlank()) {
@@ -341,6 +348,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageQUIT m -> handle(m);
             case IRCMessageTOPIC m -> handle(m);
             case IRCMessageUSER m -> {
+                /* ignore */
+            }
+            case IRCMessageUSERHOST m -> {
                 /* ignore */
             }
             case IRCMessage001 m -> handle(m);
@@ -1064,6 +1074,8 @@ public class IRCClientEngine implements Closeable {
         state.setMe(message.getClient());
 
         terminal.println(makeSystemTerminalMessage(s("You are now registered as ", f(message.getClient()), "!")));
+
+        send(new IRCMessageUSERHOST(List.of(message.getClient())));
     }
 
     private void handle(IRCMessage005 message) {
@@ -1108,11 +1120,18 @@ public class IRCClientEngine implements Closeable {
                 nickname = nickname.substring(0, nickname.length() - 1);
             }
             boolean away = parts[1].startsWith("-");
+            String host = parts[1].substring(1);
 
             state.setOperator(nickname, operator);
             state.setAway(
                     nickname,
                     away ? Objects.requireNonNullElse(state.getAwayStatus(nickname), "Marked AWAY by server") : null);
+            state.setHostname(nickname, host);
+
+            if (Objects.equals(nickname, state.getMe()) && properties.getMyAddress() == null) {
+                terminal.println(makeSystemTerminalMessage(
+                        s("Detected your public address as `", f(host), "`, this will be used for CTCP DCC")));
+            }
         }
     }
 

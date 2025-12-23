@@ -116,6 +116,11 @@ public class IRCClientState {
         user.setOperator(operator);
     }
 
+    public void setHostname(String nickname, String hostname) {
+        User user = getOrCreateUser(nickname);
+        user.setHostname(hostname);
+    }
+
     public boolean isAway(String nickname) {
         User user = findUser(nickname);
         if (user == null) {
@@ -552,6 +557,7 @@ public class IRCClientState {
         private String nickname;
         private String awayStatus;
         private boolean operator;
+        private String hostname;
         private long lastTouched = System.currentTimeMillis();
         private final SequencedSet<Channel> channels = new LinkedHashSet<>();
         private final Set<Character> flags = new HashSet<>();
@@ -592,6 +598,14 @@ public class IRCClientState {
 
         private void setOperator(boolean operator) {
             this.operator = operator;
+        }
+
+        public String getHostname() {
+            return hostname;
+        }
+
+        private void setHostname(String hostname) {
+            this.hostname = hostname;
         }
     }
 
