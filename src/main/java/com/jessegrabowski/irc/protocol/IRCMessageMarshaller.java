@@ -59,6 +59,14 @@ public class IRCMessageMarshaller {
             case IRCMessageCAPNAK m -> marshal(m, this::marshalCapNAK);
             case IRCMessageCAPNEW m -> marshal(m, this::marshalCapNEW);
             case IRCMessageCAPREQ m -> marshal(m, this::marshalCapREQ);
+            case IRCMessageCTCPAction m -> marshal(m, this::marshalCTCPAction);
+            case IRCMessageCTCPClientInfoRequest m -> marshal(m, this::marshalCTCPClientInfoRequest);
+            case IRCMessageCTCPClientInfoResponse m -> marshal(m, this::marshalCTCPClientInfoResponse);
+            case IRCMessageCTCPDCCSend m -> marshal(m, this::marshalCTCPDCCSend);
+            case IRCMessageCTCPPingRequest m -> marshal(m, this::marshalCTCPPingRequest);
+            case IRCMessageCTCPPingResponse m -> marshal(m, this::marshalCTCPPingResponse);
+            case IRCMessageCTCPVersionRequest m -> marshal(m, this::marshalCTCPVersionRequest);
+            case IRCMessageCTCPVersionResponse m -> marshal(m, this::marshalCTCPVersionResponse);
             case IRCMessageERROR m -> marshal(m, this::marshalError);
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
@@ -322,6 +330,65 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalCapREQ(IRCMessageCAPREQ message) {
         return l("REQ", trailing(ieList(message.getEnableCapabilities(), message.getDisableCapabilities())));
+    }
+
+    private List<String> marshalCTCPAction(IRCMessageCTCPAction message) {
+        return l(
+                "PRIVMSG",
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(" ", List.of("ACTION", message.getText())))));
+    }
+
+    private List<String> marshalCTCPClientInfoRequest(IRCMessageCTCPClientInfoRequest message) {
+        return l(
+                "PRIVMSG", delimited(",", message.getTargets()), trailing(ctcp(delimited(" ", List.of("CLIENTINFO")))));
+    }
+
+    private List<String> marshalCTCPClientInfoResponse(IRCMessageCTCPClientInfoResponse message) {
+        return l(
+                "NOTICE",
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(" ", List.of("CLIENTINFO", delimited(" ", message.getSupports()))))));
+    }
+
+    private List<String> marshalCTCPDCCSend(IRCMessageCTCPDCCSend message) {
+        return l(
+                "PRIVMSG",
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(
+                        " ",
+                        List.of(
+                                "DCC",
+                                "SEND",
+                                message.getFilename(),
+                                message.getHost(),
+                                String.valueOf(message.getPort()),
+                                message.getFilename())))));
+    }
+
+    private List<String> marshalCTCPPingRequest(IRCMessageCTCPPingRequest message) {
+        return l(
+                "PRIVMSG",
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(" ", List.of("PING", message.getArgs())))));
+    }
+
+    private List<String> marshalCTCPPingResponse(IRCMessageCTCPPingResponse message) {
+        return l(
+                "NOTICE",
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(" ", List.of("PING", message.getArgs())))));
+    }
+
+    private List<String> marshalCTCPVersionRequest(IRCMessageCTCPVersionRequest message) {
+        return l("PRIVMSG", delimited(",", message.getTargets()), trailing(ctcp(delimited(" ", List.of("VERSION")))));
+    }
+
+    private List<String> marshalCTCPVersionResponse(IRCMessageCTCPVersionResponse message) {
+        return l(
+                "PRIVMSG",
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(" ", List.of("VERSION", message.getVersion())))));
     }
 
     private List<String> marshalError(IRCMessageERROR message) {
@@ -1012,6 +1079,10 @@ public class IRCMessageMarshaller {
             return null;
         }
         return String.join(delimiter, values);
+    }
+
+    private String ctcp(String message) {
+        return "\u0001" + message + "\u0001";
     }
 
     private <A, B> List<String> zip(List<A> a, List<B> b) {

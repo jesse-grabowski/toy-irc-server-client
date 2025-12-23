@@ -31,25 +31,32 @@
  */
 package com.jessegrabowski.irc.protocol.model;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.SequencedMap;
 
-public final class IRCMessageParseError extends IRCMessage {
+public final class IRCMessageCTCPClientInfoRequest extends IRCMessage {
 
-    private final String error;
+    public static final String COMMAND = "PRIVMSG";
 
-    public IRCMessageParseError(
-            String command,
+    private final List<String> targets;
+
+    public IRCMessageCTCPClientInfoRequest(
             String rawMessage,
             SequencedMap<String, String> tags,
             String prefixName,
             String prefixUser,
             String prefixHost,
-            String error) {
-        super(command, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.error = error;
+            List<String> targets) {
+        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
+        this.targets = targets;
     }
 
-    public String getError() {
-        return error;
+    public IRCMessageCTCPClientInfoRequest(List<String> targets) {
+        this(null, new LinkedHashMap<>(), null, null, null, targets);
+    }
+
+    public List<String> getTargets() {
+        return targets;
     }
 }

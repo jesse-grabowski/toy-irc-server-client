@@ -29,27 +29,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol.model;
+package com.jessegrabowski.irc.protocol.dsl;
 
-import java.util.SequencedMap;
-
-public final class IRCMessageParseError extends IRCMessage {
-
-    private final String error;
-
-    public IRCMessageParseError(
-            String command,
-            String rawMessage,
-            SequencedMap<String, String> tags,
-            String prefixName,
-            String prefixUser,
-            String prefixHost,
-            String error) {
-        super(command, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.error = error;
-    }
-
-    public String getError() {
-        return error;
+public class ParserErrorException extends Exception {
+    public ParserErrorException(String message) {
+        super(message);
     }
 }

@@ -29,27 +29,58 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol.model;
+package com.jessegrabowski.irc.protocol.dsl;
 
-import java.util.SequencedMap;
+import com.jessegrabowski.irc.util.ThrowingFunction;
+import java.util.List;
 
-public final class IRCMessageParseError extends IRCMessage {
+public class SingleParameterExtractor<T> implements ParameterExtractor<T> {
 
-    private final String error;
+    private final ThrowingFunction<String, T> mapper;
+    private final boolean required;
+    private final boolean allowEmpty;
+    private final T defaultValue;
+    private final String name;
 
-    public IRCMessageParseError(
-            String command,
-            String rawMessage,
-            SequencedMap<String, String> tags,
-            String prefixName,
-            String prefixUser,
-            String prefixHost,
-            String error) {
-        super(command, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.error = error;
+    public SingleParameterExtractor(
+            ThrowingFunction<String, T> mapper, boolean required, boolean allowEmpty, T defaultValue, String name) {
+        this.mapper = mapper;
+        this.required = required;
+        this.allowEmpty = allowEmpty;
+        this.defaultValue = defaultValue;
+        this.name = name;
     }
 
-    public String getError() {
-        return error;
+    @Override
+    public T extract(int start, int endInclusive, List<String> parameters) throws Exception {
+        String rawValue = parameters.get(start);
+        if (rawValue.isEmpty() && !allowEmpty) {
+            if (required) {
+                throw new ParserErrorException("required parameter %s must not be empty".formatted(name));
+            } else {
+                return defaultValue;
+            }
+        }
+        return mapper.apply(rawValue);
+    }
+
+    @Override
+    public int consumeAtLeast() {
+        return required ? 1 : 0;
+    }
+
+    @Override
+    public int consumeAtMost() {
+        return 1;
+    }
+
+    @Override
+    public T getDefaultValue() {
+        return defaultValue;
+    }
+
+    @Override
+    public String name() {
+        return name;
     }
 }

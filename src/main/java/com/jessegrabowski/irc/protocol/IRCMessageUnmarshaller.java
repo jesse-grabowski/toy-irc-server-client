@@ -31,8 +31,22 @@
  */
 package com.jessegrabowski.irc.protocol;
 
+import static com.jessegrabowski.irc.protocol.dsl.DSL.greedyOptional;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.greedyRequired;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.greedyRequiredMap;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.optional;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.optionalAllowEmpty;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.required;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.requiredAllowEmpty;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.splitRequired;
+import static com.jessegrabowski.irc.protocol.dsl.DSL.splitString;
 import static java.util.function.Predicate.not;
 
+import com.jessegrabowski.irc.protocol.dsl.NotEnoughParametersException;
+import com.jessegrabowski.irc.protocol.dsl.ParameterExtractor;
+import com.jessegrabowski.irc.protocol.dsl.ParameterPlanner;
+import com.jessegrabowski.irc.protocol.dsl.ParserErrorException;
+import com.jessegrabowski.irc.protocol.dsl.SplittingParameterInjector;
 import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.util.Pair;
@@ -41,7 +55,6 @@ import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -50,20 +63,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class IRCMessageUnmarshaller {
-
-    private static final Logger LOG = Logger.getLogger(IRCMessageUnmarshaller.class.getName());
 
     // This is really hard to read, but it's just splitting out the tags/prefix/command/params parts
     // as defined in the modern IRC grammar (but not processing individual tags/params yet)
@@ -106,7 +111,7 @@ public class IRCMessageUnmarshaller {
             prefix = parsePrefix(matcher.group("prefix"));
             params = parseParams(matcher.group("params"));
         } catch (Exception e) {
-            return new IRCMessageParseError(command, message, tags, null, null, null, e.getMessage(), Set.of());
+            return new IRCMessageParseError(command, message, tags, null, null, null, e.getMessage());
         }
         Parameters parameters =
                 new Parameters(new HashSet<>(serverParameters.getPrefixes().values()), message, tags, prefix, params);
@@ -272,14 +277,7 @@ public class IRCMessageUnmarshaller {
                     command, message, tags, prefix.name(), prefix.user(), prefix.host());
         } catch (Exception e) {
             return new IRCMessageParseError(
-                    command,
-                    message,
-                    tags,
-                    prefix.name(),
-                    prefix.user(),
-                    prefix.host(),
-                    e.getMessage(),
-                    parameters.errorParameters);
+                    command, message, tags, prefix.name(), prefix.user(), prefix.host(), e.getMessage());
         }
     }
 
@@ -509,9 +507,15 @@ public class IRCMessageUnmarshaller {
         return parameters.inject(required("nickname"), IRCMessageNICK::new);
     }
 
-    private IRCMessageNOTICE parseNotice(Parameters parameters) throws Exception {
-        return parameters.inject(
-                required("target", this::splitToList), requiredAllowEmpty("text to be sent"), IRCMessageNOTICE::new);
+    private IRCMessage parseNotice(Parameters parameters) throws Exception {
+        return parameters
+                .injectConditionally(false)
+                .ifIndex(1, this::isCTCP, this::parseCTCP)
+                .ifNoneMatch(p -> p.inject(
+                        required("target", this::splitToList),
+                        requiredAllowEmpty("text to be sent"),
+                        IRCMessageNOTICE::new))
+                .inject();
     }
 
     private IRCMessagePART parsePart(Parameters parameters) throws Exception {
@@ -530,9 +534,15 @@ public class IRCMessageUnmarshaller {
         return parameters.inject(optional("server"), required("token"), IRCMessagePONG::new);
     }
 
-    private IRCMessagePRIVMSG parsePrivmsg(Parameters parameters) throws Exception {
-        return parameters.inject(
-                required("target", this::splitToList), requiredAllowEmpty("text to be sent"), IRCMessagePRIVMSG::new);
+    private IRCMessage parsePrivmsg(Parameters parameters) throws Exception {
+        return parameters
+                .injectConditionally(false)
+                .ifIndex(1, this::isCTCP, this::parseCTCP)
+                .ifNoneMatch(p -> p.inject(
+                        required("target", this::splitToList),
+                        requiredAllowEmpty("text to be sent"),
+                        IRCMessagePRIVMSG::new))
+                .inject();
     }
 
     private IRCMessageUSER parseUser(Parameters parameters) throws Exception {
@@ -814,6 +824,24 @@ public class IRCMessageUnmarshaller {
                 IRCMessage696::new);
     }
 
+    private IRCMessage parseCTCP(Parameters parameters) throws Exception {
+        return parameters
+                .injectConditionally(false)
+                .ifIndex(1, s -> s.startsWith("\u0001ACTION"), this::parseCTCPAction)
+                .inject();
+    }
+
+    private IRCMessage parseCTCPAction(Parameters parameters) throws Exception {
+        throw new UnsupportedOperationException("CTCP ACTION is not supported");
+    }
+
+    private ThrowingFunction<String, List<String>> splitCTCP(int limit) {
+        return body -> {
+            String stripped = body.replaceAll("^\u0001|\u0001$", "");
+            return Arrays.asList(stripped.split("\\s+", limit));
+        };
+    }
+
     // generic functions to parse the majority of numerics, which are rather simple
     private <T extends IRCMessage> T parseExact(
             Parameters parameters, String arg0, IRCMessageFactory1<T, String> factory) throws Exception {
@@ -848,6 +876,10 @@ public class IRCMessageUnmarshaller {
     }
 
     // BEYOND THIS POINT IS SCARY PARSING CODE TO ENABLE MY NICE DSL
+
+    private boolean isCTCP(String value) {
+        return value.startsWith("\u0001");
+    }
 
     private boolean isIP(String value) {
         try {
@@ -914,8 +946,6 @@ public class IRCMessageUnmarshaller {
 
     private static class Parameters {
 
-        private final Set<String> errorParameters = new HashSet<>();
-
         private final Set<Character> channelMembershipPrefixes;
         private final String raw;
         private final SequencedMap<String, String> tags;
@@ -970,22 +1000,22 @@ public class IRCMessageUnmarshaller {
         public <T extends IRCMessage, A> T inject(ParameterExtractor<A> arg0, IRCMessageFactory1<T, A> constructor)
                 throws Exception {
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0);
-            return validate(constructor.create(
-                    raw, tags, prefix.name(), prefix.user(), prefix.host(), planner.get(0, this, arg0)));
+            return constructor.create(
+                    raw, tags, prefix.name(), prefix.user(), prefix.host(), planner.get(0, params, arg0));
         }
 
         public <T extends IRCMessage, A, B> T inject(
                 ParameterExtractor<A> arg0, ParameterExtractor<B> arg1, IRCMessageFactory2<T, A, B> constructor)
                 throws Exception {
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0, arg1);
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1));
         }
 
         public <T extends IRCMessage, A, B, C> T inject(
@@ -995,15 +1025,15 @@ public class IRCMessageUnmarshaller {
                 IRCMessageFactory3<T, A, B, C> constructor)
                 throws Exception {
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0, arg1, arg2);
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2));
         }
 
         public <T extends IRCMessage, A, B, C, D> T inject(
@@ -1014,16 +1044,16 @@ public class IRCMessageUnmarshaller {
                 IRCMessageFactory4<T, A, B, C, D> constructor)
                 throws Exception {
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0, arg1, arg2, arg3);
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2),
-                    planner.get(3, this, arg3)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2),
+                    planner.get(3, params, arg3));
         }
 
         public <T extends IRCMessage, A, B, C, D, E> T inject(
@@ -1035,17 +1065,17 @@ public class IRCMessageUnmarshaller {
                 IRCMessageFactory5<T, A, B, C, D, E> constructor)
                 throws Exception {
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0, arg1, arg2, arg3, arg4);
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2),
-                    planner.get(3, this, arg3),
-                    planner.get(4, this, arg4)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2),
+                    planner.get(3, params, arg3),
+                    planner.get(4, params, arg4));
         }
 
         public <T extends IRCMessage, A, B, C, D, E, F> T inject(
@@ -1058,18 +1088,18 @@ public class IRCMessageUnmarshaller {
                 IRCMessageFactory6<T, A, B, C, D, E, F> constructor)
                 throws Exception {
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0, arg1, arg2, arg3, arg4, arg5);
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2),
-                    planner.get(3, this, arg3),
-                    planner.get(4, this, arg4),
-                    planner.get(5, this, arg5)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2),
+                    planner.get(3, params, arg3),
+                    planner.get(4, params, arg4),
+                    planner.get(5, params, arg5));
         }
 
         public <T extends IRCMessage, A, B, C, D, E, F, G> T inject(
@@ -1085,19 +1115,19 @@ public class IRCMessageUnmarshaller {
 
             ParameterPlanner planner = new ParameterPlanner(params.size(), arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2),
-                    planner.get(3, this, arg3),
-                    planner.get(4, this, arg4),
-                    planner.get(5, this, arg5),
-                    planner.get(6, this, arg6)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2),
+                    planner.get(3, params, arg3),
+                    planner.get(4, params, arg4),
+                    planner.get(5, params, arg5),
+                    planner.get(6, params, arg6));
         }
 
         public <T extends IRCMessage, A, B, C, D, E, F, G, H> T inject(
@@ -1115,20 +1145,20 @@ public class IRCMessageUnmarshaller {
             ParameterPlanner planner =
                     new ParameterPlanner(params.size(), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2),
-                    planner.get(3, this, arg3),
-                    planner.get(4, this, arg4),
-                    planner.get(5, this, arg5),
-                    planner.get(6, this, arg6),
-                    planner.get(7, this, arg7)));
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2),
+                    planner.get(3, params, arg3),
+                    planner.get(4, params, arg4),
+                    planner.get(5, params, arg5),
+                    planner.get(6, params, arg6),
+                    planner.get(7, params, arg7));
         }
 
         public <T extends IRCMessage, A, B, C, D, E, F, G, H, I> T inject(
@@ -1147,29 +1177,21 @@ public class IRCMessageUnmarshaller {
             ParameterPlanner planner =
                     new ParameterPlanner(params.size(), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 
-            return validate(constructor.create(
+            return constructor.create(
                     raw,
                     tags,
                     prefix.name(),
                     prefix.user(),
                     prefix.host(),
-                    planner.get(0, this, arg0),
-                    planner.get(1, this, arg1),
-                    planner.get(2, this, arg2),
-                    planner.get(3, this, arg3),
-                    planner.get(4, this, arg4),
-                    planner.get(5, this, arg5),
-                    planner.get(6, this, arg6),
-                    planner.get(7, this, arg7),
-                    planner.get(8, this, arg8)));
-        }
-
-        private <T> T validate(T value) throws Exception {
-            if (!errorParameters.isEmpty()) {
-                throw new ParserErrorException("Error parsing parameters %s"
-                        .formatted(errorParameters.stream().sorted().collect(Collectors.joining(", "))));
-            }
-            return value;
+                    planner.get(0, params, arg0),
+                    planner.get(1, params, arg1),
+                    planner.get(2, params, arg2),
+                    planner.get(3, params, arg3),
+                    planner.get(4, params, arg4),
+                    planner.get(5, params, arg5),
+                    planner.get(6, params, arg6),
+                    planner.get(7, params, arg7),
+                    planner.get(8, params, arg8));
         }
     }
 
@@ -1231,416 +1253,6 @@ public class IRCMessageUnmarshaller {
                 return defaultInjection.apply(parameters);
             }
             throw new ParserErrorException("could not determine appropriate subcommand");
-        }
-    }
-
-    private sealed interface ParameterPlan permits RangeParameterPlan, DefaultParameterPlan {}
-
-    private record RangeParameterPlan(int start, int end) implements ParameterPlan {}
-
-    private record DefaultParameterPlan() implements ParameterPlan {}
-
-    private static class NotEnoughParametersException extends Exception {
-        public NotEnoughParametersException(String message) {
-            super(message);
-        }
-    }
-
-    private static class ParserErrorException extends Exception {
-        public ParserErrorException(String message) {
-            super(message);
-        }
-    }
-
-    private static class ParameterPlanner {
-
-        private final ParameterPlan[] plans;
-        private final ParameterExtractor<?>[] extractors;
-
-        public ParameterPlanner(int paramCount, ParameterExtractor<?>... extractors)
-                throws NotEnoughParametersException {
-            this.extractors = extractors;
-            this.plans = new ParameterPlan[extractors.length];
-
-            int remaining = paramCount;
-            int[] stakes = new int[extractors.length];
-            for (int i = 0; i < extractors.length; i++) {
-                ParameterExtractor<?> extractor = extractors[i];
-                stakes[i] += extractor.consumeAtLeast();
-                remaining -= extractor.consumeAtLeast();
-            }
-            for (int i = 0; i < extractors.length && remaining > 0; i++) {
-                ParameterExtractor<?> extractor = extractors[i];
-                int extra = Math.min(remaining, extractor.consumeAtMost() - extractor.consumeAtLeast());
-                stakes[i] += extra;
-                remaining -= extra;
-            }
-            if (remaining < 0) {
-                throw new NotEnoughParametersException(
-                        "expected at least %d parameters but got %d".formatted(paramCount - remaining, paramCount));
-            }
-
-            int position = 0;
-            for (int i = 0; i < plans.length; i++) {
-                if (stakes[i] == 0) {
-                    plans[i] = new DefaultParameterPlan();
-                } else {
-                    plans[i] = new RangeParameterPlan(position, position + stakes[i] - 1);
-                    position += stakes[i];
-                }
-            }
-        }
-
-        public <T> T get(int index, Parameters parameters, ParameterExtractor<T> extractor) {
-            if (index < 0 || index >= plans.length) {
-                throw new IndexOutOfBoundsException(index);
-            }
-            if (extractor != extractors[index]) {
-                throw new IllegalArgumentException("Extractor must match value passed in constructor");
-            }
-            ParameterPlan plan = plans[index];
-            return switch (plan) {
-                case DefaultParameterPlan unused -> extractor.getDefaultValue();
-                case RangeParameterPlan p -> extractor.extract(p.start(), p.end(), parameters);
-            };
-        }
-    }
-
-    private ParameterExtractor<String> required(String name) {
-        return new SingleParameterExtractor<>(x -> x, true, false, null, name);
-    }
-
-    private ParameterExtractor<String> requiredAllowEmpty(String name) {
-        return new SingleParameterExtractor<>(x -> x, true, true, null, name);
-    }
-
-    private <T> ParameterExtractor<T> required(String name, ThrowingFunction<String, T> mapper) {
-        return new SingleParameterExtractor<>(mapper, true, false, null, name);
-    }
-
-    private ParameterExtractor<String> optional(String name) {
-        return new SingleParameterExtractor<>(x -> x, false, false, null, name);
-    }
-
-    private ParameterExtractor<String> optionalAllowEmpty(String name) {
-        return new SingleParameterExtractor<>(x -> x, false, true, null, name);
-    }
-
-    private <T> ParameterExtractor<T> optional(String name, ThrowingFunction<String, T> mapper) {
-        return new SingleParameterExtractor<>(mapper, false, false, null, name);
-    }
-
-    private <T> ParameterExtractor<T> optional(String name, ThrowingFunction<String, T> mapper, T defaultValue) {
-        return new SingleParameterExtractor<>(mapper, false, false, defaultValue, name);
-    }
-
-    private ParameterExtractor<List<String>> greedyRequired(String name) {
-        return new MultipleParameterExtractor<List<String>, String, List<String>>(
-                ArrayList::new, x -> x, List::add, x -> x, 1, Integer.MAX_VALUE, List.of(), name);
-    }
-
-    private ParameterExtractor<List<String>> greedyOptional(String name) {
-        return new MultipleParameterExtractor<List<String>, String, List<String>>(
-                ArrayList::new, x -> x, List::add, x -> x, 0, Integer.MAX_VALUE, List.of(), name);
-    }
-
-    private <K, V> ParameterExtractor<SequencedMap<K, V>> greedyRequiredMap(
-            String name, ThrowingFunction<String, Map.Entry<K, V>> mapper) {
-        return new MultipleParameterExtractor<List<Map.Entry<K, V>>, Map.Entry<K, V>, SequencedMap<K, V>>(
-                ArrayList::new,
-                mapper,
-                List::add,
-                entries -> entries.stream()
-                        .collect(Collectors.toMap(
-                                Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new)),
-                1,
-                Integer.MAX_VALUE,
-                new LinkedHashMap<>(),
-                name);
-    }
-
-    private <L, R> SplittingParameterInjector<L, R> splitRequired(
-            String name, ThrowingFunction<String, Pair<L, R>> splitter) {
-        return new SplittingParameterInjector<>(true, splitter, name);
-    }
-
-    private SplittingParameterInjector<String, String> splitString(String name, String regex) {
-        return new SplittingParameterInjector<>(
-                true,
-                s -> {
-                    String[] parts = s.split(regex, 2);
-                    if (parts.length == 2) {
-                        return new Pair<>(parts[0], parts[1]);
-                    } else {
-                        return new Pair<>(parts[0], null);
-                    }
-                },
-                name);
-    }
-
-    interface ParameterExtractor<T> {
-        T extract(int start, int endInclusive, Parameters parameters);
-
-        int consumeAtLeast();
-
-        int consumeAtMost();
-
-        T getDefaultValue();
-
-        String name();
-    }
-
-    private static void logExtractionException(int start, int end, String parameter, String rawMessage, Throwable e) {
-        if (LOG.isLoggable(Level.FINE)) {
-            LogRecord record =
-                    new LogRecord(Level.FINE, "Error parsing parameter in {0}..{1} (value={2}) for message: {3}");
-            record.setParameters(new Object[] {start, end, parameter, rawMessage});
-            record.setThrown(e);
-            LOG.log(record);
-        }
-    }
-
-    private static class SingleParameterExtractor<T> implements ParameterExtractor<T> {
-
-        private final ThrowingFunction<String, T> mapper;
-        private final boolean required;
-        private final boolean allowEmpty;
-        private final T defaultValue;
-        private final String name;
-
-        public SingleParameterExtractor(
-                ThrowingFunction<String, T> mapper, boolean required, boolean allowEmpty, T defaultValue, String name) {
-            this.mapper = mapper;
-            this.required = required;
-            this.allowEmpty = allowEmpty;
-            this.defaultValue = defaultValue;
-            this.name = name;
-        }
-
-        @Override
-        public T extract(int start, int endInclusive, Parameters parameters) {
-            String rawValue = null;
-            try {
-                rawValue = parameters.params.get(start);
-                if (rawValue.isEmpty() && !allowEmpty) {
-                    if (required) {
-                        throw new ParserErrorException("required parameter %s must not be empty".formatted(name));
-                    } else {
-                        return defaultValue;
-                    }
-                }
-                return mapper.apply(rawValue);
-            } catch (Exception e) {
-                logExtractionException(start, endInclusive, rawValue, parameters.raw, e);
-                parameters.errorParameters.add(name);
-                return defaultValue;
-            }
-        }
-
-        @Override
-        public int consumeAtLeast() {
-            return required ? 1 : 0;
-        }
-
-        @Override
-        public int consumeAtMost() {
-            return 1;
-        }
-
-        @Override
-        public T getDefaultValue() {
-            return defaultValue;
-        }
-
-        @Override
-        public String name() {
-            return name;
-        }
-    }
-
-    private static class MultipleParameterExtractor<C extends Collection<T>, T, R> implements ParameterExtractor<R> {
-
-        private final Supplier<C> factory;
-        private final ThrowingFunction<String, T> mapper;
-        private final BiConsumer<C, T> accumulator;
-        private final ThrowingFunction<C, R> finisher;
-        private final int consumeAtLeast;
-        private final int consumeAtMost;
-        private final R defaultValue;
-        private final String name;
-
-        public MultipleParameterExtractor(
-                Supplier<C> factory,
-                ThrowingFunction<String, T> mapper,
-                BiConsumer<C, T> accumulator,
-                ThrowingFunction<C, R> finisher,
-                int consumeAtLeast,
-                int consumeAtMost,
-                R defaultValue,
-                String name) {
-            this.factory = factory;
-            this.mapper = mapper;
-            this.accumulator = accumulator;
-            this.finisher = finisher;
-            this.consumeAtLeast = consumeAtLeast;
-            this.consumeAtMost = consumeAtMost;
-            this.defaultValue = defaultValue;
-            this.name = name;
-        }
-
-        @Override
-        public R extract(int start, int endInclusive, Parameters parameters) {
-            C collection;
-            try {
-                collection = factory.get();
-            } catch (Exception e) {
-                logExtractionException(start, endInclusive, "<collection initializer>", parameters.raw, e);
-                parameters.errorParameters.add(name);
-                return defaultValue;
-            }
-            for (int i = start; i <= endInclusive; i++) {
-                String rawValue = null;
-                try {
-                    rawValue = parameters.params.get(i);
-                    T mappedValue = mapper.apply(rawValue);
-                    accumulator.accept(collection, mappedValue);
-                } catch (Exception e) {
-                    logExtractionException(start, endInclusive, rawValue, parameters.raw, e);
-                    parameters.errorParameters.add(name);
-                }
-            }
-            try {
-                return finisher.apply(collection);
-            } catch (Exception e) {
-                logExtractionException(start, endInclusive, "<collection finisher>", parameters.raw, e);
-                parameters.errorParameters.add(name);
-                return defaultValue;
-            }
-        }
-
-        @Override
-        public int consumeAtLeast() {
-            return consumeAtLeast;
-        }
-
-        @Override
-        public int consumeAtMost() {
-            return consumeAtMost;
-        }
-
-        @Override
-        public R getDefaultValue() {
-            return defaultValue;
-        }
-
-        @Override
-        public String name() {
-            return name;
-        }
-    }
-
-    private static class SplittingParameterInjector<L, R> {
-
-        private final boolean required;
-        private final ThrowingFunction<String, Pair<L, R>> splitter;
-        private final String name;
-
-        private Pair<L, R> result = null;
-        private int extracted = -1;
-        private boolean staked = false;
-
-        public SplittingParameterInjector(
-                boolean required, ThrowingFunction<String, Pair<L, R>> splitter, String name) {
-            this.required = required;
-            this.splitter = splitter;
-            this.name = name;
-        }
-
-        private Pair<L, R> extract(Integer index, Parameters parameters) {
-            if (index == null || extracted == index) {
-                return result;
-            } else if (extracted != -1) {
-                throw new IllegalStateException(
-                        "SplittingParameterInjector already extracted %d and does not support reuse"
-                                .formatted(extracted));
-            }
-            extracted = index;
-
-            String rawValue = null;
-            try {
-                rawValue = parameters.params.get(index);
-                result = splitter.apply(rawValue);
-                return result;
-            } catch (Exception e) {
-                logExtractionException(index, index, rawValue, parameters.raw, e);
-                parameters.errorParameters.add(name);
-                return null;
-            }
-        }
-
-        private Pair<Integer, Integer> claimStake() {
-            if (staked) {
-                return new Pair<>(0, 0);
-            } else {
-                staked = true;
-                return new Pair<>(required ? 1 : 0, 1);
-            }
-        }
-
-        public ParameterExtractor<L> left(L defaultValue) {
-            return new SplitPart<L>((i, p) -> {
-                Pair<L, R> result = extract(i, p);
-                return result != null ? result.left() : defaultValue;
-            });
-        }
-
-        public ParameterExtractor<R> right(R defaultValue) {
-            return new SplitPart<R>((i, p) -> {
-                Pair<L, R> result = extract(i, p);
-                return result != null ? result.right() : defaultValue;
-            });
-        }
-
-        private class SplitPart<T> implements ParameterExtractor<T> {
-
-            private final BiFunction<Integer, Parameters, T> resultExtractor;
-
-            private Pair<Integer, Integer> stake;
-
-            public SplitPart(BiFunction<Integer, Parameters, T> resultExtractor) {
-                this.resultExtractor = resultExtractor;
-            }
-
-            @Override
-            public T extract(int start, int endInclusive, Parameters parameters) {
-                return resultExtractor.apply(start, parameters);
-            }
-
-            @Override
-            public int consumeAtLeast() {
-                if (stake == null) {
-                    stake = SplittingParameterInjector.this.claimStake();
-                }
-                return stake.left();
-            }
-
-            @Override
-            public int consumeAtMost() {
-                if (stake == null) {
-                    stake = SplittingParameterInjector.this.claimStake();
-                }
-                return stake.right();
-            }
-
-            @Override
-            public T getDefaultValue() {
-                return resultExtractor.apply(null, null);
-            }
-
-            @Override
-            public String name() {
-                return name;
-            }
         }
     }
 }

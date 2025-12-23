@@ -31,25 +31,53 @@
  */
 package com.jessegrabowski.irc.protocol.model;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.SequencedMap;
 
-public final class IRCMessageParseError extends IRCMessage {
+public final class IRCMessageCTCPDCCSend extends IRCMessage {
 
-    private final String error;
+    public static final String COMMAND = "PRIVMSG";
 
-    public IRCMessageParseError(
-            String command,
+    private final List<String> targets;
+    private final String filename;
+    private final String host;
+    private final int port;
+
+    public IRCMessageCTCPDCCSend(
             String rawMessage,
             SequencedMap<String, String> tags,
             String prefixName,
             String prefixUser,
             String prefixHost,
-            String error) {
-        super(command, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.error = error;
+            List<String> targets,
+            String filename,
+            String host,
+            int port) {
+        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
+        this.targets = targets;
+        this.filename = filename;
+        this.host = host;
+        this.port = port;
     }
 
-    public String getError() {
-        return error;
+    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port) {
+        this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port);
+    }
+
+    public List<String> getTargets() {
+        return targets;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public int getPort() {
+        return port;
     }
 }

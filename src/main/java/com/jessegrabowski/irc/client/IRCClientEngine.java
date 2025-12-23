@@ -290,6 +290,30 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageCAPREQ m -> {
                 /* ignore */
             }
+            case IRCMessageCTCPAction m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPClientInfoRequest m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPClientInfoResponse m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPDCCSend m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPPingRequest m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPPingResponse m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPVersionRequest m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPVersionResponse m -> {
+                /* ignore */
+            }
             case IRCMessageERROR m -> handle(m);
             case IRCMessageJOIN0 m -> {
                 /* ignore */
