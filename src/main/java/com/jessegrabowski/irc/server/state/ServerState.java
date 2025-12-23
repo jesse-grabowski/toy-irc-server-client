@@ -34,6 +34,7 @@ package com.jessegrabowski.irc.server.state;
 import com.jessegrabowski.irc.network.IRCConnection;
 import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.IRCMessage401;
 import com.jessegrabowski.irc.protocol.model.IRCMessage403;
 import com.jessegrabowski.irc.protocol.model.IRCMessage405;
@@ -44,6 +45,7 @@ import com.jessegrabowski.irc.protocol.model.IRCMessage451;
 import com.jessegrabowski.irc.protocol.model.IRCMessage462;
 import com.jessegrabowski.irc.protocol.model.IRCMessage476;
 import com.jessegrabowski.irc.protocol.model.IRCMessage482;
+import com.jessegrabowski.irc.protocol.model.IRCMessage502;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.Pair;
@@ -117,17 +119,45 @@ public final class ServerState {
         return user != null ? user.getAwayStatus() : null;
     }
 
-    public boolean isOperator(String nickname) {
+    public boolean userHasMode(String nickname, IRCUserMode mode) {
         ServerUser user = findUser(nickname);
-        return user != null && user.isOperator();
+        return user != null && user.getModes().contains(mode);
     }
 
-    public void setOperator(IRCConnection connection) throws StateInvariantException {
+    public void setUserMode(IRCConnection connection, String nickname, IRCUserMode mode)
+            throws StateInvariantException {
         ServerUser user = findUser(connection);
         if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
-        user.setOperator(true);
+
+        if (!Objects.equals(user.getNickname(), nickname)) {
+            throw new StateInvariantException(
+                    "Cannot set modes for other users",
+                    user.getNickname(),
+                    "Cannot change modes for other users",
+                    IRCMessage502::new);
+        }
+
+        user.addMode(mode);
+    }
+
+    public void clearUserMode(IRCConnection connection, String nickname, IRCUserMode mode)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        if (!Objects.equals(user.getNickname(), nickname)) {
+            throw new StateInvariantException(
+                    "Cannot set modes for other users",
+                    user.getNickname(),
+                    "Cannot change modes for other users",
+                    IRCMessage502::new);
+        }
+
+        user.removeMode(mode);
     }
 
     public String getHost(IRCConnection connection, String nickname) throws StateInvariantException {
@@ -147,7 +177,7 @@ public final class ServerState {
         return users.get(connection);
     }
 
-    private ServerUser findUser(String nickname) {
+    public ServerUser findUser(String nickname) {
         return usersByNickname.get(normalizeNickname(nickname));
     }
 

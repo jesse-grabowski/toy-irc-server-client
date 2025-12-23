@@ -46,6 +46,8 @@ public class IRCServerProperties implements ArgsProperties {
     private Resource isupportProperties = Resource.of("classpath:/isupport.properties");
     private int pingFrequencyMilliseconds = 60000;
     private int maxIdleMilliseconds = 300000;
+    private String operatorName = "admin";
+    private String operatorPassword = "password";
 
     @Override
     public void validate() {
@@ -135,5 +137,21 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setMaxIdleMilliseconds(int maxIdleMilliseconds) {
         this.maxIdleMilliseconds = maxIdleMilliseconds;
+    }
+
+    public String getOperatorName() {
+        return operatorName;
+    }
+
+    public void setOperatorName(String operatorName) {
+        this.operatorName = operatorName;
+    }
+
+    public String getOperatorPassword() {
+        return operatorPassword;
+    }
+
+    public void setOperatorPassword(String operatorPassword) {
+        this.operatorPassword = operatorPassword;
     }
 }

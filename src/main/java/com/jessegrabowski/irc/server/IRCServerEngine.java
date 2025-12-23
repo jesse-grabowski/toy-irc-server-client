@@ -42,6 +42,7 @@ import com.jessegrabowski.irc.protocol.IRCMessageFactory5;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory6;
 import com.jessegrabowski.irc.protocol.IRCMessageMarshaller;
 import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
+import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.state.InvalidPasswordException;
 import com.jessegrabowski.irc.server.state.MessageSource;
@@ -393,13 +394,13 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
                 case IRCMessageKICK m -> {}
-                case IRCMessageKILL m -> {}
+                case IRCMessageKILL m -> handle(connection, m);
                 case IRCMessageLIST m -> handle(connection, m);
                 case IRCMessageMODE m -> {}
                 case IRCMessageNAMES m -> {}
                 case IRCMessageNICK m -> handle(connection, m);
                 case IRCMessageNOTICE m -> handle(connection, m);
-                case IRCMessageOPER m -> {}
+                case IRCMessageOPER m -> handle(connection, m);
                 case IRCMessagePART m -> handle(connection, m);
                 case IRCMessagePASS m -> handle(connection, m);
                 case IRCMessagePING m -> handle(connection, m);
@@ -616,6 +617,49 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
+    private void handle(IRCConnection connection, IRCMessageKILL message) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+
+        if (!state.userHasMode(me.getNickname(), IRCUserMode.OPERATOR)) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    "Permission Denied- You're not an IRC operator",
+                    IRCMessage481::new);
+            return;
+        }
+
+        ServerUser target = state.findUser(message.getNickname());
+        if (target == null) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    message.getNickname(),
+                    "No such nickname '%s'".formatted(message.getNickname()),
+                    IRCMessage401::new);
+            return;
+        }
+
+        IRCConnection targetConnection = state.getConnectionForUser(target);
+        state.markQuit(
+                targetConnection,
+                "Killed (" + me.getNickname() + " (" + Objects.requireNonNullElse(message.getComment(), "no comment")
+                        + "))");
+        send(
+                targetConnection,
+                server(),
+                message,
+                "Closing Link: " + properties.getServer() + " (Killed (" + me.getNickname() + " ("
+                        + Objects.requireNonNullElse(message.getComment(), "no comment") + "))",
+                IRCMessageERROR::new);
+        targetConnection.closeDeferred();
+    }
+
     private void handle(IRCConnection connection, IRCMessageLIST message) {
         ServerState state = serverStateGuard.getState();
         Set<ServerChannel> channels = state.getChannels();
@@ -682,6 +726,27 @@ public class IRCServerEngine implements Closeable {
         if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
             echo(connection, me, message, message.getTargets(), message.getMessage(), IRCMessageNOTICE::new);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageOPER message) throws Exception {
+        ServerState state = serverStateGuard.getState();
+
+        if (!Objects.equals(message.getName(), properties.getOperatorName())
+                || !Objects.equals(message.getPassword(), properties.getOperatorPassword())) {
+            send(connection, server(), message, state.getNickname(connection), IRCMessage464::new);
+            return;
+        }
+
+        state.setUserMode(connection, state.getNickname(connection), IRCUserMode.OPERATOR);
+        send(connection, server(), message, state.getNickname(connection), IRCMessage381::new);
+        send(
+                connection,
+                server(),
+                message,
+                state.getNickname(connection),
+                "+" + IRCUserMode.OPERATOR.getMode(),
+                List.<String>of(),
+                IRCMessageMODE::new);
     }
 
     private void handle(IRCConnection connection, IRCMessagePART message) throws Exception {
@@ -830,7 +895,7 @@ public class IRCServerEngine implements Closeable {
         ServerState state = serverStateGuard.getState();
         List<String> userHosts = new ArrayList<>();
         for (String nickname : message.getNicknames()) {
-            boolean isOp = state.isOperator(nickname);
+            boolean isOp = state.userHasMode(nickname, IRCUserMode.OPERATOR);
             boolean isAway = state.getAway(nickname) != null;
             String host = state.getHost(connection, nickname);
 

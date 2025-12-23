@@ -32,6 +32,7 @@
 package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.Collections;
 import java.util.HashSet;
@@ -42,7 +43,7 @@ import java.util.Set;
 public final class ServerUser implements MessageSource {
     private final Set<IRCCapability> capabilities = new HashSet<>();
     private final SequencedSet<ServerChannel> channels = new LinkedHashSet<>();
-    private final Set<Character> flags = new HashSet<>();
+    private final Set<IRCUserMode> modes = new HashSet<>();
     private final String hostAddress;
 
     private ServerConnectionState state = ServerConnectionState.NEW;
@@ -54,7 +55,6 @@ public final class ServerUser implements MessageSource {
     private String username;
     private String realName;
     private String awayStatus;
-    private boolean operator;
     private String quitMessage;
 
     ServerUser(String hostAddress) {
@@ -156,16 +156,6 @@ public final class ServerUser implements MessageSource {
         this.awayStatus = awayStatus;
     }
 
-    public boolean isOperator() {
-        return operator;
-    }
-
-    void setOperator(boolean operator) {
-        boolean oldOperator = this.operator;
-        Transaction.addCompensation(() -> this.operator = oldOperator);
-        this.operator = operator;
-    }
-
     void addCapability(IRCCapability capability) {
         Transaction.addTransactionally(capabilities, capability);
     }
@@ -202,5 +192,17 @@ public final class ServerUser implements MessageSource {
 
     public String getQuitMessage() {
         return quitMessage;
+    }
+
+    public Set<IRCUserMode> getModes() {
+        return Set.copyOf(modes);
+    }
+
+    void addMode(IRCUserMode mode) {
+        Transaction.addTransactionally(modes, mode);
+    }
+
+    void removeMode(IRCUserMode mode) {
+        Transaction.removeTransactionally(modes, mode);
     }
 }

@@ -84,6 +84,14 @@ public class IRCServer {
                         "location of RPL_ISUPPORT definitions (default classpath:/isupport.properties)",
                         false)
                 .addStringFlag('S', "server-name", IRCServerProperties::setServer, "name of the irc server", false)
+                .addStringFlag(
+                        'o', "operator-name", IRCServerProperties::setOperatorName, "operator account name", false)
+                .addStringFlag(
+                        'O',
+                        "operator-password",
+                        IRCServerProperties::setOperatorPassword,
+                        "operator account password",
+                        false)
                 .build();
 
         ArgsTokenizer tokenizer = new ArgsTokenizer();
