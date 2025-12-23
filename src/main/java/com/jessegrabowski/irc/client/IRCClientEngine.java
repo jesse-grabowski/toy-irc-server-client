@@ -327,6 +327,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageKICK m -> handle(m);
             case IRCMessageKILL m ->
                 terminal.println(makeSystemTerminalMessage(s(f(m.getPrefixName()), " killed ", f(m.getNickname()))));
+            case IRCMessageLIST m -> {
+                /* ignore */
+            }
             case IRCMessageMODE m -> handle(m);
             case IRCMessageNAMES m -> {
                 /* ignore */
@@ -448,15 +451,15 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage320 m -> {
                 /* ignore */
             }
-            case IRCMessage321 m -> {
-                /* ignore */
-            }
-            case IRCMessage322 m -> {
-                /* ignore */
-            }
-            case IRCMessage323 m -> {
-                /* ignore */
-            }
+            case IRCMessage321 m -> terminal.println(makeSystemTerminalMessage("--- Start of Channel List ---"));
+            case IRCMessage322 m ->
+                terminal.println(makeSystemTerminalMessage(s(
+                        f(m.getChannel()),
+                        " (",
+                        m.getClientCount(),
+                        " users) -- ",
+                        Objects.requireNonNullElse(m.getTopic(), "").isEmpty() ? "no topic" : m.getTopic())));
+            case IRCMessage323 m -> terminal.println(makeSystemTerminalMessage("--- End of Channel List ---"));
             case IRCMessage324 m -> {
                 /* ignore */
             }
@@ -1076,6 +1079,7 @@ public class IRCClientEngine implements Closeable {
         terminal.println(makeSystemTerminalMessage(s("You are now registered as ", f(message.getClient()), "!")));
 
         send(new IRCMessageUSERHOST(List.of(message.getClient())));
+        send(new IRCMessageLIST(List.of()));
     }
 
     private void handle(IRCMessage005 message) {
@@ -1266,6 +1270,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandJoin c -> handle(c);
             case ClientCommandKick c -> handle(c);
             case ClientCommandKill c -> handle(c);
+            case ClientCommandList c -> handle(c);
             case ClientCommandMode c -> handle(c);
             case ClientCommandMsg c -> handle(c);
             case ClientCommandNotice c -> handle(c);
@@ -1338,6 +1343,10 @@ public class IRCClientEngine implements Closeable {
         }
 
         send(new IRCMessageKILL(command.getNick(), command.getReason()));
+    }
+
+    private void handle(ClientCommandList command) {
+        send(new IRCMessageLIST(command.getChannels()));
     }
 
     private void handle(ClientCommandMode command) {

@@ -72,6 +72,7 @@ public class IRCMessageMarshaller {
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
             case IRCMessageKICK m -> marshal(m, this::marshalKick);
             case IRCMessageKILL m -> marshal(m, this::marshalKill);
+            case IRCMessageLIST m -> marshal(m, this::marshalLIST);
             case IRCMessageMODE m -> marshal(m, this::marshalMode);
             case IRCMessageNAMES m -> marshal(m, this::marshalNames);
             case IRCMessageNICK m -> marshal(m, this::marshalNick);
@@ -403,6 +404,10 @@ public class IRCMessageMarshaller {
         return l(message.getNickname(), trailing(message.getComment()));
     }
 
+    private List<String> marshalLIST(IRCMessageLIST message) {
+        return l(delimited(",", message.getChannels()));
+    }
+
     private List<String> marshalMode(IRCMessageMODE message) {
         return l(message.getTarget(), message.getModeString(), delimited(" ", message.getModeArguments()));
     }
@@ -653,7 +658,11 @@ public class IRCMessageMarshaller {
     }
 
     private List<String> marshal322(IRCMessage322 message) {
-        return l(message.getClient(), message.getChannel(), message.getClientCount(), trailing(message.getTopic()));
+        return l(
+                message.getClient(),
+                message.getChannel(),
+                message.getClientCount(),
+                trailing(message.getTopic(), true));
     }
 
     private List<String> marshal323(IRCMessage323 message) {

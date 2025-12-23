@@ -565,4 +565,8 @@ public final class ServerState {
                     IRCMessage476::new);
         }
     }
+
+    public Set<ServerChannel> getChannels() {
+        return Set.copyOf(channels.values());
+    }
 }

@@ -394,6 +394,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageJOINNormal m -> handle(connection, m);
                 case IRCMessageKICK m -> {}
                 case IRCMessageKILL m -> {}
+                case IRCMessageLIST m -> handle(connection, m);
                 case IRCMessageMODE m -> {}
                 case IRCMessageNAMES m -> {}
                 case IRCMessageNICK m -> handle(connection, m);
@@ -613,6 +614,30 @@ public class IRCServerEngine implements Closeable {
             sendTopic(connection, message, channelName, false);
             sendNames(connection, message, channelName);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageLIST message) {
+        ServerState state = serverStateGuard.getState();
+        Set<ServerChannel> channels = state.getChannels();
+
+        send(connection, server(), message, state.getNickname(connection), IRCMessage321::new);
+        boolean filtered = !message.getChannels().isEmpty();
+        for (ServerChannel channel : channels) {
+            if (filtered && !message.getChannels().contains(channel.getName())) {
+                continue;
+            }
+
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    channel.getName(),
+                    channel.getMembers().size(),
+                    Objects.requireNonNullElse(channel.getTopic(), ""),
+                    IRCMessage322::new);
+        }
+        send(connection, server(), message, state.getNickname(connection), IRCMessage323::new);
     }
 
     private void handle(IRCConnection connection, IRCMessageNICK message)

@@ -123,6 +123,15 @@ public class ClientCommandParser {
                         .addGreedyStringPositional(1, ClientCommandKill::setReason, "reason", true)
                         .build());
         parsers.put(
+                "/list",
+                ArgsParser.builder(ClientCommandList::new, false, "list available channels and their topics")
+                        .addUsageExample("/list [<channels>]")
+                        .addUsageExample("/list")
+                        .addUsageExample("/list #channel1 #channel2")
+                        .addGreedyListPositional(
+                                0, ClientCommandList::getChannels, ClientCommandList::setChannels, "channels", false)
+                        .build());
+        parsers.put(
                 "/me",
                 ArgsParser.builder(ClientCommandAction::new, false, "send a CTCP action to the current channel")
                         .addUsageExample("/me <action>")
@@ -194,7 +203,7 @@ public class ClientCommandParser {
                         .addUsageExample("/part #channel1,#channel2")
                         .addUsageExample("/part #channel dinner time")
                         .addCommaSeparatedListPositional(0, ClientCommandPart::setChannels, "channels to leave", true)
-                        .addStringPositional(1, ClientCommandPart::setReason, "reason for leaving", false)
+                        .addGreedyStringPositional(1, ClientCommandPart::setReason, "reason for leaving", false)
                         .build());
         parsers.put(
                 "/quit",

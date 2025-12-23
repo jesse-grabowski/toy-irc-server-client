@@ -124,6 +124,7 @@ public class IRCMessageUnmarshaller {
                 case "JOIN" -> parseJoin(parameters);
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);
                 case IRCMessageKILL.COMMAND -> parseExact(parameters, "nickname", "comment", IRCMessageKILL::new);
+                case IRCMessageLIST.COMMAND -> parseList(parameters);
                 case IRCMessageMODE.COMMAND -> parseMode(parameters);
                 case IRCMessageNAMES.COMMAND -> parseNames(parameters);
                 case IRCMessageNICK.COMMAND -> parseNick(parameters);
@@ -503,6 +504,10 @@ public class IRCMessageUnmarshaller {
         return parameters.inject(required("channel"), required("nick"), optional("comment"), IRCMessageKICK::new);
     }
 
+    private IRCMessageLIST parseList(Parameters parameters) throws Exception {
+        return parameters.inject(optional("channel", this::splitToList, List.<String>of()), IRCMessageLIST::new);
+    }
+
     private IRCMessageMODE parseMode(Parameters parameters) throws Exception {
         return parameters.inject(
                 required("target"), optional("modestring"), greedyOptional("mode arguments"), IRCMessageMODE::new);
@@ -696,7 +701,7 @@ public class IRCMessageUnmarshaller {
                 required("client"),
                 required("channel"),
                 required("client count", Integer::parseInt),
-                required("topic"),
+                requiredAllowEmpty("topic"),
                 IRCMessage322::new);
     }
 

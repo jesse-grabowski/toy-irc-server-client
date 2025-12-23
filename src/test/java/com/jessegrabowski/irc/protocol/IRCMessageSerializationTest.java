@@ -226,6 +226,7 @@ public class IRCMessageSerializationTest {
                 Arguments.of(
                         ":irc.example.net 322 alice #chat 12 :General discussion",
                         ":irc.example.net 322 alice #chat 12 :General discussion"),
+                Arguments.of(":irc.example.net 322 alice #chat 12 :", ":irc.example.net 322 alice #chat 12 :"),
                 Arguments.of(":irc.example.net 323 alice :End of /LIST", ":irc.example.net 323 alice :End of /LIST"),
                 Arguments.of(":irc.example.net 324 alice #chat +nt", ":irc.example.net 324 alice #chat +nt"),
                 Arguments.of(
@@ -747,7 +748,6 @@ public class IRCMessageSerializationTest {
                 Arguments.of("ERROR :"),
                 Arguments.of("PASS :"),
                 Arguments.of("NICK :"),
-                Arguments.of(":irc.example.net 322 alice #chat 12 :"),
                 Arguments.of(":irc.example.net 001 alice :"),
                 Arguments.of(":irc.example.net 400 alice KICK :"),
                 Arguments.of("PONG irc.example.com :"),
