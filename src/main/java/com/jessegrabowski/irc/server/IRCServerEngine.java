@@ -40,6 +40,7 @@ import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory4;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory5;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory6;
+import com.jessegrabowski.irc.protocol.IRCMessageFactory9;
 import com.jessegrabowski.irc.protocol.IRCMessageMarshaller;
 import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
@@ -63,10 +64,12 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
@@ -303,6 +306,38 @@ public class IRCServerEngine implements Closeable {
         receiver.offer(MARSHALLER.marshal(message));
     }
 
+    private <T extends IRCMessage, A, B, C, D, E, F, G, H, I> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            E arg4,
+            F arg5,
+            G arg6,
+            H arg7,
+            I arg8,
+            IRCMessageFactory9<T, A, B, C, D, E, F, G, H, I> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1,
+                arg2,
+                arg3,
+                arg4,
+                arg5,
+                arg6,
+                arg7,
+                arg8);
+        receiver.offer(MARSHALLER.marshal(message));
+    }
+
     private SequencedMap<String, String> makeTags(IRCConnection connection, boolean isEcho, IRCMessage initiator) {
         ServerState state = serverStateGuard.getState();
         if (!state.hasCapability(connection, IRCCapability.MESSAGE_TAGS)
@@ -410,6 +445,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
                 case IRCMessageUSERHOST m -> handle(connection, m);
+                case IRCMessageWHO m -> handle(connection, m);
                 case IRCMessageTooLong m -> {
                     send(
                             connection,
@@ -903,6 +939,48 @@ public class IRCServerEngine implements Closeable {
         }
 
         send(connection, server(), message, state.getNickname(connection), userHosts, IRCMessage302::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessageWHO message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+
+        Set<ServerUser> users = new HashSet<>();
+
+        ServerChannel channel = state.findChannel(message.getMask());
+        if (channel != null) {
+            users.addAll(channel.getMembers());
+        }
+
+        ServerUser serverUser = state.findUser(message.getMask());
+        if (serverUser != null) {
+            users.add(serverUser);
+        }
+
+        for (ServerUser user : users) {
+            String flags = (user.getAwayStatus() == null ? "H" : "G")
+                    + (state.userHasMode(user.getNickname(), IRCUserMode.OPERATOR) ? "*" : "")
+                    + Optional.ofNullable(channel)
+                            .map(c -> c.getMembership(user))
+                            .map(ServerChannelMembership::getHighestPowerPrefix)
+                            .map(Object::toString)
+                            .orElse(" ");
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    Optional.ofNullable(channel).map(ServerChannel::getName).orElse("*"),
+                    user.getUsername(),
+                    state.getHost(connection, user.getNickname()),
+                    properties.getServer(),
+                    user.getNickname(),
+                    flags,
+                    "0",
+                    user.getRealName(),
+                    IRCMessage352::new);
+        }
+
+        send(connection, server(), message, state.getNickname(connection), message.getMask(), IRCMessage315::new);
     }
 
     private void sendWelcome(IRCConnection connection, IRCMessage initiator) {

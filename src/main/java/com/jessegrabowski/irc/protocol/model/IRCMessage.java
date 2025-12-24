@@ -196,7 +196,8 @@ public abstract sealed class IRCMessage
                 IRCMessageTooLong,
                 IRCMessageUSER,
                 IRCMessageUSERHOST,
-                IRCMessageUnsupported {
+                IRCMessageUnsupported,
+                IRCMessageWHO {
 
     private final String rawMessage;
 

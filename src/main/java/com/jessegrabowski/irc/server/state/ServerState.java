@@ -273,14 +273,19 @@ public final class ServerState {
 
     public Pair<String, String> setNickname(IRCConnection connection, String nickname)
             throws StateInvariantException, InvalidPasswordException, NoOpException {
-        String newNickname = normalizeNickname(nickname);
+        String truncatedNickname = nickname;
+        if (truncatedNickname.length() > parameters.getNickLength()) {
+            truncatedNickname = truncatedNickname.substring(0, parameters.getNickLength());
+        }
+        String normalizedNickname = normalizeNickname(nickname);
 
         ServerUser user = findUser(connection);
         if (user == null) {
-            throw new StateInvariantException("Not registered", newNickname, "Not registered", IRCMessage451::new);
+            throw new StateInvariantException(
+                    "Not registered", normalizedNickname, "Not registered", IRCMessage451::new);
         }
 
-        validateNickname(user.getNickname(), newNickname);
+        validateNickname(user.getNickname(), normalizedNickname);
 
         if (!user.isPasswordEntered()) {
             throw new InvalidPasswordException("PASS not yet entered");
@@ -288,25 +293,28 @@ public final class ServerState {
 
         String oldNickname = user.getNickname();
 
-        if (Objects.equals(oldNickname, newNickname)) {
+        if (Objects.equals(oldNickname, truncatedNickname)) {
             throw new NoOpException();
         }
 
-        if (usersByNickname.containsKey(newNickname)) {
+        String normalizedOldNickname = normalizeNickname(oldNickname);
+
+        if (usersByNickname.containsKey(normalizedNickname)
+                && !Objects.equals(normalizedOldNickname, normalizedNickname)) {
             throw new StateInvariantException(
-                    "NICK %s already in use".formatted(newNickname),
-                    oldNickname != null ? oldNickname : newNickname,
-                    newNickname,
+                    "NICK %s already in use".formatted(normalizedNickname),
+                    oldNickname != null ? oldNickname : normalizedNickname,
+                    normalizedNickname,
                     IRCMessage433::new);
         }
 
-        if (oldNickname != null) {
-            Transaction.removeTransactionally(usersByNickname, oldNickname);
+        if (normalizedOldNickname != null) {
+            Transaction.removeTransactionally(usersByNickname, normalizedOldNickname);
         }
-        user.setNickname(newNickname);
-        Transaction.putTransactionally(usersByNickname, newNickname, user);
+        user.setNickname(truncatedNickname);
+        Transaction.putTransactionally(usersByNickname, normalizedNickname, user);
 
-        return new Pair<>(oldNickname, newNickname);
+        return new Pair<>(oldNickname, truncatedNickname);
     }
 
     public void setUserInfo(IRCConnection connection, String username, String realName)

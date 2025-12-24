@@ -139,6 +139,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageUSERHOST.COMMAND -> parseUserHost(parameters);
                 case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
                 case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
+                case IRCMessageWHO.COMMAND -> parseExact(parameters, "mask", IRCMessageWHO::new);
                 case IRCMessage001.COMMAND -> parseExact(parameters, "client", "message", IRCMessage001::new);
                 case IRCMessage002.COMMAND -> parseExact(parameters, "client", "message", IRCMessage002::new);
                 case IRCMessage003.COMMAND -> parseExact(parameters, "client", "message", IRCMessage003::new);
