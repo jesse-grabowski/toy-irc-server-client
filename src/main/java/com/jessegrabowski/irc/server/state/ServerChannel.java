@@ -57,7 +57,7 @@ public final class ServerChannel {
         this.name = name;
     }
 
-    public Set<ServerUser> getMembers() {
+    Set<ServerUser> getMembers() {
         return Set.copyOf(members.keySet());
     }
 

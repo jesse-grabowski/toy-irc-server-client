@@ -661,6 +661,11 @@ public final class ServerState {
         return user.getChannels();
     }
 
+    public Set<ServerUser> getMembersForChannel(IRCConnection connection, ServerChannel channel) {
+        // todo respect +s +i
+        return channel.getMembers();
+    }
+
     public void markActivity(IRCConnection connection) {
         ServerUser user = findUser(connection);
         user.setLastActive(System.currentTimeMillis());

@@ -433,7 +433,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageKILL m -> handle(connection, m);
                 case IRCMessageLIST m -> handle(connection, m);
                 case IRCMessageMODE m -> {}
-                case IRCMessageNAMES m -> {}
+                case IRCMessageNAMES m -> handle(connection, m);
                 case IRCMessageNICK m -> handle(connection, m);
                 case IRCMessageNOTICE m -> handle(connection, m);
                 case IRCMessageOPER m -> handle(connection, m);
@@ -717,11 +717,17 @@ public class IRCServerEngine implements Closeable {
                     message,
                     state.getNickname(connection),
                     channel.getName(),
-                    channel.getMembers().size(),
+                    state.getMembersForChannel(connection, channel).size(),
                     Objects.requireNonNullElse(channel.getTopic(), ""),
                     IRCMessage322::new);
         }
         send(connection, server(), message, state.getNickname(connection), IRCMessage323::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessageNAMES message) {
+        for (String channel : message.getChannels()) {
+            sendNames(connection, message, channel);
+        }
     }
 
     private void handle(IRCConnection connection, IRCMessageNICK message)
@@ -806,7 +812,7 @@ public class IRCServerEngine implements Closeable {
                             IRCMessage403::new));
                     continue;
                 }
-                if (!channel.getMembers().contains(me)) {
+                if (!state.getMembersForChannel(connection, channel).contains(me)) {
                     results.add(() ->
                             send(connection, server(), message, me.getNickname(), channelName, IRCMessage442::new));
                     continue;
@@ -1249,17 +1255,20 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
-    private void sendNames(IRCConnection connection, IRCMessage initiator, String channelName)
-            throws StateInvariantException {
+    private void sendNames(IRCConnection connection, IRCMessage initiator, String channelName) {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
-        ServerChannel channel = state.getExistingChannel(connection, channelName);
+        ServerChannel channel = state.findChannel(channelName);
+        if (channel == null) {
+            send(connection, server(), initiator, me.getNickname(), channelName, IRCMessage366::new);
+            return;
+        }
         List<String> nicks = new ArrayList<>();
         List<Character> modes = new ArrayList<>();
         IRCServerParameters parameters = state.getParameters();
         int namesPerMessage = 400 / parameters.getNickLength();
         String channelStatus = channel.checkFlag('s') ? "@" : channel.checkFlag('p') ? "*" : "=";
-        for (ServerUser member : channel.getMembers().stream()
+        for (ServerUser member : state.getMembersForChannel(connection, channel).stream()
                 .sorted(Comparator.comparing(ServerUser::getNickname))
                 .toList()) {
             ServerChannelMembership membership = channel.getMembership(member);
