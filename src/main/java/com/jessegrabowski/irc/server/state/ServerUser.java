@@ -45,10 +45,12 @@ public final class ServerUser implements MessageSource {
     private final SequencedSet<ServerChannel> channels = new LinkedHashSet<>();
     private final Set<IRCUserMode> modes = new HashSet<>();
     private final String hostAddress;
+    private final long signOnTime = System.currentTimeMillis();
 
     private ServerConnectionState state = ServerConnectionState.NEW;
     private long lastPinged = System.currentTimeMillis();
     private long lastPonged = System.currentTimeMillis();
+    private long lastActive = System.currentTimeMillis();
     private boolean passwordEntered;
     private boolean negotiatingCapabilities;
     private String nickname;
@@ -89,6 +91,20 @@ public final class ServerUser implements MessageSource {
         long oldLastPonged = this.lastPonged;
         Transaction.addCompensation(() -> this.lastPonged = oldLastPonged);
         this.lastPonged = lastPonged;
+    }
+
+    public long getSignOnTime() {
+        return signOnTime;
+    }
+
+    public long getLastActive() {
+        return lastActive;
+    }
+
+    void setLastActive(long lastActive) {
+        long oldLastActive = this.lastActive;
+        Transaction.addCompensation(() -> this.lastActive = oldLastActive);
+        this.lastActive = lastActive;
     }
 
     public boolean isPasswordEntered() {

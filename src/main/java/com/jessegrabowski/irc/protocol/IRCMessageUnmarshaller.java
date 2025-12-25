@@ -140,6 +140,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
                 case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
                 case IRCMessageWHO.COMMAND -> parseExact(parameters, "mask", IRCMessageWHO::new);
+                case IRCMessageWHOIS.COMMAND -> parseWhoIs(parameters);
                 case IRCMessage001.COMMAND -> parseExact(parameters, "client", "message", IRCMessage001::new);
                 case IRCMessage002.COMMAND -> parseExact(parameters, "client", "message", IRCMessage002::new);
                 case IRCMessage003.COMMAND -> parseExact(parameters, "client", "message", IRCMessage003::new);
@@ -574,6 +575,10 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageTOPIC parseTopic(Parameters parameters) throws Exception {
         return parameters.inject(required("channel"), optionalAllowEmpty("topic"), IRCMessageTOPIC::new);
+    }
+
+    private IRCMessageWHOIS parseWhoIs(Parameters parameters) throws Exception {
+        return parameters.inject(optional("target"), required("nickname"), IRCMessageWHOIS::new);
     }
 
     private IRCMessage004 parse004(Parameters parameters) throws Exception {

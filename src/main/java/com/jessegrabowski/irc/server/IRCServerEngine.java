@@ -77,6 +77,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Gatherers;
 
 public class IRCServerEngine implements Closeable {
@@ -445,6 +446,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageUSER m -> handle(connection, m);
                 case IRCMessageUSERHOST m -> handle(connection, m);
                 case IRCMessageWHO m -> handle(connection, m);
+                case IRCMessageWHOIS m -> handle(connection, m);
                 case IRCMessageTooLong m -> {
                     send(
                             connection,
@@ -620,6 +622,7 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessageJOINNormal message) throws Exception {
         serverStateGuard.doTransactionally(state -> {
+            state.markActivity(connection);
             for (int i = 0; i < message.getChannels().size(); i++) {
                 String channel = message.getChannels().get(i);
                 String key = message.getKeys().size() > i ? message.getKeys().get(i) : null;
@@ -740,6 +743,7 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessageNOTICE message) throws StateInvariantException {
         ServerState state = serverStateGuard.getState();
+        state.markActivity(connection);
         ServerUser me = state.getUserForConnection(connection);
         List<MessageTarget> targets = new ArrayList<>();
         for (String targetMask : message.getTargets()) {
@@ -785,6 +789,7 @@ public class IRCServerEngine implements Closeable {
     private void handle(IRCConnection connection, IRCMessagePART message) throws Exception {
         List<Runnable> results = new ArrayList<>();
         serverStateGuard.doTransactionally(state -> {
+            state.markActivity(connection);
             ServerUser me = state.getUserForConnection(connection);
             for (String channelName : message.getChannels()) {
                 ServerChannel channel = state.findChannel(channelName);
@@ -858,6 +863,7 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessagePRIVMSG message) throws StateInvariantException {
         ServerState state = serverStateGuard.getState();
+        state.markActivity(connection);
         ServerUser me = state.getUserForConnection(connection);
         if (message.getMessage() == null || message.getMessage().isEmpty()) {
             send(connection, server(), message, me.getNickname(), "No text to send", IRCMessage412::new);
@@ -892,6 +898,9 @@ public class IRCServerEngine implements Closeable {
     }
 
     private void handle(IRCConnection connection, IRCMessageTOPIC message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        state.markActivity(connection);
+
         if (message.getTopic() == null) {
             sendTopic(connection, message, message.getChannel(), true);
             return;
@@ -902,7 +911,6 @@ public class IRCServerEngine implements Closeable {
             topic = null;
         }
 
-        ServerState state = serverStateGuard.getState();
         ServerChannel channel = state.getExistingChannel(connection, message.getChannel());
         state.setChannelTopic(connection, channel, topic);
         ServerUser me = state.getUserForConnection(connection);
@@ -978,6 +986,132 @@ public class IRCServerEngine implements Closeable {
         }
 
         send(connection, server(), message, state.getNickname(connection), message.getMask(), IRCMessage315::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessageWHOIS message) {
+        ServerState state = serverStateGuard.getState();
+
+        if (message.getTarget() != null
+                && !Objects.equals(message.getTarget(), properties.getServer())
+                && state.findUser(message.getTarget()) == null) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    message.getTarget(),
+                    "No such server",
+                    IRCMessage402::new);
+            return;
+        }
+
+        ServerUser user = state.findUser(message.getNick());
+        if (user == null) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    message.getNick(),
+                    "No such nick",
+                    IRCMessage401::new);
+            send(connection, server(), message, state.getNickname(connection), message.getNick(), IRCMessage318::new);
+            return;
+        }
+
+        ServerUser me = state.getUserForConnection(connection);
+        if (me == user || me.getModes().contains(IRCUserMode.OPERATOR)) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    user.getNickname(),
+                    user.getUsername(),
+                    user.getHostAddress(),
+                    user.getRealName(),
+                    IRCMessage311::new);
+        } else {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    user.getNickname(),
+                    user.getUsername(),
+                    properties.getServer(),
+                    user.getRealName(),
+                    IRCMessage311::new);
+        }
+        send(
+                connection,
+                server(),
+                message,
+                state.getNickname(connection),
+                user.getNickname(),
+                properties.getServer(),
+                "RitsIRC server",
+                IRCMessage312::new);
+        if (user.getModes().contains(IRCUserMode.OPERATOR)) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    user.getNickname(),
+                    "is an IRC operator",
+                    IRCMessage313::new);
+        }
+        send(
+                connection,
+                server(),
+                message,
+                state.getNickname(connection),
+                user.getNickname(),
+                (int) (System.currentTimeMillis() - user.getLastActive()) / 1000,
+                user.getSignOnTime(),
+                IRCMessage317::new);
+
+        Set<ServerChannel> channels = state.getChannelsForUser(connection, user);
+        List<String> channelNames = new ArrayList<>(channels.size());
+        List<Character> channelPrefixes = new ArrayList<>(channels.size());
+        for (ServerChannel channel : channels) {
+            channelNames.add(channel.getName());
+            channelPrefixes.add(channel.getMembership(user).getHighestPowerPrefix());
+        }
+        send(
+                connection,
+                server(),
+                message,
+                state.getNickname(connection),
+                user.getNickname(),
+                channelNames,
+                channelPrefixes,
+                IRCMessage319::new);
+        send(
+                connection,
+                server(),
+                message,
+                state.getNickname(connection),
+                user.getNickname(),
+                "is using modes +"
+                        + user.getModes().stream()
+                                .map(IRCUserMode::getMode)
+                                .sorted()
+                                .map(Object::toString)
+                                .collect(Collectors.joining()),
+                IRCMessage379::new);
+        if (user.getAwayStatus() != null) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    user.getNickname(),
+                    user.getAwayStatus(),
+                    IRCMessage301::new);
+        }
+        send(connection, server(), message, state.getNickname(connection), message.getNick(), IRCMessage318::new);
     }
 
     private void sendWelcome(IRCConnection connection, IRCMessage initiator) {

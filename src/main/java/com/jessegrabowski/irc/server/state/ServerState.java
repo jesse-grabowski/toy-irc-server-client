@@ -629,4 +629,14 @@ public final class ServerState {
     public Set<ServerChannel> getChannels() {
         return Set.copyOf(channels.values());
     }
+
+    public Set<ServerChannel> getChannelsForUser(IRCConnection connection, ServerUser user) {
+        // todo respect +s +i
+        return user.getChannels();
+    }
+
+    public void markActivity(IRCConnection connection) {
+        ServerUser user = findUser(connection);
+        user.setLastActive(System.currentTimeMillis());
+    }
 }

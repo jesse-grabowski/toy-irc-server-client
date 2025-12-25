@@ -197,7 +197,8 @@ public abstract sealed class IRCMessage
                 IRCMessageUSER,
                 IRCMessageUSERHOST,
                 IRCMessageUnsupported,
-                IRCMessageWHO {
+                IRCMessageWHO,
+                IRCMessageWHOIS {
 
     private final String rawMessage;
 
