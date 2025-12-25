@@ -37,6 +37,10 @@ import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
 import com.jessegrabowski.irc.protocol.model.IRCMessage;
 
+/*
+ * This is a bit lazy, in an ideal world I'd have an exception per error
+ * type and leave the protocol bits solely to the engine
+ */
 public class StateInvariantException extends Exception {
 
     private final IRCMessageFactory0<?> factory;
