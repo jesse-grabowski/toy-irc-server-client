@@ -43,6 +43,7 @@ import java.util.Set;
 public final class ServerUser implements MessageSource {
     private final Set<IRCCapability> capabilities = new HashSet<>();
     private final SequencedSet<ServerChannel> channels = new LinkedHashSet<>();
+    private final Set<ServerChannel> invitedChannels = new HashSet<>();
     private final Set<IRCUserMode> modes = new HashSet<>();
     private final String hostAddress;
     private final long signOnTime = System.currentTimeMillis();
@@ -220,5 +221,21 @@ public final class ServerUser implements MessageSource {
 
     void removeMode(IRCUserMode mode) {
         Transaction.removeTransactionally(modes, mode);
+    }
+
+    String getNickmask() {
+        return nickname + '!' + username + '@' + hostAddress;
+    }
+
+    public Set<ServerChannel> getInvitedChannels() {
+        return Set.copyOf(invitedChannels);
+    }
+
+    void setInvited(ServerChannel channel) {
+        Transaction.addTransactionally(invitedChannels, channel);
+    }
+
+    void clearInvited(ServerChannel channel) {
+        Transaction.removeTransactionally(invitedChannels, channel);
     }
 }

@@ -320,6 +320,7 @@ public class IRCClientEngine implements Closeable {
                 /* ignore */
             }
             case IRCMessageERROR m -> handle(m);
+            case IRCMessageINVITE m -> handle(m);
             case IRCMessageJOIN0 m -> {
                 /* ignore */
             }
@@ -490,9 +491,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage338 m -> {
                 /* ignore */
             }
-            case IRCMessage341 m -> {
-                /* ignore */
-            }
+            case IRCMessage341 m ->
+                terminal.println(makeSystemTerminalMessage(
+                        s("Successfully invited ", f(m.getNick()), " to channel ", f(m.getChannel()))));
             case IRCMessage346 m -> {
                 /* ignore */
             }
@@ -805,6 +806,11 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(IRCMessageERROR message) {
         terminal.println(makeSystemErrorMessage(message.getReason()));
+    }
+
+    private void handle(IRCMessageINVITE message) {
+        terminal.println(makeSystemTerminalMessage(f(
+                Color.GREEN, B(s(f(message.getPrefixName()), " has invited you to ", f(message.getChannel()), "!")))));
     }
 
     private void handle(IRCMessageJOINNormal message) {

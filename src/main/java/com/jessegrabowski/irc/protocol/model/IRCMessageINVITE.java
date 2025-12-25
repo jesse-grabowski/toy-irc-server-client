@@ -29,53 +29,40 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol;
+package com.jessegrabowski.irc.protocol.model;
 
-import java.util.Arrays;
-import java.util.Optional;
+import java.util.LinkedHashMap;
+import java.util.SequencedMap;
 
-public enum IRCChannelMembershipMode {
-    FOUNDER('q', '~', 5),
-    PROTECTED('a', '&', 4),
-    OPERATOR('o', '@', 3),
-    HALFOP('h', '%', 2),
-    VOICE('v', '+', 1);
+public final class IRCMessageINVITE extends IRCMessage {
 
-    private final Character letter;
-    private final Character prefix;
-    private final int power;
+    public static final String COMMAND = "INVITE";
 
-    IRCChannelMembershipMode(Character letter, Character prefix, int power) {
-        this.letter = letter;
-        this.prefix = prefix;
-        this.power = power;
+    private final String nickname;
+    private final String channel;
+
+    public IRCMessageINVITE(
+            String rawMessage,
+            SequencedMap<String, String> tags,
+            String prefixName,
+            String prefixUser,
+            String prefixHost,
+            String nickname,
+            String channel) {
+        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
+        this.nickname = nickname;
+        this.channel = channel;
     }
 
-    public Character getLetter() {
-        return letter;
+    public IRCMessageINVITE(String nickname, String channel, String reason) {
+        this(null, new LinkedHashMap<>(), null, null, null, nickname, channel);
     }
 
-    public Character getPrefix() {
-        return prefix;
+    public String getNickname() {
+        return nickname;
     }
 
-    public static Optional<IRCChannelMembershipMode> fromLetter(Character letter) {
-        return Arrays.stream(values())
-                .filter(mode -> mode.getLetter().equals(letter))
-                .findFirst();
-    }
-
-    public static Optional<IRCChannelMembershipMode> fromPrefix(Character prefix) {
-        return Arrays.stream(values())
-                .filter(mode -> mode.getPrefix().equals(prefix))
-                .findFirst();
-    }
-
-    public boolean canGrant(IRCChannelMembershipMode other) {
-        return (power >= 3 && power >= other.power) || (power >= 2 && other.power == 1);
-    }
-
-    public boolean isAtLeast(IRCChannelMembershipMode other) {
-        return power >= other.power;
+    public String getChannel() {
+        return channel;
     }
 }

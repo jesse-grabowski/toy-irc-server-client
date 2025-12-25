@@ -56,6 +56,7 @@ public final class ServerChannel {
     private final Map<IRCChannelList, List<Glob>> lists = new HashMap<>();
     private final Map<IRCChannelSetting, String> settings = new HashMap<>();
     private final Set<IRCChannelFlag> flags = new HashSet<>();
+    private final Set<ServerUser> invited = new HashSet<>();
 
     ServerChannel(String name) {
         this.name = name;
@@ -236,5 +237,61 @@ public final class ServerChannel {
 
     void clearFlag(IRCChannelFlag mode) {
         Transaction.removeTransactionally(flags, mode);
+    }
+
+    void setInvited(ServerUser user) {
+        Transaction.addTransactionally(invited, user);
+    }
+
+    void clearInvited(ServerUser user) {
+        Transaction.removeTransactionally(invited, user);
+    }
+
+    boolean isFull() {
+        try {
+            String clientLimit = settings.get(IRCChannelSetting.CLIENT_LIMIT);
+            return clientLimit != null && Integer.parseInt(clientLimit) <= members.size();
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    boolean isBanned(ServerUser user) {
+        if (!lists.containsKey(IRCChannelList.BAN)) {
+            return false;
+        }
+
+        String nickmask = user.getNickmask();
+        boolean banned = lists.get(IRCChannelList.BAN).stream().anyMatch(glob -> glob.matches(nickmask));
+        if (!banned || !lists.containsKey(IRCChannelList.EXCEPTS)) {
+            return banned;
+        }
+
+        return lists.get(IRCChannelList.EXCEPTS).stream().anyMatch(glob -> glob.matches(nickmask));
+    }
+
+    boolean isKeyValid(String key) {
+        if (!settings.containsKey(IRCChannelSetting.KEY)) {
+            return true;
+        }
+
+        return settings.get(IRCChannelSetting.KEY).equals(key);
+    }
+
+    boolean isInvited(ServerUser user) {
+        if (!flags.contains(IRCChannelFlag.INVITE_ONLY)) {
+            return true;
+        }
+
+        if (invited.contains(user)) {
+            return true;
+        }
+
+        if (lists.containsKey(IRCChannelList.INVEX)) {
+            String nickmask = user.getNickmask();
+            return lists.get(IRCChannelList.INVEX).stream().anyMatch(glob -> glob.matches(nickmask));
+        }
+
+        return false;
     }
 }

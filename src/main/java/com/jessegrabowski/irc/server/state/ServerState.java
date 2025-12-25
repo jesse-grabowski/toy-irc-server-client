@@ -47,6 +47,10 @@ import com.jessegrabowski.irc.protocol.model.IRCMessage441;
 import com.jessegrabowski.irc.protocol.model.IRCMessage442;
 import com.jessegrabowski.irc.protocol.model.IRCMessage451;
 import com.jessegrabowski.irc.protocol.model.IRCMessage462;
+import com.jessegrabowski.irc.protocol.model.IRCMessage471;
+import com.jessegrabowski.irc.protocol.model.IRCMessage473;
+import com.jessegrabowski.irc.protocol.model.IRCMessage474;
+import com.jessegrabowski.irc.protocol.model.IRCMessage475;
 import com.jessegrabowski.irc.protocol.model.IRCMessage476;
 import com.jessegrabowski.irc.protocol.model.IRCMessage482;
 import com.jessegrabowski.irc.protocol.model.IRCMessage502;
@@ -353,7 +357,8 @@ public final class ServerState {
         }
 
         ServerChannel channel = getExistingChannel(connection, channelName);
-        if (!channel.getMembership(me).canGrant(mode)) {
+        ServerChannelMembership myMembership = channel.getMembership(me);
+        if (myMembership == null || !myMembership.canGrant(mode)) {
             throw new StateInvariantException(
                     "Cannot set modes on channel",
                     me.getNickname(),
@@ -390,7 +395,8 @@ public final class ServerState {
         }
 
         ServerChannel channel = getExistingChannel(connection, channelName);
-        if (!channel.getMembership(me).canGrant(mode)) {
+        ServerChannelMembership myMembership = channel.getMembership(me);
+        if (myMembership == null || !myMembership.canGrant(mode)) {
             throw new StateInvariantException(
                     "Cannot set modes on channel",
                     me.getNickname(),
@@ -475,6 +481,9 @@ public final class ServerState {
             if (channel.isEmpty()) {
                 Transaction.removeTransactionally(channels, channel.getName());
             }
+        }
+        for (ServerChannel channel : user.getInvitedChannels()) {
+            clearChannelInvite(channel, user);
         }
         if (user.getNickname() != null && user.getUsername() != null && user.getRealName() != null) {
             Transaction.addFirstTransactionally(
@@ -750,19 +759,36 @@ public final class ServerState {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
 
-        String normalizedChannelName = normalizeChannelName(channelName);
-
-        ServerChannel channel = channels.get(normalizedChannelName);
+        ServerChannel channel = findChannel(channelName);
         if (channel == null) {
             throw new StateInvariantException(
-                    "Channel '%s' does not exist".formatted(normalizedChannelName),
+                    "Channel '%s' does not exist".formatted(channelName),
                     user.getNickname(),
-                    normalizedChannelName,
-                    "Channel '%s' does not exist".formatted(normalizedChannelName),
+                    channelName,
+                    "Channel '%s' does not exist".formatted(channelName),
                     IRCMessage403::new);
         }
 
         return channel;
+    }
+
+    public ServerUser getExistingUser(IRCConnection connection, String nickname) throws StateInvariantException {
+        ServerUser me = findUser(connection);
+        if (me == null || me.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerUser user = findUser(nickname);
+        if (user == null) {
+            throw new StateInvariantException(
+                    "User '%s' does not exist".formatted(nickname),
+                    me.getNickname(),
+                    nickname,
+                    "No such nickname",
+                    IRCMessage401::new);
+        }
+
+        return user;
     }
 
     public void setChannelTopic(IRCConnection connection, ServerChannel channel, String topic)
@@ -825,10 +851,49 @@ public final class ServerState {
             Transaction.putTransactionally(channels, normalizedChannelName, channel);
             channel.join(user, key);
             channel.addMemberModeAutomatic(user, IRCChannelMembershipMode.OPERATOR);
-        } else {
-            channel.join(user, key);
+            user.addChannel(channel);
+            return;
         }
+
+        if (channel.isBanned(user)) {
+            throw new StateInvariantException(
+                    "User is banned from channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot join channel (banned +%s)".formatted(IRCChannelList.BAN.getMode()),
+                    IRCMessage474::new);
+        }
+
+        if (!channel.isInvited(user)) {
+            throw new StateInvariantException(
+                    "Invite only channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot join channel (invite-only +%s)".formatted(IRCChannelFlag.INVITE_ONLY.getMode()),
+                    IRCMessage473::new);
+        }
+
+        if (!channel.isKeyValid(key)) {
+            throw new StateInvariantException(
+                    "Invalid key",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot join channel (key +%s)".formatted(IRCChannelSetting.KEY.getMode()),
+                    IRCMessage475::new);
+        }
+
+        if (channel.isFull()) {
+            throw new StateInvariantException(
+                    "Channel is full",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot join channel (client limit +%s)".formatted(IRCChannelSetting.CLIENT_LIMIT.getMode()),
+                    IRCMessage471::new);
+        }
+
+        channel.join(user, key);
         user.addChannel(channel);
+        clearChannelInvite(channel, user);
     }
 
     public void partChannel(IRCConnection connection, String channelName) throws StateInvariantException {
@@ -934,5 +999,39 @@ public final class ServerState {
 
     public boolean isChannelLike(String name) {
         return parameters.getChannelTypes().stream().anyMatch(c -> name.charAt(0) == c);
+    }
+
+    public void setChannelInvite(IRCConnection connection, ServerChannel channel, ServerUser user)
+            throws StateInvariantException {
+        ServerUser me = findUser(connection);
+        if (me == null || me.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        if (!channel.getMembers().contains(me)) {
+            throw new StateInvariantException(
+                    "Not a member of channel '%s'".formatted(channel.getName()),
+                    me.getNickname(),
+                    channel.getName(),
+                    IRCMessage442::new);
+        }
+
+        if (channel.checkFlag(IRCChannelFlag.INVITE_ONLY)
+                && !channel.getMembership(me).hasAtLeast(IRCChannelMembershipMode.HALFOP)) {
+            throw new StateInvariantException(
+                    "User does not have permission to invite members",
+                    me.getNickname(),
+                    channel.getName(),
+                    "Invite-only mode enabled, halfop required to send invites",
+                    IRCMessage482::new);
+        }
+
+        channel.setInvited(user);
+        user.setInvited(channel);
+    }
+
+    void clearChannelInvite(ServerChannel channel, ServerUser user) {
+        channel.clearInvited(user);
+        user.clearInvited(channel);
     }
 }

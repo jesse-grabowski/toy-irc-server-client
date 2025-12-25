@@ -68,6 +68,7 @@ public class IRCMessageMarshaller {
             case IRCMessageCTCPVersionRequest m -> marshal(m, this::marshalCTCPVersionRequest);
             case IRCMessageCTCPVersionResponse m -> marshal(m, this::marshalCTCPVersionResponse);
             case IRCMessageERROR m -> marshal(m, this::marshalError);
+            case IRCMessageINVITE m -> marshal(m, this::marshalInvite);
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
             case IRCMessageKICK m -> marshal(m, this::marshalKick);
@@ -389,6 +390,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalError(IRCMessageERROR message) {
         return l(trailing(message.getReason()));
+    }
+
+    private List<String> marshalInvite(IRCMessageINVITE message) {
+        return l(message.getNickname(), message.getChannel());
     }
 
     private List<String> marshalJoin0(IRCMessageJOIN0 message) {

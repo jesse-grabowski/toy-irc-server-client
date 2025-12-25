@@ -433,6 +433,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageCAPLSRequest m -> handle(connection, m);
                 case IRCMessageCAPREQ m -> handle(connection, m);
                 case IRCMessageCTCPAction m -> handle(connection, m);
+                case IRCMessageINVITE m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
                 case IRCMessageKICK m -> {}
@@ -625,6 +626,56 @@ public class IRCServerEngine implements Closeable {
             if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
                 echo(connection, me, message, List.of(target.getMask()), message.getText(), IRCMessageCTCPAction::new);
             }
+        }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageINVITE message) throws StateInvariantException {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        if (message.getNickname() != null && message.getChannel() != null) {
+            ServerChannel channel = state.getExistingChannel(connection, message.getChannel());
+            ServerUser user = state.getExistingUser(connection, message.getNickname());
+            if (channel.getMembership(user) != null) {
+                send(
+                        connection,
+                        server(),
+                        message,
+                        me.getNickname(),
+                        message.getNickname(),
+                        message.getChannel(),
+                        IRCMessage443::new);
+                return;
+            }
+            state.setChannelInvite(connection, channel, user);
+            send(
+                    connection,
+                    server(),
+                    message,
+                    me.getNickname(),
+                    message.getNickname(),
+                    channel.getName(),
+                    IRCMessage341::new);
+            send(
+                    state.getConnectionForUser(user),
+                    me,
+                    message,
+                    message.getNickname(),
+                    message.getChannel(),
+                    IRCMessageINVITE::new);
+        } else if (message.getNickname() != null || message.getChannel() != null) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    me.getNickname(),
+                    message.getCommand(),
+                    "Not enough parameters",
+                    IRCMessage461::new);
+        } else {
+            for (ServerChannel channel : me.getInvitedChannels()) {
+                send(connection, server(), message, me.getNickname(), channel.getName(), IRCMessage336::new);
+            }
+            send(connection, server(), message, me.getNickname(), IRCMessage337::new);
         }
     }
 
@@ -827,9 +878,11 @@ public class IRCServerEngine implements Closeable {
                                     if (adding) {
                                         state.setChannelMembershipMode(connection, message.getTarget(), nick, mode);
                                         addedModes.add(c);
+                                        addedValues.add(nick);
                                     } else {
                                         state.clearChannelMembershipMode(connection, message.getTarget(), nick, mode);
                                         removedModes.add(c);
+                                        removedValues.add(nick);
                                     }
                                 } else {
                                     unknownModes.add(c);
@@ -907,8 +960,10 @@ public class IRCServerEngine implements Closeable {
                                     unknownModes.add(c);
                                 } else if (adding) {
                                     state.setChannelFlag(connection, message.getTarget(), mode);
+                                    addedModes.add(c);
                                 } else {
                                     state.clearChannelFlag(connection, message.getTarget(), mode);
+                                    removedModes.add(c);
                                 }
                             } else {
                                 unknownModes.add(c);
@@ -919,8 +974,10 @@ public class IRCServerEngine implements Closeable {
                                 unknownModes.add(c);
                             } else if (adding) {
                                 state.setUserMode(connection, message.getTarget(), mode);
+                                addedModes.add(c);
                             } else {
                                 state.clearUserMode(connection, message.getTarget(), mode);
+                                removedModes.add(c);
                             }
                         }
                     }
