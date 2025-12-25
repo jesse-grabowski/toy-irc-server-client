@@ -64,7 +64,6 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -600,7 +599,7 @@ public class IRCServerEngine implements Closeable {
         ServerUser me = state.getUserForConnection(connection);
         List<MessageTarget> targets = new ArrayList<>();
         for (String target : message.getTargets()) {
-            targets.add(state.resolveMask(connection, target));
+            targets.add(state.resolveRequired(connection, target, false));
         }
         for (MessageTarget target : targets) {
             String away = state.getAway(target.getMask());
@@ -743,12 +742,10 @@ public class IRCServerEngine implements Closeable {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
         List<MessageTarget> targets = new ArrayList<>();
-        for (String target : message.getTargets()) {
-            try {
-                targets.add(state.resolveMask(connection, target));
-            } catch (Exception e) {
-                LOG.log(Level.FINE, "Invalid NOTICE target '%s', silently ignored".formatted(target), e);
-                return;
+        for (String targetMask : message.getTargets()) {
+            MessageTarget target = state.resolveOptional(connection, targetMask, false);
+            if (!target.isEmpty()) {
+                targets.add(target);
             }
         }
         for (MessageTarget target : targets) {
@@ -868,7 +865,7 @@ public class IRCServerEngine implements Closeable {
         }
         List<MessageTarget> targets = new ArrayList<>();
         for (String target : message.getTargets()) {
-            targets.add(state.resolveMask(connection, target));
+            targets.add(state.resolveRequired(connection, target, false));
         }
         for (MessageTarget target : targets) {
             String away = state.getAway(target.getMask());
@@ -943,33 +940,33 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessageWHO message) throws StateInvariantException {
         ServerState state = serverStateGuard.getState();
+        MessageTarget target = state.resolveOptional(connection, message.getMask(), true);
 
-        Set<ServerUser> users = new HashSet<>();
+        for (IRCConnection targetConnection : target.getConnections()) {
+            ServerUser user = state.getUserForConnection(targetConnection);
 
-        ServerChannel channel = state.findChannel(message.getMask());
-        if (channel != null) {
-            users.addAll(channel.getMembers());
-        }
+            ServerChannel channel;
+            if (target.isChannel() && target.isLiteral()) {
+                channel = state.findChannel(message.getMask());
+            } else {
+                channel = user.getChannels().stream().findAny().orElse(null);
+            }
 
-        ServerUser serverUser = state.findUser(message.getMask());
-        if (serverUser != null) {
-            users.add(serverUser);
-        }
+            String channelMembershipPrefix = Optional.ofNullable(channel)
+                    .map(c -> c.getMembership(user))
+                    .map(ServerChannelMembership::getHighestPowerPrefix)
+                    .map(Object::toString)
+                    .orElse("");
 
-        for (ServerUser user : users) {
             String flags = (user.getAwayStatus() == null ? "H" : "G")
                     + (state.userHasMode(user.getNickname(), IRCUserMode.OPERATOR) ? "*" : "")
-                    + Optional.ofNullable(channel)
-                            .map(c -> c.getMembership(user))
-                            .map(ServerChannelMembership::getHighestPowerPrefix)
-                            .map(Object::toString)
-                            .orElse(" ");
+                    + channelMembershipPrefix;
             send(
                     connection,
                     server(),
                     message,
                     state.getNickname(connection),
-                    Optional.ofNullable(channel).map(ServerChannel::getName).orElse("*"),
+                    channel != null ? channel.getName() : "*",
                     user.getUsername(),
                     state.getHost(connection, user.getNickname()),
                     properties.getServer(),

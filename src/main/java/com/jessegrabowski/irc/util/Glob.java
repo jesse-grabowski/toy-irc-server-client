@@ -158,6 +158,10 @@ public final class Glob {
         return new Glob(parts.stream().map(part -> part.casefold(caseMapping)).toList());
     }
 
+    public boolean isLiteral() {
+        return parts.stream().allMatch(part -> part instanceof Literal);
+    }
+
     public boolean matches(String input) {
         return matches(input, 0, 0);
     }

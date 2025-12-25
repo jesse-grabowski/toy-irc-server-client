@@ -38,16 +38,32 @@ import java.util.stream.Collectors;
 
 public final class MessageTarget {
     private final String mask;
+    private final boolean channel;
+    private final boolean literal;
 
     private Set<IRCConnection> connections;
 
-    MessageTarget(String mask, Set<IRCConnection> connections) {
+    MessageTarget(String mask, boolean channel, boolean literal, Set<IRCConnection> connections) {
         this.mask = mask;
+        this.channel = channel;
+        this.literal = literal;
         this.connections = connections;
     }
 
     public String getMask() {
         return mask;
+    }
+
+    public boolean isChannel() {
+        return channel;
+    }
+
+    public boolean isLiteral() {
+        return literal;
+    }
+
+    public boolean isEmpty() {
+        return connections.isEmpty();
     }
 
     public Set<IRCConnection> getConnections() {

@@ -48,6 +48,7 @@ import com.jessegrabowski.irc.protocol.model.IRCMessage482;
 import com.jessegrabowski.irc.protocol.model.IRCMessage502;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.server.IRCServerProperties;
+import com.jessegrabowski.irc.util.Glob;
 import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.HashMap;
@@ -379,48 +380,69 @@ public final class ServerState {
         return true;
     }
 
-    public MessageTarget resolveMask(IRCConnection connection, String mask) throws StateInvariantException {
+    public MessageTarget resolveRequired(IRCConnection connection, String mask, boolean includeSelf)
+            throws StateInvariantException {
         ServerUser user = findUser(connection);
         if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
 
-        if (parameters.getChannelTypes().stream().anyMatch(c -> mask.charAt(0) == c)) {
-            ServerChannel channel = findChannel(mask);
-            if (channel == null) {
-                throw new StateInvariantException(
-                        "Could not find channel '%s'".formatted(mask),
-                        user.getNickname(),
-                        mask,
-                        "No such channel '%s'".formatted(mask),
-                        IRCMessage403::new);
-            }
-
-            Set<IRCConnection> connections = new HashSet<>();
-            for (ServerUser channelUser : channel.getMembers()) {
-                if (channelUser != user) {
-                    connections.add(getConnectionForUser(channelUser));
-                }
-            }
-            return new MessageTarget(mask, connections);
+        MessageTarget target = resolveOptional(connection, mask, true);
+        if (!target.isEmpty()) {
+            target.filter(c -> includeSelf || !c.equals(connection));
+            return target;
         }
 
-        ServerUser targetUser = findUser(mask);
-        if (targetUser == null || targetUser.getState() != ServerConnectionState.REGISTERED) {
+        if (target.isChannel()) {
             throw new StateInvariantException(
-                    "Could not find user '%s'".formatted(mask),
+                    "Could not find channel '%s'".formatted(mask),
                     user.getNickname(),
                     mask,
-                    "No such nick '%s'".formatted(mask),
-                    IRCMessage401::new);
+                    "No such channel '%s'".formatted(mask),
+                    IRCMessage403::new);
         }
 
-        return new MessageTarget(mask, Set.of(getConnectionForUser(targetUser)));
+        throw new StateInvariantException(
+                "Could not find user '%s'".formatted(mask),
+                user.getNickname(),
+                mask,
+                "No such nick '%s'".formatted(mask),
+                IRCMessage401::new);
+    }
+
+    public MessageTarget resolveOptional(IRCConnection connection, String mask, boolean includeSelf)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        Glob glob = Glob.of(mask).casefold(parameters.getCaseMapping());
+
+        if (parameters.getChannelTypes().stream().anyMatch(c -> mask.charAt(0) == c)) {
+            Set<IRCConnection> connections = channels.entrySet().stream()
+                    .filter(e -> glob.matches(normalizeChannelName(e.getKey())))
+                    .map(e -> e.getValue().getMembers())
+                    .flatMap(Set::stream)
+                    .map(this::getConnectionForUser)
+                    .filter(c -> includeSelf || !c.equals(connection))
+                    .collect(Collectors.toSet());
+            return new MessageTarget(mask, true, glob.isLiteral(), connections);
+        }
+
+        Set<IRCConnection> connections = users.values().stream()
+                .filter(u -> glob.matches(normalizeNickname(u.getNickname())))
+                .map(this::getConnectionForUser)
+                .filter(c -> includeSelf || !c.equals(connection))
+                .collect(Collectors.toSet());
+        return new MessageTarget(mask, false, glob.isLiteral(), connections);
     }
 
     public MessageTarget getWatchers(ServerChannel channel) {
         return new MessageTarget(
                 channel.getName(),
+                true,
+                true,
                 channel.getMembers().stream().map(this::getConnectionForUser).collect(Collectors.toSet()));
     }
 
@@ -435,7 +457,7 @@ public final class ServerState {
         if (!includeSelf) {
             watchers.remove(getConnectionForUser(user));
         }
-        return new MessageTarget(user.getNickname(), watchers);
+        return new MessageTarget(user.getNickname(), false, true, watchers);
     }
 
     public ServerChannel findChannel(String channelName) {
