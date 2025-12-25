@@ -788,7 +788,7 @@ public class IRCServerEngine implements Closeable {
         if (message.getModeString() == null) {
             if (state.isChannelLike(message.getTarget())) {
                 ServerChannel channel = state.getExistingChannel(connection, message.getTarget());
-                StringBuilder modeStringBuilder = new StringBuilder();
+                StringBuilder modeStringBuilder = new StringBuilder("+");
                 List<String> arguments = new ArrayList<>();
                 for (IRCChannelSetting setting : IRCChannelSetting.values()) {
                     String value = channel.getSetting(setting);
@@ -815,6 +815,14 @@ public class IRCServerEngine implements Closeable {
                         modeStringBuilder.toString(),
                         arguments,
                         IRCMessage324::new);
+                send(
+                        connection,
+                        server(),
+                        message,
+                        me.getNickname(),
+                        channel.getName(),
+                        channel.getCreationTime(),
+                        IRCMessage329::new);
             } else {
                 ServerUser target = state.findUser(message.getTarget());
                 if (target != me) {

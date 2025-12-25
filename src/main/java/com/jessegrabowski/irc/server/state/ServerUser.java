@@ -32,7 +32,9 @@
 package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.protocol.IRCCaseMapping;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
+import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.Collections;
 import java.util.HashSet;
@@ -223,8 +225,13 @@ public final class ServerUser implements MessageSource {
         Transaction.removeTransactionally(modes, mode);
     }
 
-    String getNickmask() {
-        return nickname + '!' + username + '@' + hostAddress;
+    String getNickmask(IRCServerParameters parameters) {
+        IRCCaseMapping mapping = parameters.getCaseMapping();
+        return mapping.normalizeNickname(nickname)
+                + '!'
+                + mapping.normalizeNickname(username)
+                + '@'
+                + mapping.normalizeNickname(hostAddress);
     }
 
     public Set<ServerChannel> getInvitedChannels() {

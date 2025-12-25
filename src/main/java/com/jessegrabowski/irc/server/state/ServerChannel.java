@@ -37,6 +37,7 @@ import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
 import com.jessegrabowski.irc.protocol.IRCChannelSetting;
 import com.jessegrabowski.irc.protocol.model.IRCMessage443;
 import com.jessegrabowski.irc.protocol.model.IRCMessage482;
+import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.util.Glob;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.ArrayList;
@@ -52,6 +53,7 @@ public final class ServerChannel {
     private String topic;
     private ServerSetBy topicSetBy;
     private long topicSetAt;
+    private final long creationTime = System.currentTimeMillis();
     private final Map<ServerUser, ServerChannelMembership> members = new HashMap<>();
     private final Map<IRCChannelList, List<Glob>> lists = new HashMap<>();
     private final Map<IRCChannelSetting, String> settings = new HashMap<>();
@@ -193,6 +195,10 @@ public final class ServerChannel {
         Transaction.addCompensation(() -> this.topicSetAt = oldTopicSetAt);
     }
 
+    public long getCreationTime() {
+        return creationTime;
+    }
+
     public List<Glob> getList(IRCChannelList mode) {
         return Collections.unmodifiableList(lists.getOrDefault(mode, List.of()));
     }
@@ -256,18 +262,18 @@ public final class ServerChannel {
         }
     }
 
-    boolean isBanned(ServerUser user) {
+    boolean isBanned(IRCServerParameters parameters, ServerUser user) {
         if (!lists.containsKey(IRCChannelList.BAN)) {
             return false;
         }
 
-        String nickmask = user.getNickmask();
+        String nickmask = user.getNickmask(parameters);
         boolean banned = lists.get(IRCChannelList.BAN).stream().anyMatch(glob -> glob.matches(nickmask));
         if (!banned || !lists.containsKey(IRCChannelList.EXCEPTS)) {
             return banned;
         }
 
-        return lists.get(IRCChannelList.EXCEPTS).stream().anyMatch(glob -> glob.matches(nickmask));
+        return lists.get(IRCChannelList.EXCEPTS).stream().noneMatch(glob -> glob.matches(nickmask));
     }
 
     boolean isKeyValid(String key) {
@@ -278,7 +284,7 @@ public final class ServerChannel {
         return settings.get(IRCChannelSetting.KEY).equals(key);
     }
 
-    boolean isInvited(ServerUser user) {
+    boolean isInvited(IRCServerParameters parameters, ServerUser user) {
         if (!flags.contains(IRCChannelFlag.INVITE_ONLY)) {
             return true;
         }
@@ -288,7 +294,7 @@ public final class ServerChannel {
         }
 
         if (lists.containsKey(IRCChannelList.INVEX)) {
-            String nickmask = user.getNickmask();
+            String nickmask = user.getNickmask(parameters);
             return lists.get(IRCChannelList.INVEX).stream().anyMatch(glob -> glob.matches(nickmask));
         }
 

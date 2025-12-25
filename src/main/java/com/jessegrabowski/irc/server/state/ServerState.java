@@ -198,6 +198,17 @@ public final class ServerState {
                     IRCMessage482::new);
         }
 
+        if (value == null || value.isBlank() || value.contains(" ") || value.length() > 50) {
+            throw new StateInvariantException(
+                    "Invalid mode param",
+                    user.getNickname(),
+                    channel.getName(),
+                    setting.getMode(),
+                    "*",
+                    "Cannot set modes on channel",
+                    IRCMessage696::new);
+        }
+
         boolean valid =
                 switch (setting) {
                     case CLIENT_LIMIT -> {
@@ -280,6 +291,17 @@ public final class ServerState {
                     channel.getName(),
                     "Cannot set modes on channel",
                     IRCMessage482::new);
+        }
+
+        if (value == null || value.isBlank() || value.contains(" ") || value.length() > 50) {
+            throw new StateInvariantException(
+                    "Invalid mode param",
+                    user.getNickname(),
+                    channel.getName(),
+                    list.getMode(),
+                    "*",
+                    "Cannot set modes on channel",
+                    IRCMessage696::new);
         }
 
         Glob glob = Glob.of(value).casefold(parameters.getCaseMapping());
@@ -855,7 +877,7 @@ public final class ServerState {
             return;
         }
 
-        if (channel.isBanned(user)) {
+        if (channel.isBanned(parameters, user)) {
             throw new StateInvariantException(
                     "User is banned from channel",
                     user.getNickname(),
@@ -864,7 +886,7 @@ public final class ServerState {
                     IRCMessage474::new);
         }
 
-        if (!channel.isInvited(user)) {
+        if (!channel.isInvited(parameters, user)) {
             throw new StateInvariantException(
                     "Invite only channel",
                     user.getNickname(),
