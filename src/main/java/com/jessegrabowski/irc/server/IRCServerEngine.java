@@ -53,6 +53,7 @@ import com.jessegrabowski.irc.server.state.ServerChannel;
 import com.jessegrabowski.irc.server.state.ServerChannelMembership;
 import com.jessegrabowski.irc.server.state.ServerState;
 import com.jessegrabowski.irc.server.state.ServerUser;
+import com.jessegrabowski.irc.server.state.ServerUserWas;
 import com.jessegrabowski.irc.server.state.StateInvariantException;
 import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.StateGuard;
@@ -447,6 +448,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageUSERHOST m -> handle(connection, m);
                 case IRCMessageWHO m -> handle(connection, m);
                 case IRCMessageWHOIS m -> handle(connection, m);
+                case IRCMessageWHOWAS m -> handle(connection, m);
                 case IRCMessageTooLong m -> {
                     send(
                             connection,
@@ -1112,6 +1114,52 @@ public class IRCServerEngine implements Closeable {
                     IRCMessage301::new);
         }
         send(connection, server(), message, state.getNickname(connection), message.getNick(), IRCMessage318::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessageWHOWAS message) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+
+        int count = message.getCount() == null || message.getCount() <= 0 ? Integer.MAX_VALUE : message.getCount();
+        List<ServerUserWas> history = state.getNicknameHistory(message.getNick(), count);
+
+        if (history.isEmpty()) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    message.getNick(),
+                    "No such nick",
+                    IRCMessage406::new);
+        }
+
+        for (ServerUserWas entry : history) {
+            if (me.getModes().contains(IRCUserMode.OPERATOR) || Objects.equals(me.getUsername(), entry.getUsername())) {
+                send(
+                        connection,
+                        server(),
+                        message,
+                        state.getNickname(connection),
+                        message.getNick(),
+                        entry.getUsername(),
+                        entry.getHostname(),
+                        entry.getRealName(),
+                        IRCMessage314::new);
+            } else {
+                send(
+                        connection,
+                        server(),
+                        message,
+                        state.getNickname(connection),
+                        message.getNick(),
+                        entry.getUsername(),
+                        properties.getServer(),
+                        entry.getRealName(),
+                        IRCMessage314::new);
+            }
+        }
+        send(connection, server(), message, state.getNickname(connection), message.getNick(), IRCMessage369::new);
     }
 
     private void sendWelcome(IRCConnection connection, IRCMessage initiator) {

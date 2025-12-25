@@ -89,6 +89,7 @@ public class IRCMessageMarshaller {
             case IRCMessageTOPIC m -> marshal(m, this::marshalTopic);
             case IRCMessageWHO m -> marshal(m, this::marshalWho);
             case IRCMessageWHOIS m -> marshal(m, this::marshalWhoIs);
+            case IRCMessageWHOWAS m -> marshal(m, this::marshalWhoWas);
             case IRCMessage001 m -> marshal(m, this::marshal001);
             case IRCMessage002 m -> marshal(m, this::marshal002);
             case IRCMessage003 m -> marshal(m, this::marshal003);
@@ -472,6 +473,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalWhoIs(IRCMessageWHOIS message) {
         return l(message.getTarget(), message.getNick());
+    }
+
+    private List<String> marshalWhoWas(IRCMessageWHOWAS message) {
+        return l(message.getNick(), message.getCount());
     }
 
     private List<String> marshal001(IRCMessage001 message) {

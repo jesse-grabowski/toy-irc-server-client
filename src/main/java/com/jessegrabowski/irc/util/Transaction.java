@@ -32,6 +32,7 @@
 package com.jessegrabowski.irc.util;
 
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedSet;
@@ -159,5 +160,16 @@ public final class Transaction {
             V removed = list.remove(index);
             addCompensation(() -> list.add(index, removed));
         }
+    }
+
+    public static <V> void addFirstTransactionally(Deque<V> deque, V value) {
+        deque.addFirst(value);
+        addCompensation(deque::removeFirst);
+    }
+
+    public static <V> V removeLastTransactionally(Deque<V> deque) {
+        V value = deque.removeLast();
+        addCompensation(() -> deque.addLast(value));
+        return value;
     }
 }

@@ -362,6 +362,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageWHOIS m -> {
                 /* ignore */
             }
+            case IRCMessageWHOWAS m -> {
+                /* ignore */
+            }
             case IRCMessage001 m -> handle(m);
             case IRCMessage002 m -> terminal.println(makeSystemTerminalMessage(m.getMessage()));
             case IRCMessage003 m -> terminal.println(makeSystemTerminalMessage(m.getMessage()));

@@ -51,8 +51,11 @@ import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.Glob;
 import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.Transaction;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -68,6 +71,7 @@ public final class ServerState {
     private final Map<IRCConnection, ServerUser> users = new HashMap<>();
     private final Map<ServerUser, IRCConnection> connectionsByUser = new HashMap<>();
     private final Map<String, ServerUser> usersByNickname = new HashMap<>();
+    private final Deque<ServerUserWas> nicknameHistory = new ArrayDeque<>();
 
     private final Map<String, ServerChannel> channels = new HashMap<>();
 
@@ -219,6 +223,18 @@ public final class ServerState {
                 Transaction.removeTransactionally(channels, channel.getName());
             }
         }
+        if (user.getNickname() != null && user.getUsername() != null && user.getRealName() != null) {
+            Transaction.addFirstTransactionally(
+                    nicknameHistory,
+                    new ServerUserWas(
+                            normalizeNickname(user.getNickname()),
+                            user.getUsername(),
+                            user.getHostAddress(),
+                            user.getRealName()));
+            while (nicknameHistory.size() > properties.getMaxNicknameHistory()) {
+                Transaction.removeLastTransactionally(nicknameHistory);
+            }
+        }
     }
 
     public void startCapabilityNegotiation(IRCConnection connection) {
@@ -314,6 +330,16 @@ public final class ServerState {
         }
         user.setNickname(truncatedNickname);
         Transaction.putTransactionally(usersByNickname, normalizedNickname, user);
+
+        if (normalizedOldNickname != null && !Objects.equals(normalizedOldNickname, normalizedNickname)) {
+            Transaction.addFirstTransactionally(
+                    nicknameHistory,
+                    new ServerUserWas(
+                            normalizedOldNickname, user.getUsername(), user.getHostAddress(), user.getRealName()));
+            while (nicknameHistory.size() > properties.getMaxNicknameHistory()) {
+                Transaction.removeLastTransactionally(nicknameHistory);
+            }
+        }
 
         return new Pair<>(oldNickname, truncatedNickname);
     }
@@ -638,5 +664,12 @@ public final class ServerState {
     public void markActivity(IRCConnection connection) {
         ServerUser user = findUser(connection);
         user.setLastActive(System.currentTimeMillis());
+    }
+
+    public List<ServerUserWas> getNicknameHistory(String nickname, int limit) {
+        return nicknameHistory.stream()
+                .filter(u -> u.getNickname().equals(normalizeNickname(nickname)))
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 }

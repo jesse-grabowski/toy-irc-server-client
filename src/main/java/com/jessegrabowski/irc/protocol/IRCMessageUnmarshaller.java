@@ -120,18 +120,18 @@ public class IRCMessageUnmarshaller {
             return switch (command) {
                 case IRCMessageAWAY.COMMAND -> parseAway(parameters);
                 case "CAP" -> parseCap(parameters);
-                case IRCMessageERROR.COMMAND -> parseError(parameters);
+                case IRCMessageERROR.COMMAND -> parseExact(parameters, "message", IRCMessageERROR::new);
                 case "JOIN" -> parseJoin(parameters);
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);
                 case IRCMessageKILL.COMMAND -> parseExact(parameters, "nickname", "comment", IRCMessageKILL::new);
                 case IRCMessageLIST.COMMAND -> parseList(parameters);
                 case IRCMessageMODE.COMMAND -> parseMode(parameters);
                 case IRCMessageNAMES.COMMAND -> parseNames(parameters);
-                case IRCMessageNICK.COMMAND -> parseNick(parameters);
+                case IRCMessageNICK.COMMAND -> parseExact(parameters, "nickname", IRCMessageNICK::new);
                 case IRCMessageNOTICE.COMMAND -> parseNotice(parameters);
                 case IRCMessageOPER.COMMAND -> parseExact(parameters, "name", "password", IRCMessageOPER::new);
                 case IRCMessagePART.COMMAND -> parsePart(parameters);
-                case IRCMessagePASS.COMMAND -> parsePass(parameters);
+                case IRCMessagePASS.COMMAND -> parseExact(parameters, "password", IRCMessagePASS::new);
                 case IRCMessagePING.COMMAND -> parsePing(parameters);
                 case IRCMessagePONG.COMMAND -> parsePong(parameters);
                 case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(parameters);
@@ -141,6 +141,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
                 case IRCMessageWHO.COMMAND -> parseExact(parameters, "mask", IRCMessageWHO::new);
                 case IRCMessageWHOIS.COMMAND -> parseWhoIs(parameters);
+                case IRCMessageWHOWAS.COMMAND -> parseWhoWas(parameters);
                 case IRCMessage001.COMMAND -> parseExact(parameters, "client", "message", IRCMessage001::new);
                 case IRCMessage002.COMMAND -> parseExact(parameters, "client", "message", IRCMessage002::new);
                 case IRCMessage003.COMMAND -> parseExact(parameters, "client", "message", IRCMessage003::new);
@@ -487,10 +488,6 @@ public class IRCMessageUnmarshaller {
         return new Pair<>(enabledCapabilities, disabledCapabilities);
     }
 
-    private IRCMessageERROR parseError(Parameters parameters) throws Exception {
-        return parameters.inject(required("reason"), IRCMessageERROR::new);
-    }
-
     private IRCMessage parseJoin(Parameters parameters) throws Exception {
         return parameters
                 .injectConditionally()
@@ -519,10 +516,6 @@ public class IRCMessageUnmarshaller {
         return parameters.inject(required("channel", this::splitToList), IRCMessageNAMES::new);
     }
 
-    private IRCMessageNICK parseNick(Parameters parameters) throws Exception {
-        return parameters.inject(required("nickname"), IRCMessageNICK::new);
-    }
-
     private IRCMessage parseNotice(Parameters parameters) throws Exception {
         return parameters
                 .injectConditionally(false)
@@ -536,10 +529,6 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessagePART parsePart(Parameters parameters) throws Exception {
         return parameters.inject(required("channel", this::splitToList), optional("reason"), IRCMessagePART::new);
-    }
-
-    private IRCMessagePASS parsePass(Parameters parameters) throws Exception {
-        return parameters.inject(required("password"), IRCMessagePASS::new);
     }
 
     private IRCMessagePING parsePing(Parameters parameters) throws Exception {
@@ -579,6 +568,10 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageWHOIS parseWhoIs(Parameters parameters) throws Exception {
         return parameters.inject(optional("target"), required("nickname"), IRCMessageWHOIS::new);
+    }
+
+    private IRCMessageWHOWAS parseWhoWas(Parameters parameters) throws Exception {
+        return parameters.inject(required("nick"), optional("count", Integer::parseInt), IRCMessageWHOWAS::new);
     }
 
     private IRCMessage004 parse004(Parameters parameters) throws Exception {

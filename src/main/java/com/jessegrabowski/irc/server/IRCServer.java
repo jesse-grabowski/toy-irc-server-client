@@ -92,6 +92,12 @@ public class IRCServer {
                         IRCServerProperties::setOperatorPassword,
                         "operator account password",
                         false)
+                .addIntegerFlag(
+                        'N',
+                        "nickname-history",
+                        IRCServerProperties::setMaxNicknameHistory,
+                        "maximum depth of nickname history (default 200)",
+                        false)
                 .build();
 
         ArgsTokenizer tokenizer = new ArgsTokenizer();

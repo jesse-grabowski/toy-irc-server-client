@@ -48,6 +48,7 @@ public class IRCServerProperties implements ArgsProperties {
     private int maxIdleMilliseconds = 300000;
     private String operatorName = "admin";
     private String operatorPassword = "password";
+    private int maxNicknameHistory = 200;
 
     @Override
     public void validate() {
@@ -64,6 +65,15 @@ public class IRCServerProperties implements ArgsProperties {
         } catch (Exception e) {
             throw new IllegalArgumentException(
                     "invalid log level '%s': expected integer or valid jul level name".formatted(logLevel));
+        }
+        if (pingFrequencyMilliseconds < 0) {
+            throw new IllegalArgumentException("pingFrequencyMilliseconds must be greater than or equal to 0");
+        }
+        if (maxIdleMilliseconds < 0) {
+            throw new IllegalArgumentException("maxIdleMilliseconds must be greater than or equal to 0");
+        }
+        if (maxNicknameHistory < 1) {
+            throw new IllegalArgumentException("maxNicknameHistory must be greater than 0");
         }
     }
 
@@ -153,5 +163,13 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setOperatorPassword(String operatorPassword) {
         this.operatorPassword = operatorPassword;
+    }
+
+    public int getMaxNicknameHistory() {
+        return maxNicknameHistory;
+    }
+
+    public void setMaxNicknameHistory(int maxNicknameHistory) {
+        this.maxNicknameHistory = maxNicknameHistory;
     }
 }
