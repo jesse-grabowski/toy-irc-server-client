@@ -33,19 +33,24 @@ package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.network.IRCConnection;
 import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.protocol.IRCChannelFlag;
+import com.jessegrabowski.irc.protocol.IRCChannelList;
 import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.IRCChannelSetting;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.IRCMessage401;
 import com.jessegrabowski.irc.protocol.model.IRCMessage403;
 import com.jessegrabowski.irc.protocol.model.IRCMessage405;
 import com.jessegrabowski.irc.protocol.model.IRCMessage432;
 import com.jessegrabowski.irc.protocol.model.IRCMessage433;
+import com.jessegrabowski.irc.protocol.model.IRCMessage441;
 import com.jessegrabowski.irc.protocol.model.IRCMessage442;
 import com.jessegrabowski.irc.protocol.model.IRCMessage451;
 import com.jessegrabowski.irc.protocol.model.IRCMessage462;
 import com.jessegrabowski.irc.protocol.model.IRCMessage476;
 import com.jessegrabowski.irc.protocol.model.IRCMessage482;
 import com.jessegrabowski.irc.protocol.model.IRCMessage502;
+import com.jessegrabowski.irc.protocol.model.IRCMessage696;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.Glob;
@@ -129,6 +134,180 @@ public final class ServerState {
         return user != null && user.getModes().contains(mode);
     }
 
+    public void setChannelFlag(IRCConnection connection, String channelName, IRCChannelFlag flag)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        ServerChannelMembership membership = channel.getMembership(user);
+        if (membership == null || !membership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        channel.setFlag(flag);
+    }
+
+    public void clearChannelFlag(IRCConnection connection, String channelName, IRCChannelFlag flag)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        ServerChannelMembership membership = channel.getMembership(user);
+        if (membership == null || !membership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        channel.clearFlag(flag);
+    }
+
+    public void setChannelSetting(IRCConnection connection, String channelName, IRCChannelSetting setting, String value)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        ServerChannelMembership membership = channel.getMembership(user);
+        if (membership == null || !membership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        boolean valid =
+                switch (setting) {
+                    case CLIENT_LIMIT -> {
+                        try {
+                            int limit = Integer.parseInt(value);
+                            yield limit > 0;
+                        } catch (NumberFormatException e) {
+                            yield false;
+                        }
+                    }
+                    case KEY -> value.matches("[a-zA-Z0-9]{1,32}");
+                };
+
+        if (!valid) {
+            throw new StateInvariantException(
+                    "Invalid mode param",
+                    user.getNickname(),
+                    channel.getName(),
+                    setting.getMode(),
+                    value,
+                    "Cannot set modes on channel",
+                    IRCMessage696::new);
+        }
+
+        channel.setSetting(setting, value);
+    }
+
+    public void clearChannelSetting(
+            IRCConnection connection, String channelName, IRCChannelSetting setting, String value)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        ServerChannelMembership membership = channel.getMembership(user);
+        if (membership == null || !membership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot clear modes on channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot clear modes on channel",
+                    IRCMessage482::new);
+        }
+
+        boolean valid =
+                switch (setting) {
+                    case CLIENT_LIMIT -> true;
+                    case KEY -> Objects.equals(value, channel.getSetting(IRCChannelSetting.KEY));
+                };
+
+        if (!valid) {
+            throw new StateInvariantException(
+                    "Invalid mode param",
+                    user.getNickname(),
+                    channel.getName(),
+                    setting.getMode(),
+                    value,
+                    "Cannot clear modes on channel",
+                    IRCMessage696::new);
+        }
+
+        channel.removeSetting(setting);
+    }
+
+    public void addToChannelList(IRCConnection connection, String channelName, IRCChannelList list, String value)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        ServerChannelMembership membership = channel.getMembership(user);
+        if (membership == null || !membership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        Glob glob = Glob.of(value).casefold(parameters.getCaseMapping());
+        if (!channel.getList(list).contains(glob)) {
+            channel.addToList(list, glob);
+        }
+    }
+
+    public void removeFromChannelList(IRCConnection connection, String channelName, IRCChannelList list, String value)
+            throws StateInvariantException {
+        ServerUser user = findUser(connection);
+        if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        ServerChannelMembership membership = channel.getMembership(user);
+        if (membership == null || !membership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    user.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        Glob glob = Glob.of(value).casefold(parameters.getCaseMapping());
+        if (channel.getList(list).contains(glob)) {
+            channel.removeFromList(list, glob);
+        }
+    }
+
     public void setUserMode(IRCConnection connection, String nickname, IRCUserMode mode)
             throws StateInvariantException {
         ServerUser user = findUser(connection);
@@ -163,6 +342,80 @@ public final class ServerState {
         }
 
         user.removeMode(mode);
+    }
+
+    public void setChannelMembershipMode(
+            IRCConnection connection, String channelName, String nickname, IRCChannelMembershipMode mode)
+            throws StateInvariantException {
+        ServerUser me = findUser(connection);
+        if (me == null || me.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        if (!channel.getMembership(me).canGrant(mode)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    me.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        ServerUser target = findUser(nickname);
+        if (target == null) {
+            throw new StateInvariantException(
+                    "User not found", me.getNickname(), nickname, "No such nick", IRCMessage401::new);
+        }
+
+        ServerChannelMembership membership = channel.getMembership(target);
+        if (membership == null) {
+            throw new StateInvariantException(
+                    "User not in channel",
+                    me.getNickname(),
+                    target.getNickname(),
+                    channel.getName(),
+                    IRCMessage441::new);
+        }
+
+        membership.addMode(mode);
+    }
+
+    public void clearChannelMembershipMode(
+            IRCConnection connection, String channelName, String nickname, IRCChannelMembershipMode mode)
+            throws StateInvariantException {
+        ServerUser me = findUser(connection);
+        if (me == null || me.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannel channel = getExistingChannel(connection, channelName);
+        if (!channel.getMembership(me).canGrant(mode)) {
+            throw new StateInvariantException(
+                    "Cannot set modes on channel",
+                    me.getNickname(),
+                    channel.getName(),
+                    "Cannot set modes on channel",
+                    IRCMessage482::new);
+        }
+
+        ServerUser target = findUser(nickname);
+        if (target == null) {
+            throw new StateInvariantException(
+                    "User not found", me.getNickname(), nickname, "No such nick", IRCMessage401::new);
+        }
+
+        ServerChannelMembership membership = channel.getMembership(target);
+        if (membership == null) {
+            throw new StateInvariantException(
+                    "User not in channel",
+                    me.getNickname(),
+                    target.getNickname(),
+                    channel.getName(),
+                    IRCMessage441::new);
+        }
+
+        membership.removeMode(mode);
     }
 
     public String getHost(IRCConnection connection, String nickname) throws StateInvariantException {
@@ -527,7 +780,8 @@ public final class ServerState {
                     IRCMessage442::new);
         }
 
-        if (channel.checkFlag('t') && !channel.getMembership(user).hasAtLeast(IRCChannelMembershipMode.HALFOP)) {
+        if (channel.checkFlag(IRCChannelFlag.TOPIC)
+                && !channel.getMembership(user).hasAtLeast(IRCChannelMembershipMode.HALFOP)) {
             throw new StateInvariantException(
                     "User does not have permission to set topic",
                     user.getNickname(),
@@ -676,5 +930,9 @@ public final class ServerState {
                 .filter(u -> u.getNickname().equals(normalizeNickname(nickname)))
                 .limit(limit)
                 .collect(Collectors.toList());
+    }
+
+    public boolean isChannelLike(String name) {
+        return parameters.getChannelTypes().stream().anyMatch(c -> name.charAt(0) == c);
     }
 }

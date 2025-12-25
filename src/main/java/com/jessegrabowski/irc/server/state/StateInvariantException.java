@@ -35,6 +35,7 @@ import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory3;
+import com.jessegrabowski.irc.protocol.IRCMessageFactory5;
 import com.jessegrabowski.irc.protocol.model.IRCMessage;
 
 /*
@@ -65,6 +66,19 @@ public class StateInvariantException extends Exception {
             String message, A arg0, B arg1, C arg2, IRCMessageFactory3<IRCMessage, A, B, C> factory2) {
         super(message);
         this.factory = (raw, tags, name, user, host) -> factory2.create(raw, tags, name, user, host, arg0, arg1, arg2);
+    }
+
+    public <A, B, C, D, E> StateInvariantException(
+            String message,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            E arg4,
+            IRCMessageFactory5<IRCMessage, A, B, C, D, E> factory2) {
+        super(message);
+        this.factory = (raw, tags, name, user, host) ->
+                factory2.create(raw, tags, name, user, host, arg0, arg1, arg2, arg3, arg4);
     }
 
     public IRCMessageFactory0<?> getFactory() {

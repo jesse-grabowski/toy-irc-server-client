@@ -31,51 +31,34 @@
  */
 package com.jessegrabowski.irc.protocol;
 
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
-public enum IRCChannelMembershipMode {
-    FOUNDER('q', '~', 5),
-    PROTECTED('a', '&', 4),
-    OPERATOR('o', '@', 3),
-    HALFOP('h', '%', 2),
-    VOICE('v', '+', 1);
+public enum IRCChannelList {
+    BAN('b'),
+    EXCEPTS('e'),
+    INVEX('I');
 
-    private final Character letter;
-    private final Character prefix;
-    private final int power;
+    private static final Map<Character, IRCChannelList> CHANNEL_LIST_MODES = new HashMap<>();
 
-    IRCChannelMembershipMode(Character letter, Character prefix, int power) {
-        this.letter = letter;
-        this.prefix = prefix;
-        this.power = power;
+    static {
+        for (IRCChannelList flag : IRCChannelList.values()) {
+            CHANNEL_LIST_MODES.put(flag.mode, flag);
+        }
     }
 
-    public Character getLetter() {
-        return letter;
+    private final char mode;
+
+    IRCChannelList(char mode) {
+        this.mode = mode;
     }
 
-    public Character getPrefix() {
-        return prefix;
+    public char getMode() {
+        return mode;
     }
 
-    public static Optional<IRCChannelMembershipMode> fromLetter(Character letter) {
-        return Arrays.stream(values())
-                .filter(mode -> mode.getLetter().equals(letter))
-                .findFirst();
-    }
-
-    public static Optional<IRCChannelMembershipMode> fromPrefix(Character prefix) {
-        return Arrays.stream(values())
-                .filter(mode -> mode.getPrefix().equals(prefix))
-                .findFirst();
-    }
-
-    public boolean canGrant(IRCChannelMembershipMode other) {
-        return power > other.power || power == 5;
-    }
-
-    public boolean isAtLeast(IRCChannelMembershipMode other) {
-        return power >= other.power;
+    public static Optional<IRCChannelList> fromMode(char mode) {
+        return Optional.ofNullable(CHANNEL_LIST_MODES.get(mode));
     }
 }

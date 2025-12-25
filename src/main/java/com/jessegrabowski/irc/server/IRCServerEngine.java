@@ -33,6 +33,10 @@ package com.jessegrabowski.irc.server;
 
 import com.jessegrabowski.irc.network.IRCConnection;
 import com.jessegrabowski.irc.protocol.IRCCapability;
+import com.jessegrabowski.irc.protocol.IRCChannelFlag;
+import com.jessegrabowski.irc.protocol.IRCChannelList;
+import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.IRCChannelSetting;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory0;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory1;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory2;
@@ -55,6 +59,7 @@ import com.jessegrabowski.irc.server.state.ServerState;
 import com.jessegrabowski.irc.server.state.ServerUser;
 import com.jessegrabowski.irc.server.state.ServerUserWas;
 import com.jessegrabowski.irc.server.state.StateInvariantException;
+import com.jessegrabowski.irc.util.Glob;
 import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.StateGuard;
 import java.io.Closeable;
@@ -65,6 +70,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -432,7 +438,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageKICK m -> {}
                 case IRCMessageKILL m -> handle(connection, m);
                 case IRCMessageLIST m -> handle(connection, m);
-                case IRCMessageMODE m -> {}
+                case IRCMessageMODE m -> handle(connection, m);
                 case IRCMessageNAMES m -> handle(connection, m);
                 case IRCMessageNICK m -> handle(connection, m);
                 case IRCMessageNOTICE m -> handle(connection, m);
@@ -722,6 +728,296 @@ public class IRCServerEngine implements Closeable {
                     IRCMessage322::new);
         }
         send(connection, server(), message, state.getNickname(connection), IRCMessage323::new);
+    }
+
+    private void handle(IRCConnection connection, IRCMessageMODE message) throws Exception {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+
+        if (message.getModeString() == null) {
+            if (state.isChannelLike(message.getTarget())) {
+                ServerChannel channel = state.getExistingChannel(connection, message.getTarget());
+                StringBuilder modeStringBuilder = new StringBuilder();
+                List<String> arguments = new ArrayList<>();
+                for (IRCChannelSetting setting : IRCChannelSetting.values()) {
+                    String value = channel.getSetting(setting);
+                    if (value != null) {
+                        modeStringBuilder.append(setting.getMode());
+                        arguments.add(
+                                switch (setting) {
+                                    case KEY -> "<hidden>";
+                                    case CLIENT_LIMIT -> value;
+                                });
+                    }
+                }
+                for (IRCChannelFlag flag : IRCChannelFlag.values()) {
+                    if (channel.checkFlag(flag)) {
+                        modeStringBuilder.append(flag.getMode());
+                    }
+                }
+                send(
+                        connection,
+                        server(),
+                        message,
+                        me.getNickname(),
+                        channel.getName(),
+                        modeStringBuilder.toString(),
+                        arguments,
+                        IRCMessage324::new);
+            } else {
+                ServerUser target = state.findUser(message.getTarget());
+                if (target != me) {
+                    send(
+                            connection,
+                            server(),
+                            message,
+                            me.getNickname(),
+                            "Cannot set user mode on other user",
+                            IRCMessage502::new);
+                } else {
+                    send(
+                            connection,
+                            server(),
+                            message,
+                            me.getNickname(),
+                            "+"
+                                    + me.getModes().stream()
+                                            .map(IRCUserMode::getMode)
+                                            .map(Object::toString)
+                                            .sorted()
+                                            .collect(Collectors.joining()),
+                            IRCMessage221::new);
+                }
+            }
+        } else {
+            updateOrViewModes(connection, message);
+        }
+    }
+
+    private void updateOrViewModes(IRCConnection connection, IRCMessageMODE message) throws Exception {
+        List<Character> unknownModes = new ArrayList<>();
+        List<Character> addedModes = new ArrayList<>();
+        List<String> addedValues = new ArrayList<>();
+        List<Character> removedModes = new ArrayList<>();
+        List<String> removedValues = new ArrayList<>();
+        List<IRCChannelList> viewedLists = new ArrayList<>();
+
+        serverStateGuard.doTransactionally(state -> {
+            Boolean adding = null; // we don't know yet
+            Iterator<String> argumentIterator = message.getModeArguments().iterator();
+
+            for (char c : message.getModeString().toCharArray()) {
+                switch (c) {
+                    case '+' -> adding = true;
+                    case '-' -> adding = false;
+                    default -> {
+                        if (adding == null) {
+                            unknownModes.add(c);
+                            continue;
+                        }
+
+                        if (state.isChannelLike(message.getTarget())) { // channel modes
+                            if (parameters.getPrefixes().containsKey(c)) { // user prefix mode
+                                IRCChannelMembershipMode mode =
+                                        IRCChannelMembershipMode.fromLetter(c).orElse(null);
+                                if (mode == null) {
+                                    unknownModes.add(c);
+                                } else if (argumentIterator.hasNext()) {
+                                    String nick = argumentIterator.next();
+                                    if (adding) {
+                                        state.setChannelMembershipMode(connection, message.getTarget(), nick, mode);
+                                        addedModes.add(c);
+                                    } else {
+                                        state.clearChannelMembershipMode(connection, message.getTarget(), nick, mode);
+                                        removedModes.add(c);
+                                    }
+                                } else {
+                                    unknownModes.add(c);
+                                }
+                            } else if (parameters.getTypeAChannelModes().contains(c)) { // list values (e.g. bans)
+                                IRCChannelList mode = IRCChannelList.fromMode(c).orElse(null);
+                                if (mode == null) {
+                                    unknownModes.add(c);
+                                } else if (argumentIterator.hasNext()) {
+                                    String mask = argumentIterator.next();
+                                    if (adding) {
+                                        state.addToChannelList(connection, message.getTarget(), mode, mask);
+                                        addedModes.add(c);
+                                        addedValues.add(mask);
+                                    } else {
+                                        state.removeFromChannelList(connection, message.getTarget(), mode, mask);
+                                        removedModes.add(c);
+                                        removedValues.add(mask);
+                                    }
+                                } else {
+                                    viewedLists.add(mode);
+                                }
+                            } else if (parameters
+                                    .getTypeBChannelModes()
+                                    .contains(c)) { // settings that always need value (e.g. password)
+                                IRCChannelSetting mode =
+                                        IRCChannelSetting.fromMode(c).orElse(null);
+                                if (mode == null) {
+                                    unknownModes.add(c);
+                                } else if (argumentIterator.hasNext()) {
+                                    String value = argumentIterator.next();
+                                    if (adding) {
+                                        state.setChannelSetting(connection, message.getTarget(), mode, value);
+                                        addedModes.add(c);
+                                        addedValues.add(
+                                                switch (mode) {
+                                                    case KEY -> "<hidden>";
+                                                    case CLIENT_LIMIT -> value;
+                                                });
+                                    } else {
+                                        state.clearChannelSetting(connection, message.getTarget(), mode, value);
+                                        removedModes.add(c);
+                                        removedValues.add(
+                                                switch (mode) {
+                                                    case KEY -> "<hidden>";
+                                                    case CLIENT_LIMIT -> value;
+                                                });
+                                    }
+                                }
+                            } else if (parameters
+                                    .getTypeCChannelModes()
+                                    .contains(c)) { // settings that only consume a value on set
+                                IRCChannelSetting mode =
+                                        IRCChannelSetting.fromMode(c).orElse(null);
+                                if (mode == null) {
+                                    unknownModes.add(c);
+                                } else if (adding) {
+                                    if (argumentIterator.hasNext()) {
+                                        String value = argumentIterator.next();
+                                        state.setChannelSetting(connection, message.getTarget(), mode, value);
+                                        addedModes.add(c);
+                                        addedValues.add(
+                                                switch (mode) {
+                                                    case KEY -> "<hidden>";
+                                                    case CLIENT_LIMIT -> value;
+                                                });
+                                    }
+                                } else {
+                                    state.clearChannelSetting(connection, message.getTarget(), mode, null);
+                                    removedModes.add(c);
+                                }
+                            } else if (parameters.getTypeDChannelModes().contains(c)) { // flags
+                                IRCChannelFlag mode = IRCChannelFlag.fromMode(c).orElse(null);
+                                if (mode == null) {
+                                    unknownModes.add(c);
+                                } else if (adding) {
+                                    state.setChannelFlag(connection, message.getTarget(), mode);
+                                } else {
+                                    state.clearChannelFlag(connection, message.getTarget(), mode);
+                                }
+                            } else {
+                                unknownModes.add(c);
+                            }
+                        } else { // user modes
+                            IRCUserMode mode = IRCUserMode.fromMode(c).orElse(null);
+                            if (mode == null) {
+                                unknownModes.add(c);
+                            } else if (adding) {
+                                state.setUserMode(connection, message.getTarget(), mode);
+                            } else {
+                                state.clearUserMode(connection, message.getTarget(), mode);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+
+        List<String> arguments = new ArrayList<>();
+        StringBuilder modeStringBuilder = new StringBuilder();
+        if (!addedModes.isEmpty()) {
+            modeStringBuilder.append('+');
+            addedModes.forEach(modeStringBuilder::append);
+            arguments.addAll(addedValues);
+        }
+        if (!removedModes.isEmpty()) {
+            modeStringBuilder.append('-');
+            removedModes.forEach(modeStringBuilder::append);
+            arguments.addAll(removedValues);
+        }
+        if (!modeStringBuilder.isEmpty() && state.isChannelLike(message.getTarget())) {
+            MessageTarget watchers = state.getWatchers(state.getExistingChannel(connection, message.getTarget()));
+            sendToTarget(
+                    me,
+                    message,
+                    watchers,
+                    (raw, tags, nick, user, host) -> new IRCMessageMODE(
+                            raw, tags, nick, user, host, message.getTarget(), modeStringBuilder.toString(), arguments));
+        } else if (!modeStringBuilder.isEmpty()) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    message.getTarget(),
+                    modeStringBuilder.toString(),
+                    arguments,
+                    IRCMessageMODE::new);
+        }
+        if (!unknownModes.isEmpty()) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    me.getNickname(),
+                    "Unknown modes "
+                            + unknownModes.stream().map(Object::toString).collect(Collectors.joining()),
+                    IRCMessage501::new);
+        }
+
+        ServerChannel channel = state.getExistingChannel(connection, message.getTarget());
+        for (IRCChannelList list : viewedLists) {
+            switch (list) {
+                case BAN -> {
+                    for (Glob glob : channel.getList(list)) {
+                        send(
+                                connection,
+                                server(),
+                                message,
+                                me.getNickname(),
+                                channel.getName(),
+                                glob.toString(),
+                                null,
+                                null,
+                                IRCMessage367::new);
+                    }
+                    send(connection, server(), message, me.getNickname(), channel.getName(), IRCMessage368::new);
+                }
+                case EXCEPTS -> {
+                    for (Glob glob : channel.getList(list)) {
+                        send(
+                                connection,
+                                server(),
+                                message,
+                                me.getNickname(),
+                                channel.getName(),
+                                glob.toString(),
+                                IRCMessage348::new);
+                    }
+                    send(connection, server(), message, me.getNickname(), channel.getName(), IRCMessage349::new);
+                }
+                case INVEX -> {
+                    for (Glob glob : channel.getList(list)) {
+                        send(
+                                connection,
+                                server(),
+                                message,
+                                me.getNickname(),
+                                channel.getName(),
+                                glob.toString(),
+                                IRCMessage346::new);
+                    }
+                    send(connection, server(), message, me.getNickname(), channel.getName(), IRCMessage347::new);
+                }
+            }
+        }
     }
 
     private void handle(IRCConnection connection, IRCMessageNAMES message) {
@@ -1267,7 +1563,7 @@ public class IRCServerEngine implements Closeable {
         List<Character> modes = new ArrayList<>();
         IRCServerParameters parameters = state.getParameters();
         int namesPerMessage = 400 / parameters.getNickLength();
-        String channelStatus = channel.checkFlag('s') ? "@" : channel.checkFlag('p') ? "*" : "=";
+        String channelStatus = channel.checkFlag(IRCChannelFlag.SECRET) ? "@" : "=";
         for (ServerUser member : state.getMembersForChannel(connection, channel).stream()
                 .sorted(Comparator.comparing(ServerUser::getNickname))
                 .toList()) {

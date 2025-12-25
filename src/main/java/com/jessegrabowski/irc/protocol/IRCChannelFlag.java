@@ -31,40 +31,36 @@
  */
 package com.jessegrabowski.irc.protocol;
 
-import com.jessegrabowski.irc.server.IRCServerParameters;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
-public enum IRCChannelMode {
-    BAN,
-    EXCEPTION,
-    CLIENT_LIMIT,
-    INVITE_ONLY,
-    INVITE_EXCEPTION,
-    KEY,
-    MODERATED,
-    SECRET,
-    PROTECTED,
-    NO_EXTERNAL_MESSAGES;
+public enum IRCChannelFlag {
+    INVITE_ONLY('i'),
+    MODERATED('m'),
+    SECRET('s'),
+    TOPIC('t'),
+    NO_EXTERNAL_MESSAGES('n');
 
-    public static Optional<IRCChannelMode> forName(IRCServerParameters parameters, char name) {
-        return switch (name) {
-            case 'b' -> Optional.of(BAN);
-            case 'l' -> Optional.of(CLIENT_LIMIT);
-            case 'i' -> Optional.of(INVITE_ONLY);
-            case 'k' -> Optional.of(KEY);
-            case 'm' -> Optional.of(MODERATED);
-            case 's' -> Optional.of(SECRET);
-            case 't' -> Optional.of(PROTECTED);
-            case 'n' -> Optional.of(NO_EXTERNAL_MESSAGES);
-            default -> {
-                if (parameters.getExcepts() == name) {
-                    yield Optional.of(EXCEPTION);
-                } else if (parameters.getInviteExceptions() == name) {
-                    yield Optional.of(INVITE_EXCEPTION);
-                } else {
-                    yield Optional.empty();
-                }
-            }
-        };
+    private static final Map<Character, IRCChannelFlag> CHANNEL_FLAG_MODES = new HashMap<>();
+
+    static {
+        for (IRCChannelFlag flag : IRCChannelFlag.values()) {
+            CHANNEL_FLAG_MODES.put(flag.mode, flag);
+        }
+    }
+
+    private final char mode;
+
+    IRCChannelFlag(char mode) {
+        this.mode = mode;
+    }
+
+    public char getMode() {
+        return mode;
+    }
+
+    public static Optional<IRCChannelFlag> fromMode(char mode) {
+        return Optional.ofNullable(CHANNEL_FLAG_MODES.get(mode));
     }
 }

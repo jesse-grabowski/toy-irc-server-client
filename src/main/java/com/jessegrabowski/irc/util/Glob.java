@@ -35,6 +35,8 @@ import com.jessegrabowski.irc.protocol.IRCCaseMapping;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /*
  * Java doesn't have a built-in glob matcher, so we roll our own.
@@ -185,6 +187,23 @@ public final class Glob {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Glob glob = (Glob) o;
+        return Objects.equals(parts, glob.parts);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(parts);
+    }
+
+    @Override
+    public String toString() {
+        return parts.stream().map(GlobPart::toString).collect(Collectors.joining());
+    }
+
     private interface GlobPart {
         int[] consume(String input, int startIndex, GlobPart nextGlobPart);
 
@@ -218,6 +237,23 @@ public final class Glob {
         public GlobPart casefold(IRCCaseMapping caseMapping) {
             return new Literal(caseMapping.normalizeNickname(literal));
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            Literal literal1 = (Literal) o;
+            return Objects.equals(literal, literal1.literal);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(literal);
+        }
+
+        @Override
+        public String toString() {
+            return literal;
+        }
     }
 
     private static class QuestionMark implements GlobPart {
@@ -232,6 +268,21 @@ public final class Glob {
         @Override
         public GlobPart casefold(IRCCaseMapping caseMapping) {
             return this;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof QuestionMark;
+        }
+
+        @Override
+        public int hashCode() {
+            return QuestionMark.class.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return "?";
         }
     }
 
@@ -255,6 +306,21 @@ public final class Glob {
         @Override
         public GlobPart casefold(IRCCaseMapping caseMapping) {
             return this;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof Star;
+        }
+
+        @Override
+        public int hashCode() {
+            return Star.class.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return "*";
         }
     }
 
@@ -320,6 +386,23 @@ public final class Glob {
         private CharRanges casefold(IRCCaseMapping caseMapping) {
             return CharRanges.parse(caseMapping.normalizeNickname(spec));
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            CharRanges that = (CharRanges) o;
+            return Objects.equals(spec, that.spec) && Arrays.equals(start, that.start) && Arrays.equals(end, that.end);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(spec, Arrays.hashCode(start), Arrays.hashCode(end));
+        }
+
+        @Override
+        public String toString() {
+            return spec;
+        }
     }
 
     private static class CharacterSet implements GlobPart {
@@ -341,6 +424,23 @@ public final class Glob {
         public GlobPart casefold(IRCCaseMapping caseMapping) {
             return new CharacterSet(ranges.casefold(caseMapping));
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            CharacterSet that = (CharacterSet) o;
+            return Objects.equals(ranges, that.ranges);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(ranges);
+        }
+
+        @Override
+        public String toString() {
+            return "[" + ranges + "]";
+        }
     }
 
     private static class InvertedCharacterSet implements GlobPart {
@@ -361,6 +461,23 @@ public final class Glob {
         @Override
         public GlobPart casefold(IRCCaseMapping caseMapping) {
             return new InvertedCharacterSet(ranges.casefold(caseMapping));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            InvertedCharacterSet that = (InvertedCharacterSet) o;
+            return Objects.equals(ranges, that.ranges);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(ranges);
+        }
+
+        @Override
+        public String toString() {
+            return "[!" + ranges + "]";
         }
     }
 
@@ -388,6 +505,23 @@ public final class Glob {
         public GlobPart casefold(IRCCaseMapping caseMapping) {
             return new StringSet(
                     Arrays.stream(strings).map(caseMapping::normalizeNickname).toArray(String[]::new));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            StringSet stringSet = (StringSet) o;
+            return Objects.deepEquals(strings, stringSet.strings);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(strings);
+        }
+
+        @Override
+        public String toString() {
+            return "{" + String.join(",", strings) + "}";
         }
     }
 }

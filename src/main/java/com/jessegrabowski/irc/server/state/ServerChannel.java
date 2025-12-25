@@ -31,9 +31,13 @@
  */
 package com.jessegrabowski.irc.server.state;
 
+import com.jessegrabowski.irc.protocol.IRCChannelFlag;
+import com.jessegrabowski.irc.protocol.IRCChannelList;
 import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
+import com.jessegrabowski.irc.protocol.IRCChannelSetting;
 import com.jessegrabowski.irc.protocol.model.IRCMessage443;
 import com.jessegrabowski.irc.protocol.model.IRCMessage482;
+import com.jessegrabowski.irc.util.Glob;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,9 +53,9 @@ public final class ServerChannel {
     private ServerSetBy topicSetBy;
     private long topicSetAt;
     private final Map<ServerUser, ServerChannelMembership> members = new HashMap<>();
-    private final Map<Character, List<String>> lists = new HashMap<>();
-    private final Map<Character, String> settings = new HashMap<>();
-    private final Set<Character> flags = new HashSet<>();
+    private final Map<IRCChannelList, List<Glob>> lists = new HashMap<>();
+    private final Map<IRCChannelSetting, String> settings = new HashMap<>();
+    private final Set<IRCChannelFlag> flags = new HashSet<>();
 
     ServerChannel(String name) {
         this.name = name;
@@ -188,20 +192,20 @@ public final class ServerChannel {
         Transaction.addCompensation(() -> this.topicSetAt = oldTopicSetAt);
     }
 
-    public List<String> getList(Character mode) {
+    public List<Glob> getList(IRCChannelList mode) {
         return Collections.unmodifiableList(lists.getOrDefault(mode, List.of()));
     }
 
-    void addToList(Character mode, String entry) {
-        List<String> list = Transaction.computeIfAbsentTransactionally(lists, mode, k -> new ArrayList<>());
+    void addToList(IRCChannelList mode, Glob entry) {
+        List<Glob> list = Transaction.computeIfAbsentTransactionally(lists, mode, k -> new ArrayList<>());
         if (list.contains(entry)) {
             return;
         }
         Transaction.addTransactionally(list, entry);
     }
 
-    void removeFromList(Character mode, String entry) {
-        List<String> list = lists.get(mode);
+    void removeFromList(IRCChannelList mode, Glob entry) {
+        List<Glob> list = lists.get(mode);
         if (list != null) {
             Transaction.removeTransactionally(list, entry);
             if (list.isEmpty()) {
@@ -210,27 +214,27 @@ public final class ServerChannel {
         }
     }
 
-    public String getSetting(Character mode) {
+    public String getSetting(IRCChannelSetting mode) {
         return settings.get(mode);
     }
 
-    void setSetting(Character mode, String setting) {
+    void setSetting(IRCChannelSetting mode, String setting) {
         Transaction.putTransactionally(settings, mode, setting);
     }
 
-    void removeSetting(Character mode) {
+    void removeSetting(IRCChannelSetting mode) {
         Transaction.removeTransactionally(settings, mode);
     }
 
-    public boolean checkFlag(Character mode) {
+    public boolean checkFlag(IRCChannelFlag mode) {
         return flags.contains(mode);
     }
 
-    void setFlag(Character mode) {
+    void setFlag(IRCChannelFlag mode) {
         Transaction.addTransactionally(flags, mode);
     }
 
-    void clearFlag(Character mode) {
+    void clearFlag(IRCChannelFlag mode) {
         Transaction.removeTransactionally(flags, mode);
     }
 }
