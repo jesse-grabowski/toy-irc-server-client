@@ -110,8 +110,8 @@ public class ClientCommandParser {
                         .addUsageExample("/kick <channel> <nick> [<reason>]")
                         .addUsageExample("/kick #channel taro")
                         .addUsageExample("/kick #channel taro Kicked for speaking english")
-                        .addStringPositional(0, ClientCommandKick::setChannel, "channel name", true)
-                        .addStringPositional(1, ClientCommandKick::setNick, "nick to kick", true)
+                        .addCommaSeparatedListPositional(0, ClientCommandKick::setChannel, "channel name", true)
+                        .addCommaSeparatedListPositional(1, ClientCommandKick::setNick, "nicks to kick", true)
                         .addGreedyStringPositional(2, ClientCommandKick::setReason, "reason for kick", false)
                         .build());
         parsers.put(

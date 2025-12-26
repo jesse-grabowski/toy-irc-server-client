@@ -429,7 +429,8 @@ public class IRCMessageMarshaller {
     }
 
     private List<String> marshalKick(IRCMessageKICK message) {
-        return l(message.getChannel(), message.getNick(), trailing(message.getReason()));
+        return l(
+                delimited(",", message.getChannel()), delimited(",", message.getNick()), trailing(message.getReason()));
     }
 
     private List<String> marshalKill(IRCMessageKILL message) {

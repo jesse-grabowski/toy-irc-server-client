@@ -31,28 +31,35 @@
  */
 package com.jessegrabowski.irc.client.command.model;
 
+import java.util.List;
+
 public final class ClientCommandKick implements ClientCommand {
 
-    private String channel;
-    private String nick;
+    private List<String> channel;
+    private List<String> nick;
     private String reason;
 
     @Override
-    public void validate() {}
+    public void validate() {
+        if (channel.size() != 1 && channel.size() != nick.size()) {
+            throw new IllegalArgumentException(
+                    "You must provide either one channel or an equal number of channels to nicks");
+        }
+    }
 
-    public String getChannel() {
+    public List<String> getChannel() {
         return channel;
     }
 
-    public void setChannel(String channel) {
+    public void setChannel(List<String> channel) {
         this.channel = channel;
     }
 
-    public String getNick() {
+    public List<String> getNick() {
         return nick;
     }
 
-    public void setNick(String nick) {
+    public void setNick(List<String> nick) {
         this.nick = nick;
     }
 

@@ -58,6 +58,10 @@ public class ServerChannelMembership {
         return modes.stream().anyMatch(mode -> mode.canGrant(other));
     }
 
+    public IRCChannelMembershipMode getHighestPowerMode() {
+        return modes.stream().max(IRCChannelMembershipMode::compareTo).orElse(null);
+    }
+
     public Character getHighestPowerPrefix() {
         return modes.stream()
                 .max(IRCChannelMembershipMode::compareTo)

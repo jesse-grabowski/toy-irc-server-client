@@ -847,23 +847,29 @@ public class IRCClientEngine implements Closeable {
             return;
         }
 
-        state.deleteChannelMember(message.getChannel(), message.getNick());
-        terminal.println(new TerminalMessage(
-                getMessageTime(message),
-                f(message.getPrefixName()),
-                f(message.getChannel()),
-                s(
-                        f(message.getPrefixName()),
-                        f(Color.RED, " kicked "),
-                        f(message.getNick()),
-                        f(Color.RED, " from "),
-                        f(message.getChannel()),
-                        f(Color.RED, "!"),
-                        s(
-                                message.getReason() != null
-                                                && !message.getReason().isBlank()
-                                        ? f(Color.GRAY, s(" (", message.getReason(), ")"))
-                                        : ""))));
+        List<String> channels = message.getChannel();
+        List<String> nicks = message.getNick();
+        for (int i = 0; i < nicks.size(); i++) {
+            String nick = nicks.get(i);
+            String channel = channels.size() > i ? channels.get(i) : channels.getFirst();
+            state.deleteChannelMember(channel, nick);
+            terminal.println(new TerminalMessage(
+                    getMessageTime(message),
+                    f(message.getPrefixName()),
+                    f(channel),
+                    s(
+                            f(message.getPrefixName()),
+                            f(Color.RED, " kicked "),
+                            f(nick),
+                            f(Color.RED, " from "),
+                            f(channel),
+                            f(Color.RED, "!"),
+                            s(
+                                    message.getReason() != null
+                                                    && !message.getReason().isBlank()
+                                            ? f(Color.GRAY, s(" (", message.getReason(), ")"))
+                                            : ""))));
+        }
     }
 
     // IRC specification for MODE is genuinely unhinged

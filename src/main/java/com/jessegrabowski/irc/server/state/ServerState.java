@@ -960,6 +960,50 @@ public final class ServerState {
         user.removeChannel(channel);
     }
 
+    public void kickFromChannel(IRCConnection connection, ServerChannel channel, ServerUser target)
+            throws StateInvariantException {
+        ServerUser me = findUser(connection);
+        if (me == null || me.getState() != ServerConnectionState.REGISTERED) {
+            throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
+        }
+
+        ServerChannelMembership myMembership = channel.getMembership(me);
+        if (myMembership == null) {
+            throw new StateInvariantException(
+                    "Not on channel", me.getNickname(), channel.getName(), IRCMessage442::new);
+        }
+
+        if (!myMembership.hasAtLeast(IRCChannelMembershipMode.OPERATOR)) {
+            throw new StateInvariantException(
+                    "Cannot kick in channel",
+                    me.getNickname(),
+                    channel.getName(),
+                    "Cannot kick in channel (requires operator)",
+                    IRCMessage482::new);
+        }
+
+        ServerChannelMembership targetMembership = channel.getMembership(target);
+        if (targetMembership == null) {
+            throw new StateInvariantException(
+                    "Cannot kick user from channel",
+                    me.getNickname(),
+                    channel.getName(),
+                    "Cannot kick user from channel (not in channel)",
+                    IRCMessage441::new);
+        }
+
+        if (!myMembership.getHighestPowerMode().isAtLeast(targetMembership.getHighestPowerMode())) {
+            throw new StateInvariantException(
+                    "Cannot kick in channel",
+                    me.getNickname(),
+                    channel.getName(),
+                    "Cannot kick in channel (requires operator)",
+                    IRCMessage482::new);
+        }
+
+        channel.part(target);
+    }
+
     private String normalizeNickname(String nickname) {
         if (nickname == null) {
             return null;

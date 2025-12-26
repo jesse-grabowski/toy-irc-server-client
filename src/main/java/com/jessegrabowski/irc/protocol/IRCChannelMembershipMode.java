@@ -76,6 +76,6 @@ public enum IRCChannelMembershipMode {
     }
 
     public boolean isAtLeast(IRCChannelMembershipMode other) {
-        return power >= other.power;
+        return other == null || power >= other.power;
     }
 }

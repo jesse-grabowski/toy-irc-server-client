@@ -456,7 +456,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageINVITE m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
-                case IRCMessageKICK m -> {}
+                case IRCMessageKICK m -> handle(connection, m);
                 case IRCMessageKILL m -> handle(connection, m);
                 case IRCMessageLIST m -> handle(connection, m);
                 case IRCMessageLUSERS m -> handle(connection, m);
@@ -726,6 +726,45 @@ public class IRCServerEngine implements Closeable {
             sendTopic(connection, message, channelName, false);
             sendNames(connection, message, channelName);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageKICK message) throws Exception {
+        serverStateGuard.doTransactionally(state -> {
+            ServerUser me = state.getUserForConnection(connection);
+
+            List<String> nicknames = message.getNick();
+            List<String> channels = new ArrayList<>(message.getChannel());
+            while (channels.size() < nicknames.size()) {
+                channels.add(message.getChannel().getFirst());
+            }
+
+            List<MessageTarget> watchers = new ArrayList<>();
+            for (int i = 0; i < channels.size(); i++) {
+                ServerChannel channel = state.getExistingChannel(connection, channels.get(i));
+                ServerUser target = state.getExistingUser(connection, nicknames.get(i));
+                state.kickFromChannel(connection, channel, target);
+                watchers.add(state.getWatchers(channel).include(target));
+            }
+
+            for (int i = 0; i < watchers.size(); i++) {
+                MessageTarget watcher = watchers.get(i);
+                String nickname = nicknames.get(i);
+                String channelName = channels.get(i);
+                sendToTarget(
+                        me,
+                        message,
+                        watcher,
+                        (raw, tags, name, user, host) -> new IRCMessageKICK(
+                                raw,
+                                tags,
+                                name,
+                                user,
+                                host,
+                                List.of(channelName),
+                                List.of(nickname),
+                                Objects.requireNonNullElse(message.getReason(), me.getNickname())));
+            }
+        });
     }
 
     private void handle(IRCConnection connection, IRCMessageKILL message) {

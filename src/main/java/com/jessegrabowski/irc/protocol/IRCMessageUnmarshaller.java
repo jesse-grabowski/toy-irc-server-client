@@ -521,7 +521,11 @@ public class IRCMessageUnmarshaller {
     }
 
     private IRCMessageKICK parseKick(Parameters parameters) throws Exception {
-        return parameters.inject(required("channel"), required("nick"), optional("comment"), IRCMessageKICK::new);
+        return parameters.inject(
+                required("channel", this::splitToList),
+                required("nick", this::splitToList),
+                optional("comment"),
+                IRCMessageKICK::new);
     }
 
     private IRCMessageLIST parseList(Parameters parameters) throws Exception {
