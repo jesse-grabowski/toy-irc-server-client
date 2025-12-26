@@ -123,6 +123,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageERROR.COMMAND -> parseExact(parameters, "message", IRCMessageERROR::new);
                 case IRCMessageHELP.COMMAND -> parseHelp(parameters);
                 case IRCMessageHELPOP.COMMAND -> parseHelpOp(parameters);
+                case IRCMessageINFO.COMMAND -> parseExact(parameters, IRCMessageINFO::new);
                 case IRCMessageINVITE.COMMAND -> parseInvite(parameters);
                 case "JOIN" -> parseJoin(parameters);
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);

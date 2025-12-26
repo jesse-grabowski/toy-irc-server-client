@@ -452,6 +452,7 @@ public class IRCServerEngine implements Closeable {
                     handlePrivmsg(connection, m, m.getTargets(), m.getText(), IRCMessageCTCPAction::new);
                 case IRCMessageHELP m -> sendHelp(connection, m, m.getSubject());
                 case IRCMessageHELPOP m -> sendHelp(connection, m, m.getSubject());
+                case IRCMessageINFO m -> sendInfo(connection, m);
                 case IRCMessageINVITE m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
@@ -1844,6 +1845,19 @@ public class IRCServerEngine implements Closeable {
                 Objects.requireNonNullElse(subject, "*"),
                 "Sorry about that",
                 IRCMessage706::new);
+    }
+
+    private void sendInfo(IRCConnection connection, IRCMessage initiator) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                "- " + properties.getServer() + " -",
+                IRCMessage371::new);
+        send(connection, server(), initiator, me.getNickname(), IRCMessage374::new);
     }
 
     private <T extends IRCMessage> void sendToTarget(

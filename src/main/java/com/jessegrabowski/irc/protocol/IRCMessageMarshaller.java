@@ -71,6 +71,7 @@ public class IRCMessageMarshaller {
             case IRCMessageERROR m -> marshal(m, this::marshalError);
             case IRCMessageHELP m -> marshal(m, this::marshalHelp);
             case IRCMessageHELPOP m -> marshal(m, this::marshalHelpOp);
+            case IRCMessageINFO m -> marshal(m, this::marshalInfo);
             case IRCMessageINVITE m -> marshal(m, this::marshalInvite);
             case IRCMessageJOIN0 m -> marshal(m, this::marshalJoin0);
             case IRCMessageJOINNormal m -> marshal(m, this::marshalJoinNormal);
@@ -408,6 +409,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalHelpOp(IRCMessageHELPOP message) {
         return l(message.getSubject());
+    }
+
+    private List<String> marshalInfo(IRCMessageINFO message) {
+        return l();
     }
 
     private List<String> marshalInvite(IRCMessageINVITE message) {

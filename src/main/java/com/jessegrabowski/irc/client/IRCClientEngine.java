@@ -328,6 +328,9 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageHELPOP m -> {
                 /* ignore */
             }
+            case IRCMessageINFO m -> {
+                /* ignore */
+            }
             case IRCMessageINVITE m -> handle(m);
             case IRCMessageJOIN0 m -> {
                 /* ignore */

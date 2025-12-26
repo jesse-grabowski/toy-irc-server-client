@@ -178,6 +178,7 @@ public abstract sealed class IRCMessage
                 IRCMessageERROR,
                 IRCMessageHELP,
                 IRCMessageHELPOP,
+                IRCMessageINFO,
                 IRCMessageINVITE,
                 IRCMessageJOIN0,
                 IRCMessageJOINNormal,
