@@ -96,7 +96,7 @@ public final class MessageTarget {
     }
 
     public boolean isEmpty() {
-        return users.isEmpty() && channels.isEmpty();
+        return getAllMatchingUsers().isEmpty();
     }
 
     public MessageTarget filterUsers(Predicate<ServerUser> filter) {
