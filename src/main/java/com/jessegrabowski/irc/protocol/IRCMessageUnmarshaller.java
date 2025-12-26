@@ -228,6 +228,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessage405.COMMAND -> parseExact(parameters, "client", "channel", "text", IRCMessage405::new);
                 case IRCMessage406.COMMAND -> parseExact(parameters, "client", "nickname", "text", IRCMessage406::new);
                 case IRCMessage409.COMMAND -> parseExact(parameters, "client", "text", IRCMessage409::new);
+                case IRCMessage410.COMMAND -> parseExact(parameters, "client", "command", "text", IRCMessage410::new);
                 case IRCMessage411.COMMAND -> parseExact(parameters, "client", "text", IRCMessage411::new);
                 case IRCMessage412.COMMAND -> parseExact(parameters, "client", "text", IRCMessage412::new);
                 case IRCMessage417.COMMAND -> parseExact(parameters, "client", "text", IRCMessage417::new);
@@ -470,6 +471,7 @@ public class IRCMessageUnmarshaller {
                                 required("nick"),
                                 required("extensions", splitToMapDelimited("\\s+")),
                                 IRCMessageCAPNEW::new))
+                .ifNoneMatch(p -> p.inject(optional("command", x -> x, "<NONE>"), IRCMessageCAPInvalid::new))
                 .inject();
     }
 

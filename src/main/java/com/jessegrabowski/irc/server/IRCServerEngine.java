@@ -430,6 +430,7 @@ public class IRCServerEngine implements Closeable {
             switch (message) {
                 case IRCMessageAWAY m -> handle(connection, m);
                 case IRCMessageCAPEND m -> handle(connection, m);
+                case IRCMessageCAPInvalid m -> handle(connection, m);
                 case IRCMessageCAPLISTRequest m -> handle(connection, m);
                 case IRCMessageCAPLSRequest m -> handle(connection, m);
                 case IRCMessageCAPREQ m -> handle(connection, m);
@@ -530,6 +531,19 @@ public class IRCServerEngine implements Closeable {
         if (state.tryFinishRegistration(connection)) {
             sendWelcome(connection, message);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageCAPInvalid message) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        send(
+                connection,
+                server(),
+                message,
+                Objects.requireNonNullElse(me.getNickname(), "*"),
+                message.getInvalidCommand(),
+                "unsupported CAP command",
+                IRCMessage410::new);
     }
 
     private void handle(IRCConnection connection, IRCMessageCAPLISTRequest message) {

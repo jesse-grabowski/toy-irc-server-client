@@ -544,6 +544,9 @@ public class IRCMessageSerializationTest {
                 Arguments.of("CAP LIST", IRCMessageCAPLISTRequest.class),
                 Arguments.of("CAP REQ :multi-prefix sasl -batch", IRCMessageCAPREQ.class),
                 Arguments.of("CAP END", IRCMessageCAPEND.class),
+                Arguments.of("CAP", IRCMessageCAPInvalid.class),
+                Arguments.of("CAP nick", IRCMessageCAPInvalid.class),
+                Arguments.of("CAP nick FOO :bar", IRCMessageCAPInvalid.class),
                 Arguments.of("CAP nick ACK :multi-prefix -batch", IRCMessageCAPACK.class),
                 Arguments.of("CAP nick NAK :multi-prefix -batch", IRCMessageCAPNAK.class),
                 Arguments.of("CAP nick NEW :multi-prefix sasl", IRCMessageCAPNEW.class),
@@ -738,7 +741,6 @@ public class IRCMessageSerializationTest {
                 Arguments.of(":irc.example.net 317 alice bob notInt 1700000000 :seconds idle, signon time"),
                 Arguments.of(":irc.example.net 317 alice bob 120 notALong :seconds idle, signon time"),
                 Arguments.of("CAP nick ACK :"),
-                Arguments.of("CAP nick FOO :bar"),
                 Arguments.of(":nick! PRIVMSG #c :hi"),
                 Arguments.of(":nick! PRIVMSG #c :hi"),
                 Arguments.of(":nick@ PRIVMSG #c :hi"),
@@ -762,9 +764,7 @@ public class IRCMessageSerializationTest {
                 Arguments.of("CAP nick ACK :"),
                 Arguments.of("JOIN :"),
                 Arguments.of("PART :"),
-                Arguments.of("PONG :"),
-                Arguments.of("CAP"),
-                Arguments.of("CAP nick"));
+                Arguments.of("PONG :"));
     }
 
     @ParameterizedTest(name = "{index}: parse error for \"{0}\"")

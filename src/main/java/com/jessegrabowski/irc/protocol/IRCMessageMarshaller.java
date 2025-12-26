@@ -52,6 +52,7 @@ public class IRCMessageMarshaller {
             case IRCMessageCAPACK m -> marshal(m, this::marshalCapACK);
             case IRCMessageCAPDEL m -> marshal(m, this::marshalCapDEL);
             case IRCMessageCAPEND m -> marshal(m, this::marshalCapEND);
+            case IRCMessageCAPInvalid m -> marshal(m, this::marshalCapInvalid);
             case IRCMessageCAPLISTRequest m -> marshal(m, this::marshalCapLISTRequest);
             case IRCMessageCAPLISTResponse m -> marshal(m, this::marshalCapLISTResponse);
             case IRCMessageCAPLSRequest m -> marshal(m, this::marshalCapLSRequest);
@@ -172,6 +173,7 @@ public class IRCMessageMarshaller {
             case IRCMessage405 m -> marshal(m, this::marshal405);
             case IRCMessage406 m -> marshal(m, this::marshal406);
             case IRCMessage409 m -> marshal(m, this::marshal409);
+            case IRCMessage410 m -> marshal(m, this::marshal410);
             case IRCMessage411 m -> marshal(m, this::marshal411);
             case IRCMessage412 m -> marshal(m, this::marshal412);
             case IRCMessage417 m -> marshal(m, this::marshal417);
@@ -297,6 +299,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalCapEND(IRCMessageCAPEND message) {
         return l("END");
+    }
+
+    private List<String> marshalCapInvalid(IRCMessageCAPInvalid message) {
+        return l(message.getInvalidCommand());
     }
 
     private List<String> marshalCapLISTRequest(IRCMessageCAPLISTRequest message) {
@@ -891,6 +897,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshal409(IRCMessage409 message) {
         return l(message.getClient(), trailing(message.getText()));
+    }
+
+    private List<String> marshal410(IRCMessage410 message) {
+        return l(message.getClient(), message.getInvalidCommand(), trailing(message.getText()));
     }
 
     private List<String> marshal411(IRCMessage411 message) {

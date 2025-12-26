@@ -284,6 +284,8 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageCAPEND m -> {
                 /* ignore */
             }
+            case IRCMessageCAPInvalid m ->
+                terminal.println(makeSystemErrorMessage(s("Received invalid CAP command ", m.getInvalidCommand())));
             case IRCMessageCAPLISTRequest m -> {
                 /* ignored */
             }
@@ -561,6 +563,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage405 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage406 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage409 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage410 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage411 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage412 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage417 m -> terminal.println(makeSystemErrorMessage(m.getText()));
