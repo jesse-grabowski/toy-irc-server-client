@@ -69,6 +69,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -79,6 +80,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -363,11 +365,12 @@ public class IRCServerEngine implements Closeable {
     private SequencedMap<String, String> makeTags(IRCConnection connection, boolean isEcho, IRCMessage initiator) {
         ServerState state = serverStateGuard.getState();
         if (!state.hasCapability(connection, IRCCapability.MESSAGE_TAGS)
-                && !state.hasCapability(connection, IRCCapability.ECHO_MESSAGE)) {
+                && !state.hasCapability(connection, IRCCapability.SERVER_TIME)) {
             return new LinkedHashMap<>();
         }
 
         SequencedMap<String, String> tags = new LinkedHashMap<>();
+
         if (initiator != null) {
             for (Map.Entry<String, String> entry : initiator.getTags().entrySet()) {
                 if (isEcho || entry.getKey().startsWith("+")) {
@@ -473,6 +476,15 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessagePRIVMSG m ->
                     handlePrivmsg(connection, m, m.getTargets(), m.getMessage(), IRCMessagePRIVMSG::new);
                 case IRCMessageQUIT m -> handle(connection, m);
+                case IRCMessageTAGMSG m ->
+                    handlePrivmsg(
+                            connection,
+                            m,
+                            m.getTargets(),
+                            "*",
+                            (raw, tags, nick, user, host, targets, _) ->
+                                    new IRCMessageTAGMSG(raw, tags, nick, user, host, targets),
+                            IRCCapability.MESSAGE_TAGS);
                 case IRCMessageTIME m -> handle(connection, m);
                 case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
@@ -480,7 +492,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageWHO m -> handle(connection, m);
                 case IRCMessageWHOIS m -> handle(connection, m);
                 case IRCMessageWHOWAS m -> handle(connection, m);
-                case IRCMessageTooLong m -> {
+                case IRCMessageTooLong m ->
                     send(
                             connection,
                             server(),
@@ -488,8 +500,7 @@ public class IRCServerEngine implements Closeable {
                             Objects.requireNonNullElse(me.getNickname(), "*"),
                             "Input line was too long",
                             IRCMessage417::new);
-                }
-                case IRCMessageNotEnoughParameters m -> {
+                case IRCMessageNotEnoughParameters m ->
                     send(
                             connection,
                             server(),
@@ -498,10 +509,15 @@ public class IRCServerEngine implements Closeable {
                             m.getCommand(),
                             "Not enough parameters",
                             IRCMessage461::new);
-                }
-                default -> {
-                    send(connection, server(), message, "NOT IMPLEMENTED", IRCMessageERROR::new);
-                }
+                case IRCMessageUnsupported m ->
+                    send(
+                            connection,
+                            server(),
+                            message,
+                            Objects.requireNonNullElse(me.getNickname(), "*"),
+                            m.getCommand(),
+                            IRCMessage421::new);
+                default -> LOG.log(Level.WARNING, "Could not understand message: {0}", message.getRawMessage());
             }
         } catch (NoOpException e) {
             LOG.log(Level.FINE, "Ignoring no-op message", e);
@@ -1321,7 +1337,8 @@ public class IRCServerEngine implements Closeable {
             IRCMessage message,
             List<String> messageTargets,
             String messageText,
-            IRCMessageFactory2<T, List<String>, String> factory)
+            IRCMessageFactory2<T, List<String>, String> factory,
+            IRCCapability... requiredCapabilities)
             throws Exception {
         ServerState state = serverStateGuard.getState();
         state.markActivity(connection);
@@ -1371,11 +1388,12 @@ public class IRCServerEngine implements Closeable {
             sendToTarget(
                     me,
                     message,
-                    target,
+                    target.filterUsers(
+                            u -> Arrays.stream(requiredCapabilities).allMatch(u.getCapabilities()::contains)),
                     (raw, tags, nick, user, host) ->
-                            new IRCMessagePRIVMSG(raw, tags, nick, user, host, List.of(target.getMask()), messageText));
+                            factory.create(raw, tags, nick, user, host, List.of(target.getMask()), messageText));
             if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
-                echo(connection, me, message, List.of(target.getMask()), messageText, IRCMessagePRIVMSG::new);
+                echo(connection, me, message, List.of(target.getMask()), messageText, factory);
             }
         }
     }

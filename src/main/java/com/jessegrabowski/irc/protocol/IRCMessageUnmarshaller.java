@@ -142,6 +142,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessagePONG.COMMAND -> parsePong(parameters);
                 case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(parameters);
                 case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
+                case IRCMessageTAGMSG.COMMAND -> parseTagmsg(parameters);
                 case IRCMessageTIME.COMMAND -> parseTime(parameters);
                 case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
                 case IRCMessageUSER.COMMAND -> parseUser(parameters);
@@ -299,8 +300,8 @@ public class IRCMessageUnmarshaller {
         if (message.isEmpty()) {
             throw new IllegalArgumentException("message is empty");
         }
-        // 4095 (tags) + 510 (body), quick sanity check before we get more involved
-        if (message.length() > 4605) {
+        // 4096 (tags) + 510 (body), quick sanity check before we get more involved
+        if (message.length() > 4606) {
             throw new MessageTooLongException();
         }
         int i = 0;
@@ -312,7 +313,7 @@ public class IRCMessageUnmarshaller {
             while (i < message.length() && message.charAt(i) == ' ') {
                 i++;
             }
-            if (message.substring(0, i).getBytes(charset).length > 4095) {
+            if (message.substring(0, i).getBytes(charset).length > 4096) {
                 throw new MessageTooLongException();
             }
         }
@@ -581,6 +582,10 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageQUIT parseQuit(Parameters parameters) throws Exception {
         return parameters.inject(optional("reason"), IRCMessageQUIT::new);
+    }
+
+    private IRCMessageTAGMSG parseTagmsg(Parameters parameters) throws Exception {
+        return parameters.inject(required("target", this::splitToList), IRCMessageTAGMSG::new);
     }
 
     private IRCMessageTIME parseTime(Parameters parameters) throws Exception {

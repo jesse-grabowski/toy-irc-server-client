@@ -93,6 +93,7 @@ public class IRCMessageMarshaller {
             case IRCMessageUSER m -> marshal(m, this::marshalUser);
             case IRCMessageUSERHOST m -> marshal(m, this::marshalUserHost);
             case IRCMessageQUIT m -> marshal(m, this::marshalQuit);
+            case IRCMessageTAGMSG m -> marshal(m, this::marshalTagmsg);
             case IRCMessageTIME m -> marshal(m, this::marshalTime);
             case IRCMessageTOPIC m -> marshal(m, this::marshalTopic);
             case IRCMessageWHO m -> marshal(m, this::marshalWho);
@@ -499,6 +500,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshalQuit(IRCMessageQUIT message) {
         return l(trailing(message.getReason()));
+    }
+
+    private List<String> marshalTagmsg(IRCMessageTAGMSG message) {
+        return l(delimited(",", message.getTargets()));
     }
 
     private List<String> marshalTime(IRCMessageTIME message) {
