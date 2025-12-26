@@ -322,6 +322,12 @@ public class IRCClientEngine implements Closeable {
                 /* ignore */
             }
             case IRCMessageERROR m -> handle(m);
+            case IRCMessageHELP m -> {
+                /* ignore */
+            }
+            case IRCMessageHELPOP m -> {
+                /* ignore */
+            }
             case IRCMessageINVITE m -> handle(m);
             case IRCMessageJOIN0 m -> {
                 /* ignore */

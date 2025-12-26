@@ -121,6 +121,8 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageAWAY.COMMAND -> parseAway(parameters);
                 case "CAP" -> parseCap(parameters);
                 case IRCMessageERROR.COMMAND -> parseExact(parameters, "message", IRCMessageERROR::new);
+                case IRCMessageHELP.COMMAND -> parseHelp(parameters);
+                case IRCMessageHELPOP.COMMAND -> parseHelpOp(parameters);
                 case IRCMessageINVITE.COMMAND -> parseInvite(parameters);
                 case "JOIN" -> parseJoin(parameters);
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);
@@ -491,6 +493,14 @@ public class IRCMessageUnmarshaller {
             }
         }
         return new Pair<>(enabledCapabilities, disabledCapabilities);
+    }
+
+    private IRCMessageHELP parseHelp(Parameters parameters) throws Exception {
+        return parameters.inject(optional("subject"), IRCMessageHELP::new);
+    }
+
+    private IRCMessageHELPOP parseHelpOp(Parameters parameters) throws Exception {
+        return parameters.inject(optional("subject"), IRCMessageHELPOP::new);
     }
 
     private IRCMessageINVITE parseInvite(Parameters parameters) throws Exception {

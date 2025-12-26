@@ -450,6 +450,8 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageCAPREQ m -> handle(connection, m);
                 case IRCMessageCTCPAction m ->
                     handlePrivmsg(connection, m, m.getTargets(), m.getText(), IRCMessageCTCPAction::new);
+                case IRCMessageHELP m -> sendHelp(connection, m, m.getSubject());
+                case IRCMessageHELPOP m -> sendHelp(connection, m, m.getSubject());
                 case IRCMessageINVITE m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
@@ -1821,6 +1823,27 @@ public class IRCServerEngine implements Closeable {
                 IRCMessage375::new);
         motd.lines().forEach(line -> send(connection, server(), initiator, me.getNickname(), line, IRCMessage372::new));
         send(connection, server(), initiator, me.getNickname(), IRCMessage376::new);
+    }
+
+    private void sendHelp(IRCConnection connection, IRCMessage initiator, String subject) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                Objects.requireNonNullElse(subject, "*"),
+                "There is no help here",
+                IRCMessage704::new);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                Objects.requireNonNullElse(subject, "*"),
+                "Sorry about that",
+                IRCMessage706::new);
     }
 
     private <T extends IRCMessage> void sendToTarget(

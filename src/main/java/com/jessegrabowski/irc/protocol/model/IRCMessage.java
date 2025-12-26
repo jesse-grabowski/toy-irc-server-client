@@ -176,6 +176,8 @@ public abstract sealed class IRCMessage
                 IRCMessageCTCPVersionRequest,
                 IRCMessageCTCPVersionResponse,
                 IRCMessageERROR,
+                IRCMessageHELP,
+                IRCMessageHELPOP,
                 IRCMessageINVITE,
                 IRCMessageJOIN0,
                 IRCMessageJOINNormal,
