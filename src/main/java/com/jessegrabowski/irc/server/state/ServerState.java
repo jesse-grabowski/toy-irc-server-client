@@ -63,7 +63,6 @@ import com.jessegrabowski.irc.util.Transaction;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -690,16 +689,14 @@ public final class ServerState {
         return true;
     }
 
-    public MessageTarget resolveRequired(IRCConnection connection, String mask, boolean includeSelf)
-            throws StateInvariantException {
+    public MessageTarget resolveRequired(IRCConnection connection, String mask) throws StateInvariantException {
         ServerUser user = findUser(connection);
         if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
 
-        MessageTarget target = resolveOptional(connection, mask, true);
+        MessageTarget target = resolveOptional(connection, mask);
         if (!target.isEmpty()) {
-            target.filter(c -> includeSelf || !c.equals(connection));
             return target;
         }
 
@@ -720,8 +717,7 @@ public final class ServerState {
                 IRCMessage401::new);
     }
 
-    public MessageTarget resolveOptional(IRCConnection connection, String mask, boolean includeSelf)
-            throws StateInvariantException {
+    public MessageTarget resolveOptional(IRCConnection connection, String mask) throws StateInvariantException {
         ServerUser user = findUser(connection);
         if (user == null || user.getState() != ServerConnectionState.REGISTERED) {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
@@ -730,44 +726,32 @@ public final class ServerState {
         Glob glob = Glob.of(mask).casefold(parameters.getCaseMapping());
 
         if (parameters.getChannelTypes().stream().anyMatch(c -> mask.charAt(0) == c)) {
-            Set<IRCConnection> connections = channels.entrySet().stream()
-                    .filter(e -> glob.matches(normalizeChannelName(e.getKey())))
-                    .map(e -> e.getValue().getMembers())
-                    .flatMap(Set::stream)
-                    .map(this::getConnectionForUser)
-                    .filter(c -> includeSelf || !c.equals(connection))
-                    .collect(Collectors.toSet());
-            return new MessageTarget(mask, true, glob.isLiteral(), connections);
+            return new MessageTarget(
+                    mask,
+                    true,
+                    glob.isLiteral(),
+                    Set.of(),
+                    channels.values().stream()
+                            .filter(c -> glob.matches(normalizeChannelName(c.getName())))
+                            .collect(Collectors.toSet()));
         }
 
-        Set<IRCConnection> connections = users.values().stream()
-                .filter(u -> glob.matches(normalizeNickname(u.getNickname())))
-                .map(this::getConnectionForUser)
-                .filter(c -> includeSelf || !c.equals(connection))
-                .collect(Collectors.toSet());
-        return new MessageTarget(mask, false, glob.isLiteral(), connections);
+        return new MessageTarget(
+                mask,
+                false,
+                glob.isLiteral(),
+                users.values().stream()
+                        .filter(u -> glob.matches(normalizeNickname(u.getNickname())))
+                        .collect(Collectors.toSet()),
+                Set.of());
     }
 
     public MessageTarget getWatchers(ServerChannel channel) {
-        return new MessageTarget(
-                channel.getName(),
-                true,
-                true,
-                channel.getMembers().stream().map(this::getConnectionForUser).collect(Collectors.toSet()));
+        return new MessageTarget(channel.getName(), true, true, Set.of(), Set.of(channel));
     }
 
-    public MessageTarget getWatchers(ServerUser user, boolean includeSelf) {
-        Set<IRCConnection> watchers = new HashSet<>();
-        watchers.add(getConnectionForUser(user));
-        for (ServerChannel channel : user.getChannels()) {
-            watchers.addAll(channel.getMembers().stream()
-                    .map(this::getConnectionForUser)
-                    .collect(Collectors.toSet()));
-        }
-        if (!includeSelf) {
-            watchers.remove(getConnectionForUser(user));
-        }
-        return new MessageTarget(user.getNickname(), false, true, watchers);
+    public MessageTarget getWatchers(ServerUser user) {
+        return new MessageTarget(user.getNickname(), false, true, Set.of(user), user.getChannels());
     }
 
     public ServerChannel findChannel(String channelName) {

@@ -31,23 +31,50 @@
  */
 package com.jessegrabowski.irc.server.state;
 
-import com.jessegrabowski.irc.network.IRCConnection;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class MessageTarget {
+    private final List<Predicate<ServerUser>> userFilters;
+    private final List<Predicate<ServerChannel>> channelFilters;
+
     private final String mask;
     private final boolean channel;
     private final boolean literal;
 
-    private Set<IRCConnection> connections;
+    private final Set<ServerUser> users;
+    private final Set<ServerChannel> channels;
 
-    MessageTarget(String mask, boolean channel, boolean literal, Set<IRCConnection> connections) {
+    MessageTarget(String mask, boolean channel, boolean literal, Set<ServerUser> users, Set<ServerChannel> channels) {
         this.mask = mask;
         this.channel = channel;
         this.literal = literal;
-        this.connections = connections;
+        this.users = users;
+        this.channels = channels;
+        userFilters = new ArrayList<>();
+        channelFilters = new ArrayList<>();
+    }
+
+    private MessageTarget(
+            String mask,
+            boolean channel,
+            boolean literal,
+            Set<ServerUser> users,
+            Set<ServerChannel> channels,
+            List<Predicate<ServerUser>> userFilters,
+            List<Predicate<ServerChannel>> channelFilters) {
+        this.mask = mask;
+        this.channel = channel;
+        this.literal = literal;
+        this.users = users;
+        this.channels = channels;
+        this.userFilters = userFilters;
+        this.channelFilters = channelFilters;
     }
 
     public String getMask() {
@@ -63,14 +90,46 @@ public final class MessageTarget {
     }
 
     public boolean isEmpty() {
-        return connections.isEmpty();
+        return users.isEmpty() && channels.isEmpty();
     }
 
-    public Set<IRCConnection> getConnections() {
-        return Set.copyOf(connections);
+    public MessageTarget filterUsers(Predicate<ServerUser> filter) {
+        List<Predicate<ServerUser>> newFilters = new ArrayList<>(userFilters);
+        newFilters.add(filter);
+        return new MessageTarget(mask, channel, literal, users, channels, newFilters, channelFilters);
     }
 
-    public void filter(Predicate<IRCConnection> predicate) {
-        this.connections = connections.stream().filter(predicate).collect(Collectors.toSet());
+    public MessageTarget exclude(ServerUser user) {
+        return filterUsers(u -> u != user);
+    }
+
+    public MessageTarget include(ServerUser user) {
+        if (users.contains(user)) {
+            return this;
+        }
+        Set<ServerUser> newUsers = new HashSet<>(users);
+        newUsers.add(user);
+        return new MessageTarget(mask, channel, literal, newUsers, channels, userFilters, channelFilters);
+    }
+
+    public MessageTarget filterChannels(Predicate<ServerChannel> filter) {
+        List<Predicate<ServerChannel>> newFilters = new ArrayList<>(channelFilters);
+        newFilters.add(filter);
+        return new MessageTarget(mask, channel, literal, users, channels, userFilters, newFilters);
+    }
+
+    public Set<ServerChannel> findChannels(Predicate<ServerChannel> predicate) {
+        return channels.stream().filter(predicate).collect(Collectors.toSet());
+    }
+
+    public Set<ServerUser> getAllMatchingUsers() {
+        return Stream.concat(
+                        users.stream(),
+                        channels.stream()
+                                .filter(c -> channelFilters.stream().allMatch(p -> p.test(c)))
+                                .map(ServerChannel::getMembers)
+                                .flatMap(Set::stream))
+                .filter(u -> userFilters.stream().allMatch(p -> p.test(u)))
+                .collect(Collectors.toSet());
     }
 }

@@ -35,6 +35,7 @@ import com.jessegrabowski.irc.protocol.IRCChannelFlag;
 import com.jessegrabowski.irc.protocol.IRCChannelList;
 import com.jessegrabowski.irc.protocol.IRCChannelMembershipMode;
 import com.jessegrabowski.irc.protocol.IRCChannelSetting;
+import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.IRCMessage443;
 import com.jessegrabowski.irc.protocol.model.IRCMessage482;
 import com.jessegrabowski.irc.server.IRCServerParameters;
@@ -243,6 +244,35 @@ public final class ServerChannel {
 
     void clearFlag(IRCChannelFlag mode) {
         Transaction.removeTransactionally(flags, mode);
+    }
+
+    public boolean checkModerationAllows(ServerUser user) {
+        if (!flags.contains(IRCChannelFlag.MODERATED)) {
+            return true;
+        }
+
+        ServerChannelMembership membership = members.get(user);
+        if (membership == null) {
+            return false;
+        }
+
+        return membership.hasAtLeast(IRCChannelMembershipMode.VOICE);
+    }
+
+    public boolean checkExternalMessagingAllows(ServerUser user) {
+        if (!flags.contains(IRCChannelFlag.NO_EXTERNAL_MESSAGES)) {
+            return true;
+        }
+
+        return members.get(user) != null;
+    }
+
+    public boolean checkVisible(ServerUser user) {
+        if (!flags.contains(IRCChannelFlag.SECRET)) {
+            return true;
+        }
+
+        return members.get(user) != null || user.getModes().contains(IRCUserMode.OPERATOR);
     }
 
     void setInvited(ServerUser user) {

@@ -70,6 +70,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -399,7 +400,7 @@ public class IRCServerEngine implements Closeable {
         ServerState state = serverStateGuard.getState();
         try {
             ServerUser me = state.getUserForConnection(connection);
-            MessageTarget target = state.getWatchers(me, false);
+            MessageTarget target = state.getWatchers(me).exclude(me);
             sendToTarget(
                     me,
                     null,
@@ -432,7 +433,8 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageCAPLISTRequest m -> handle(connection, m);
                 case IRCMessageCAPLSRequest m -> handle(connection, m);
                 case IRCMessageCAPREQ m -> handle(connection, m);
-                case IRCMessageCTCPAction m -> handle(connection, m);
+                case IRCMessageCTCPAction m ->
+                    handlePrivmsg(connection, m, m.getTargets(), m.getText(), IRCMessageCTCPAction::new);
                 case IRCMessageINVITE m -> handle(connection, m);
                 case IRCMessageJOIN0 m -> {}
                 case IRCMessageJOINNormal m -> handle(connection, m);
@@ -448,7 +450,8 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessagePASS m -> handle(connection, m);
                 case IRCMessagePING m -> handle(connection, m);
                 case IRCMessagePONG m -> handle(connection, m);
-                case IRCMessagePRIVMSG m -> handle(connection, m);
+                case IRCMessagePRIVMSG m ->
+                    handlePrivmsg(connection, m, m.getTargets(), m.getMessage(), IRCMessagePRIVMSG::new);
                 case IRCMessageQUIT m -> handle(connection, m);
                 case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
@@ -510,12 +513,14 @@ public class IRCServerEngine implements Closeable {
         }
 
         ServerUser me = state.getUserForConnection(connection);
-        MessageTarget watchers = state.getWatchers(me, state.isRegistered(connection));
-        watchers.filter(c -> state.hasCapability(c, IRCCapability.AWAY_NOTIFY));
+        MessageTarget watchers = state.getWatchers(me);
+        if (!state.isRegistered(connection)) {
+            watchers = watchers.exclude(me);
+        }
         sendToTarget(
                 me,
                 message,
-                watchers,
+                watchers.filterUsers(u -> u.getCapabilities().contains(IRCCapability.AWAY_NOTIFY)),
                 (raw, tags, nick, user, host) -> new IRCMessageAWAY(raw, tags, nick, user, host, message.getText()));
     }
 
@@ -605,30 +610,6 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
-    private void handle(IRCConnection connection, IRCMessageCTCPAction message) throws Exception {
-        ServerState state = serverStateGuard.getState();
-        ServerUser me = state.getUserForConnection(connection);
-        List<MessageTarget> targets = new ArrayList<>();
-        for (String target : message.getTargets()) {
-            targets.add(state.resolveRequired(connection, target, false));
-        }
-        for (MessageTarget target : targets) {
-            String away = state.getAway(target.getMask());
-            if (away != null && !away.isEmpty()) {
-                send(connection, server(), message, me.getNickname(), target.getMask(), away, IRCMessage301::new);
-            }
-            sendToTarget(
-                    me,
-                    message,
-                    target,
-                    (raw, tags, nick, user, host) -> new IRCMessageCTCPAction(
-                            raw, tags, nick, user, host, List.of(target.getMask()), message.getText()));
-            if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
-                echo(connection, me, message, List.of(target.getMask()), message.getText(), IRCMessageCTCPAction::new);
-            }
-        }
-    }
-
     private void handle(IRCConnection connection, IRCMessageINVITE message) throws StateInvariantException {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
@@ -701,11 +682,10 @@ public class IRCServerEngine implements Closeable {
                     (raw, tags, nick, user, host) -> new IRCMessageJOINNormal(
                             raw, tags, nick, user, host, List.of(channel.getName()), List.of()));
             if (me.getAwayStatus() != null) {
-                watchers.filter(c -> state.hasCapability(c, IRCCapability.AWAY_NOTIFY));
                 sendToTarget(
                         me,
                         message,
-                        watchers,
+                        watchers.filterUsers(u -> u.getCapabilities().contains(IRCCapability.AWAY_NOTIFY)),
                         (raw, tags, nick, user, host) ->
                                 new IRCMessageAWAY(raw, tags, nick, user, host, me.getAwayStatus()));
             }
@@ -759,7 +739,9 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessageLIST message) {
         ServerState state = serverStateGuard.getState();
-        Set<ServerChannel> channels = state.getChannels();
+        ServerUser me = state.getUserForConnection(connection);
+        Set<ServerChannel> channels =
+                state.getChannels().stream().filter(c -> c.checkVisible(me)).collect(Collectors.toSet());
 
         send(connection, server(), message, state.getNickname(connection), IRCMessage321::new);
         boolean filtered = !message.getChannels().isEmpty();
@@ -1098,7 +1080,10 @@ public class IRCServerEngine implements Closeable {
         MessageSource sender = state.isRegistered(connection)
                 ? new MessageSource.NamedMessageSource(me.getNickname(), me.getUsername(), me.getHostAddress())
                 : server();
-        MessageTarget watchers = state.getWatchers(me, state.isRegistered(connection));
+        MessageTarget watchers = state.getWatchers(me);
+        if (!state.isRegistered(connection)) {
+            watchers = watchers.exclude(me);
+        }
         Pair<String, String> result = state.setNickname(connection, message.getNick());
         sendToTarget(
                 sender,
@@ -1115,11 +1100,15 @@ public class IRCServerEngine implements Closeable {
         state.markActivity(connection);
         ServerUser me = state.getUserForConnection(connection);
         List<MessageTarget> targets = new ArrayList<>();
-        for (String targetMask : message.getTargets()) {
-            MessageTarget target = state.resolveOptional(connection, targetMask, false);
-            if (!target.isEmpty()) {
-                targets.add(target);
-            }
+        Set<ServerChannel> invalidChannels = new HashSet<>();
+        for (String target : message.getTargets()) {
+            MessageTarget t = state.resolveRequired(connection, target).exclude(me);
+            invalidChannels.addAll(t.findChannels(c -> !c.checkModerationAllows(me)));
+            invalidChannels.addAll(t.findChannels(c -> !c.checkExternalMessagingAllows(me)));
+            targets.add(t);
+        }
+        if (!invalidChannels.isEmpty()) {
+            return;
         }
         for (MessageTarget target : targets) {
             sendToTarget(
@@ -1179,8 +1168,10 @@ public class IRCServerEngine implements Closeable {
                     continue;
                 }
 
-                MessageTarget watchers = state.getWatchers(channel);
                 state.partChannel(connection, channelName);
+
+                MessageTarget watchers = state.getWatchers(channel).include(me);
+
                 results.add(() -> sendToTarget(
                         me,
                         message,
@@ -1230,17 +1221,53 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
-    private void handle(IRCConnection connection, IRCMessagePRIVMSG message) throws StateInvariantException {
+    // bit of an edge case as CTCP commands also share the same logic
+    private <T extends IRCMessage> void handlePrivmsg(
+            IRCConnection connection,
+            IRCMessage message,
+            List<String> messageTargets,
+            String messageText,
+            IRCMessageFactory2<T, List<String>, String> factory)
+            throws Exception {
         ServerState state = serverStateGuard.getState();
         state.markActivity(connection);
         ServerUser me = state.getUserForConnection(connection);
-        if (message.getMessage() == null || message.getMessage().isEmpty()) {
+        if (messageText == null || messageText.isEmpty()) {
             send(connection, server(), message, me.getNickname(), "No text to send", IRCMessage412::new);
             return;
         }
+
         List<MessageTarget> targets = new ArrayList<>();
-        for (String target : message.getTargets()) {
-            targets.add(state.resolveRequired(connection, target, false));
+        Set<ServerChannel> invalidChannelsModerated = new HashSet<>();
+        Set<ServerChannel> invalidChannelsNoExternal = new HashSet<>();
+        for (String target : messageTargets) {
+            MessageTarget t = state.resolveRequired(connection, target).exclude(me);
+            invalidChannelsModerated.addAll(t.findChannels(c -> !c.checkModerationAllows(me)));
+            invalidChannelsNoExternal.addAll(t.findChannels(c -> !c.checkExternalMessagingAllows(me)));
+            targets.add(t);
+        }
+        if (!invalidChannelsModerated.isEmpty() || !invalidChannelsNoExternal.isEmpty()) {
+            Set<ServerChannel> invalidChannels = new HashSet<>(invalidChannelsModerated);
+            invalidChannels.addAll(invalidChannelsNoExternal);
+            for (ServerChannel channel : invalidChannels) {
+                send(
+                        connection,
+                        server(),
+                        message,
+                        me.getNickname(),
+                        channel.getName(),
+                        "Cannot send to channel %s (+%s%s)"
+                                .formatted(
+                                        channel.getName(),
+                                        invalidChannelsModerated.contains(channel)
+                                                ? IRCChannelFlag.MODERATED.getMode()
+                                                : "",
+                                        invalidChannelsNoExternal.contains(channel)
+                                                ? IRCChannelFlag.NO_EXTERNAL_MESSAGES.getMode()
+                                                : ""),
+                        IRCMessage404::new);
+            }
+            return;
         }
         for (MessageTarget target : targets) {
             String away = state.getAway(target.getMask());
@@ -1251,10 +1278,10 @@ public class IRCServerEngine implements Closeable {
                     me,
                     message,
                     target,
-                    (raw, tags, nick, user, host) -> new IRCMessagePRIVMSG(
-                            raw, tags, nick, user, host, List.of(target.getMask()), message.getMessage()));
+                    (raw, tags, nick, user, host) ->
+                            new IRCMessagePRIVMSG(raw, tags, nick, user, host, List.of(target.getMask()), messageText));
             if (me.hasCapability(IRCCapability.ECHO_MESSAGE)) {
-                echo(connection, me, message, List.of(target.getMask()), message.getMessage(), IRCMessagePRIVMSG::new);
+                echo(connection, me, message, List.of(target.getMask()), messageText, IRCMessagePRIVMSG::new);
             }
         }
     }
@@ -1317,16 +1344,19 @@ public class IRCServerEngine implements Closeable {
 
     private void handle(IRCConnection connection, IRCMessageWHO message) throws StateInvariantException {
         ServerState state = serverStateGuard.getState();
-        MessageTarget target = state.resolveOptional(connection, message.getMask(), true);
+        ServerUser me = state.getUserForConnection(connection);
+        MessageTarget target =
+                state.resolveOptional(connection, message.getMask()).filterChannels(c -> c.checkVisible(me));
 
-        for (IRCConnection targetConnection : target.getConnections()) {
-            ServerUser user = state.getUserForConnection(targetConnection);
-
+        for (ServerUser user : target.getAllMatchingUsers()) {
             ServerChannel channel;
             if (target.isChannel() && target.isLiteral()) {
                 channel = state.findChannel(message.getMask());
             } else {
-                channel = user.getChannels().stream().findAny().orElse(null);
+                channel = user.getChannels().stream()
+                        .filter(c -> c.checkVisible(me))
+                        .findAny()
+                        .orElse(null);
             }
 
             String channelMembershipPrefix = Optional.ofNullable(channel)
@@ -1445,8 +1475,10 @@ public class IRCServerEngine implements Closeable {
         List<String> channelNames = new ArrayList<>(channels.size());
         List<Character> channelPrefixes = new ArrayList<>(channels.size());
         for (ServerChannel channel : channels) {
-            channelNames.add(channel.getName());
-            channelPrefixes.add(channel.getMembership(user).getHighestPowerPrefix());
+            if (channel.checkVisible(me)) {
+                channelNames.add(channel.getName());
+                channelPrefixes.add(channel.getMembership(user).getHighestPowerPrefix());
+            }
         }
         send(
                 connection,
@@ -1620,7 +1652,7 @@ public class IRCServerEngine implements Closeable {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
         ServerChannel channel = state.findChannel(channelName);
-        if (channel == null) {
+        if (channel == null || !channel.checkVisible(me)) {
             send(connection, server(), initiator, me.getNickname(), channelName, IRCMessage366::new);
             return;
         }
@@ -1667,8 +1699,10 @@ public class IRCServerEngine implements Closeable {
 
     private <T extends IRCMessage> void sendToTarget(
             MessageSource messageSource, IRCMessage initiator, MessageTarget target, IRCMessageFactory0<T> factory) {
-        for (IRCConnection targetConnection : target.getConnections()) {
-            send(targetConnection, messageSource, initiator, factory);
+        ServerState state = serverStateGuard.getState();
+        for (ServerUser user : target.getAllMatchingUsers()) {
+            IRCConnection connection = state.getConnectionForUser(user);
+            send(connection, messageSource, initiator, factory);
         }
     }
 
