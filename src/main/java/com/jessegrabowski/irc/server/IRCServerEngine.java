@@ -1102,7 +1102,7 @@ public class IRCServerEngine implements Closeable {
         List<MessageTarget> targets = new ArrayList<>();
         Set<ServerChannel> invalidChannels = new HashSet<>();
         for (String target : message.getTargets()) {
-            MessageTarget t = state.resolveRequired(connection, target).exclude(me);
+            MessageTarget t = state.resolveOptional(connection, target).exclude(me);
             invalidChannels.addAll(t.findChannels(c -> !c.checkModerationAllows(me)));
             invalidChannels.addAll(t.findChannels(c -> !c.checkExternalMessagingAllows(me)));
             targets.add(t);
@@ -1349,6 +1349,10 @@ public class IRCServerEngine implements Closeable {
                 state.resolveOptional(connection, message.getMask()).filterChannels(c -> c.checkVisible(me));
 
         for (ServerUser user : target.getAllMatchingUsers()) {
+            if (!user.isVisibleTo(me) && !(target.isLiteral() && !target.isChannel())) {
+                continue;
+            }
+
             ServerChannel channel;
             if (target.isChannel() && target.isLiteral()) {
                 channel = state.findChannel(message.getMask());
@@ -1390,6 +1394,8 @@ public class IRCServerEngine implements Closeable {
     private void handle(IRCConnection connection, IRCMessageWHOIS message) {
         ServerState state = serverStateGuard.getState();
 
+        // this reads a bit weirdly, but target is a server name OR nickname
+        // and is really designed for multi-server topologies
         if (message.getTarget() != null
                 && !Objects.equals(message.getTarget(), properties.getServer())
                 && state.findUser(message.getTarget()) == null) {
@@ -1662,6 +1668,7 @@ public class IRCServerEngine implements Closeable {
         int namesPerMessage = 400 / parameters.getNickLength();
         String channelStatus = channel.checkFlag(IRCChannelFlag.SECRET) ? "@" : "=";
         for (ServerUser member : state.getMembersForChannel(connection, channel).stream()
+                .filter(m -> m.isVisibleTo(me))
                 .sorted(Comparator.comparing(ServerUser::getNickname))
                 .toList()) {
             ServerChannelMembership membership = channel.getMembership(member);

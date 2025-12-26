@@ -245,4 +245,12 @@ public final class ServerUser implements MessageSource {
     void clearInvited(ServerChannel channel) {
         Transaction.removeTransactionally(invitedChannels, channel);
     }
+
+    public boolean isVisibleTo(ServerUser user) {
+        if (!modes.contains(IRCUserMode.INVISIBLE)) {
+            return true;
+        }
+
+        return channels.stream().anyMatch(c -> user.getChannels().contains(c));
+    }
 }
