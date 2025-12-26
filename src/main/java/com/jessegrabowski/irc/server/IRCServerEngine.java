@@ -473,6 +473,7 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessagePRIVMSG m ->
                     handlePrivmsg(connection, m, m.getTargets(), m.getMessage(), IRCMessagePRIVMSG::new);
                 case IRCMessageQUIT m -> handle(connection, m);
+                case IRCMessageTIME m -> handle(connection, m);
                 case IRCMessageTOPIC m -> handle(connection, m);
                 case IRCMessageUSER m -> handle(connection, m);
                 case IRCMessageUSERHOST m -> handle(connection, m);
@@ -1345,6 +1346,32 @@ public class IRCServerEngine implements Closeable {
         state.markQuit(connection, "Quit: " + Objects.requireNonNullElse(message.getReason(), "client requested QUIT"));
         send(connection, server(), message, "Exiting due to QUIT", IRCMessageERROR::new);
         connection.closeDeferred();
+    }
+
+    private void handle(IRCConnection connection, IRCMessageTIME message) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        if (message.getServer() != null && !Objects.equals(properties.getServer(), message.getServer())) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    me.getNickname(),
+                    message.getServer(),
+                    "No such server %s".formatted(message.getServer()),
+                    IRCMessage402::new);
+            return;
+        }
+        send(
+                connection,
+                server(),
+                message,
+                me.getNickname(),
+                properties.getServer(),
+                System.currentTimeMillis() / 1000,
+                null,
+                DateTimeFormatter.ISO_INSTANT.format(Instant.now()),
+                IRCMessage391::new);
     }
 
     private void handle(IRCConnection connection, IRCMessageTOPIC message) throws StateInvariantException {

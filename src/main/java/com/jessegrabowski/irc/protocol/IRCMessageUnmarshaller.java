@@ -141,10 +141,11 @@ public class IRCMessageUnmarshaller {
                 case IRCMessagePING.COMMAND -> parsePing(parameters);
                 case IRCMessagePONG.COMMAND -> parsePong(parameters);
                 case IRCMessagePRIVMSG.COMMAND -> parsePrivmsg(parameters);
+                case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
+                case IRCMessageTIME.COMMAND -> parseTime(parameters);
+                case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
                 case IRCMessageUSER.COMMAND -> parseUser(parameters);
                 case IRCMessageUSERHOST.COMMAND -> parseUserHost(parameters);
-                case IRCMessageQUIT.COMMAND -> parseQuit(parameters);
-                case IRCMessageTOPIC.COMMAND -> parseTopic(parameters);
                 case IRCMessageWHO.COMMAND -> parseExact(parameters, "mask", IRCMessageWHO::new);
                 case IRCMessageWHOIS.COMMAND -> parseWhoIs(parameters);
                 case IRCMessageWHOWAS.COMMAND -> parseWhoWas(parameters);
@@ -574,6 +575,18 @@ public class IRCMessageUnmarshaller {
                 .inject();
     }
 
+    private IRCMessageQUIT parseQuit(Parameters parameters) throws Exception {
+        return parameters.inject(optional("reason"), IRCMessageQUIT::new);
+    }
+
+    private IRCMessageTIME parseTime(Parameters parameters) throws Exception {
+        return parameters.inject(optional("server"), IRCMessageTIME::new);
+    }
+
+    private IRCMessageTOPIC parseTopic(Parameters parameters) throws Exception {
+        return parameters.inject(required("channel"), optionalAllowEmpty("topic"), IRCMessageTOPIC::new);
+    }
+
     private IRCMessageUSER parseUser(Parameters parameters) throws Exception {
         return parameters
                 .discard(1, 2)
@@ -582,14 +595,6 @@ public class IRCMessageUnmarshaller {
 
     private IRCMessageUSERHOST parseUserHost(Parameters parameters) throws Exception {
         return parameters.inject(greedyRequired("nickname"), IRCMessageUSERHOST::new);
-    }
-
-    private IRCMessageQUIT parseQuit(Parameters parameters) throws Exception {
-        return parameters.inject(optional("reason"), IRCMessageQUIT::new);
-    }
-
-    private IRCMessageTOPIC parseTopic(Parameters parameters) throws Exception {
-        return parameters.inject(required("channel"), optionalAllowEmpty("topic"), IRCMessageTOPIC::new);
     }
 
     private IRCMessageWHOIS parseWhoIs(Parameters parameters) throws Exception {

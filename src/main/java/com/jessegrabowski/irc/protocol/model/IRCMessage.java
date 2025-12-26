@@ -200,6 +200,7 @@ public abstract sealed class IRCMessage
                 IRCMessagePRIVMSG,
                 IRCMessageParseError,
                 IRCMessageQUIT,
+                IRCMessageTIME,
                 IRCMessageTOPIC,
                 IRCMessageTooLong,
                 IRCMessageUSER,

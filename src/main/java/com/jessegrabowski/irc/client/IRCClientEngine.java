@@ -367,6 +367,9 @@ public class IRCClientEngine implements Closeable {
             }
             case IRCMessagePRIVMSG m -> handle(m);
             case IRCMessageQUIT m -> handle(m);
+            case IRCMessageTIME m -> {
+                /* ignore */
+            }
             case IRCMessageTOPIC m -> handle(m);
             case IRCMessageUSER m -> {
                 /* ignore */
