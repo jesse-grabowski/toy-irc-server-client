@@ -762,27 +762,28 @@ public final class ServerState {
             throw new StateInvariantException("Not registered", "*", "Not registered", IRCMessage451::new);
         }
 
-        Glob glob = Glob.of(mask).casefold(parameters.getCaseMapping());
-
-        if (parameters.getChannelTypes().stream().anyMatch(c -> mask.charAt(0) == c)) {
-            return new MessageTarget(
-                    mask,
-                    true,
-                    glob.isLiteral(),
-                    Set.of(),
-                    channels.values().stream()
-                            .filter(c -> glob.matches(normalizeChannelName(c.getName())))
-                            .collect(Collectors.toSet()));
+        // STATUSMSG
+        if (mask.length() > 1 && parameters.getPrefixes().values().stream().anyMatch(c -> mask.charAt(0) == c)) {
+            Glob glob = Glob.of(mask.substring(1)).casefold(parameters.getCaseMapping());
+            IRCChannelMembershipMode mode =
+                    IRCChannelMembershipMode.fromPrefix(mask.charAt(0)).orElse(null);
+            return new MessageTarget(mask, true, glob.isLiteral(), Set.of(), Set.copyOf(channels.values()))
+                    .filterChannels(c -> glob.matches(normalizeChannelName(c.getName())))
+                    .filterChannelUsers((c, u) ->
+                            c.getMembership(u) != null && c.getMembership(u).hasAtLeast(mode));
         }
 
-        return new MessageTarget(
-                mask,
-                false,
-                glob.isLiteral(),
-                users.values().stream()
-                        .filter(u -> glob.matches(normalizeNickname(u.getNickname())))
-                        .collect(Collectors.toSet()),
-                Set.of());
+        Glob glob = Glob.of(mask).casefold(parameters.getCaseMapping());
+
+        // Channel
+        if (parameters.getChannelTypes().stream().anyMatch(c -> mask.charAt(0) == c)) {
+            return new MessageTarget(mask, true, glob.isLiteral(), Set.of(), Set.copyOf(channels.values()))
+                    .filterChannels(c -> glob.matches(normalizeChannelName(c.getName())));
+        }
+
+        // Nickname
+        return new MessageTarget(mask, false, glob.isLiteral(), Set.copyOf(users.values()), Set.of())
+                .filterUsers(u -> glob.matches(normalizeNickname(u.getNickname())));
     }
 
     public MessageTarget getWatchers(ServerChannel channel) {

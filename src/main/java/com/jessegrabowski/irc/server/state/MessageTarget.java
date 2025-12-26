@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -42,6 +43,8 @@ import java.util.stream.Stream;
 public final class MessageTarget {
     private final List<Predicate<ServerUser>> userFilters;
     private final List<Predicate<ServerChannel>> channelFilters;
+    private final List<BiPredicate<ServerChannel, ServerUser>> channelUserFilters;
+    ;
 
     private final String mask;
     private final boolean channel;
@@ -58,6 +61,7 @@ public final class MessageTarget {
         this.channels = channels;
         userFilters = new ArrayList<>();
         channelFilters = new ArrayList<>();
+        channelUserFilters = new ArrayList<>();
     }
 
     private MessageTarget(
@@ -67,7 +71,8 @@ public final class MessageTarget {
             Set<ServerUser> users,
             Set<ServerChannel> channels,
             List<Predicate<ServerUser>> userFilters,
-            List<Predicate<ServerChannel>> channelFilters) {
+            List<Predicate<ServerChannel>> channelFilters,
+            List<BiPredicate<ServerChannel, ServerUser>> channelUserFilters) {
         this.mask = mask;
         this.channel = channel;
         this.literal = literal;
@@ -75,6 +80,7 @@ public final class MessageTarget {
         this.channels = channels;
         this.userFilters = userFilters;
         this.channelFilters = channelFilters;
+        this.channelUserFilters = channelUserFilters;
     }
 
     public String getMask() {
@@ -96,7 +102,8 @@ public final class MessageTarget {
     public MessageTarget filterUsers(Predicate<ServerUser> filter) {
         List<Predicate<ServerUser>> newFilters = new ArrayList<>(userFilters);
         newFilters.add(filter);
-        return new MessageTarget(mask, channel, literal, users, channels, newFilters, channelFilters);
+        return new MessageTarget(
+                mask, channel, literal, users, channels, newFilters, channelFilters, channelUserFilters);
     }
 
     public MessageTarget exclude(ServerUser user) {
@@ -109,13 +116,21 @@ public final class MessageTarget {
         }
         Set<ServerUser> newUsers = new HashSet<>(users);
         newUsers.add(user);
-        return new MessageTarget(mask, channel, literal, newUsers, channels, userFilters, channelFilters);
+        return new MessageTarget(
+                mask, channel, literal, newUsers, channels, userFilters, channelFilters, channelUserFilters);
     }
 
     public MessageTarget filterChannels(Predicate<ServerChannel> filter) {
         List<Predicate<ServerChannel>> newFilters = new ArrayList<>(channelFilters);
         newFilters.add(filter);
-        return new MessageTarget(mask, channel, literal, users, channels, userFilters, newFilters);
+        return new MessageTarget(mask, channel, literal, users, channels, userFilters, newFilters, channelUserFilters);
+    }
+
+    public MessageTarget filterChannelUsers(BiPredicate<ServerChannel, ServerUser> filter) {
+        List<BiPredicate<ServerChannel, ServerUser>> newChannelUserFilters = new ArrayList<>(channelUserFilters);
+        newChannelUserFilters.add(filter);
+        return new MessageTarget(
+                mask, channel, literal, users, channels, userFilters, channelFilters, newChannelUserFilters);
     }
 
     public Set<ServerChannel> findChannels(Predicate<ServerChannel> predicate) {
@@ -127,8 +142,8 @@ public final class MessageTarget {
                         users.stream(),
                         channels.stream()
                                 .filter(c -> channelFilters.stream().allMatch(p -> p.test(c)))
-                                .map(ServerChannel::getMembers)
-                                .flatMap(Set::stream))
+                                .flatMap(c -> c.getMembers().stream()
+                                        .filter(m -> channelUserFilters.stream().allMatch(f -> f.test(c, m)))))
                 .filter(u -> userFilters.stream().allMatch(p -> p.test(u)))
                 .collect(Collectors.toSet());
     }
