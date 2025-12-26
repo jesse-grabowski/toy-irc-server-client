@@ -49,6 +49,7 @@ public class IRCServerProperties implements ArgsProperties {
     private String operatorName = "admin";
     private String operatorPassword = "password";
     private int maxNicknameHistory = 200;
+    private Resource motd = Resource.of("classpath:/motd.txt");
 
     @Override
     public void validate() {
@@ -171,5 +172,13 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setMaxNicknameHistory(int maxNicknameHistory) {
         this.maxNicknameHistory = maxNicknameHistory;
+    }
+
+    public Resource getMotd() {
+        return motd;
+    }
+
+    public void setMotd(Resource motd) {
+        this.motd = motd;
     }
 }

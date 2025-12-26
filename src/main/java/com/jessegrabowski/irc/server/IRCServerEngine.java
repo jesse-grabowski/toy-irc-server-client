@@ -104,6 +104,7 @@ public class IRCServerEngine implements Closeable {
     private final ScheduledExecutorService executor;
     private final IRCServerProperties properties;
     private final IRCServerParameters parameters;
+    private final String motd;
 
     // there's a lot going on here but I'll try to call out the important bits
     public IRCServerEngine(IRCServerProperties properties) throws IOException {
@@ -111,6 +112,8 @@ public class IRCServerEngine implements Closeable {
 
         this.parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
         ServerState state = new ServerState(properties, parameters);
+
+        this.motd = new String(properties.getMotd().getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 
         this.serverStateGuard = new StateGuard<>(state);
 
@@ -159,6 +162,17 @@ public class IRCServerEngine implements Closeable {
         }));
     }
 
+    private void send(IRCConnection receiver, IRCMessage message) {
+        String rawValue = MARSHALLER.marshal(message);
+        if (!receiver.offer(rawValue) && !receiver.isClosed()) {
+            LOG.log(Level.WARNING, "Failed to send message to client {0}: {1}", new Object[] {
+                receiver.getHostAddress(), rawValue
+            });
+            LOG.log(Level.WARNING, "Terminating client connection {0}", receiver.getHostAddress());
+            receiver.closeDeferred();
+        }
+    }
+
     private <T extends IRCMessage> void send(
             IRCConnection receiver, MessageSource sender, IRCMessage initiator, IRCMessageFactory0<T> factory) {
         T message = factory.create(
@@ -167,7 +181,7 @@ public class IRCServerEngine implements Closeable {
                 makePrefixName(sender),
                 makePrefixUser(sender),
                 makePrefixHost(receiver, sender));
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A> void send(
@@ -183,7 +197,7 @@ public class IRCServerEngine implements Closeable {
                 makePrefixUser(sender),
                 makePrefixHost(receiver, sender),
                 arg0);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B> void send(
@@ -201,7 +215,7 @@ public class IRCServerEngine implements Closeable {
                 makePrefixHost(receiver, sender),
                 arg0,
                 arg1);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B> void echo(
@@ -219,7 +233,7 @@ public class IRCServerEngine implements Closeable {
                 makePrefixHost(receiver, sender),
                 arg0,
                 arg1);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B, C> void send(
@@ -239,7 +253,7 @@ public class IRCServerEngine implements Closeable {
                 arg0,
                 arg1,
                 arg2);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B, C, D> void send(
@@ -261,7 +275,7 @@ public class IRCServerEngine implements Closeable {
                 arg1,
                 arg2,
                 arg3);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B, C, D, E> void send(
@@ -285,7 +299,7 @@ public class IRCServerEngine implements Closeable {
                 arg2,
                 arg3,
                 arg4);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B, C, D, E, F> void send(
@@ -311,7 +325,7 @@ public class IRCServerEngine implements Closeable {
                 arg3,
                 arg4,
                 arg5);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private <T extends IRCMessage, A, B, C, D, E, F, G, H, I> void send(
@@ -343,7 +357,7 @@ public class IRCServerEngine implements Closeable {
                 arg6,
                 arg7,
                 arg8);
-        receiver.offer(MARSHALLER.marshal(message));
+        send(receiver, message);
     }
 
     private SequencedMap<String, String> makeTags(IRCConnection connection, boolean isEcho, IRCMessage initiator) {
@@ -442,7 +456,9 @@ public class IRCServerEngine implements Closeable {
                 case IRCMessageKICK m -> {}
                 case IRCMessageKILL m -> handle(connection, m);
                 case IRCMessageLIST m -> handle(connection, m);
+                case IRCMessageLUSERS m -> handle(connection, m);
                 case IRCMessageMODE m -> handle(connection, m);
+                case IRCMessageMOTD m -> handle(connection, m);
                 case IRCMessageNAMES m -> handle(connection, m);
                 case IRCMessageNICK m -> handle(connection, m);
                 case IRCMessageNOTICE m -> handle(connection, m);
@@ -777,6 +793,10 @@ public class IRCServerEngine implements Closeable {
         send(connection, server(), message, state.getNickname(connection), IRCMessage323::new);
     }
 
+    private void handle(IRCConnection connection, IRCMessageLUSERS message) {
+        sendLUsers(connection, message);
+    }
+
     private void handle(IRCConnection connection, IRCMessageMODE message) throws Exception {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
@@ -1081,6 +1101,23 @@ public class IRCServerEngine implements Closeable {
         }
     }
 
+    private void handle(IRCConnection connection, IRCMessageMOTD message) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        if (message.getTarget() != null && !Objects.equals(properties.getServer(), message.getTarget())) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    me.getNickname(),
+                    message.getTarget(),
+                    "No such server %s".formatted(message.getTarget()),
+                    IRCMessage402::new);
+            return;
+        }
+        sendMOTD(connection, message);
+    }
+
     private void handle(IRCConnection connection, IRCMessageNAMES message) {
         for (String channel : message.getChannels()) {
             sendNames(connection, message, channel);
@@ -1336,6 +1373,17 @@ public class IRCServerEngine implements Closeable {
     private void handle(IRCConnection connection, IRCMessageUSER message)
             throws StateInvariantException, InvalidPasswordException {
         ServerState state = serverStateGuard.getState();
+        if (message.getRealName() == null || message.getRealName().isBlank()) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    "USER",
+                    "No real name specified",
+                    IRCMessage461::new);
+            return;
+        }
         state.setUserInfo(connection, message.getUser(), message.getRealName());
         if (state.tryFinishRegistration(connection)) {
             sendWelcome(connection, message);
@@ -1596,7 +1644,7 @@ public class IRCServerEngine implements Closeable {
                 server(),
                 initiator,
                 state.getNickname(connection),
-                "Your host is RitsIRC, running version 1.0.0",
+                "Your host is %s, running version 1.0.0".formatted(properties.getServer()),
                 IRCMessage002::new);
         send(
                 connection,
@@ -1612,13 +1660,15 @@ public class IRCServerEngine implements Closeable {
                 server(),
                 initiator,
                 state.getNickname(connection),
-                "RitsIRC",
+                properties.getServer(),
                 "1.0.0",
                 availableUserModes,
                 availableChannelModes,
                 null,
                 IRCMessage004::new);
         send005(connection, initiator);
+        sendLUsers(connection, initiator);
+        sendMOTD(connection, initiator);
     }
 
     private void send005(IRCConnection connection, IRCMessage initiator) {
@@ -1716,6 +1766,61 @@ public class IRCServerEngine implements Closeable {
                     IRCMessage353::new);
         }
         send(connection, server(), initiator, me.getNickname(), channel.getName(), IRCMessage366::new);
+    }
+
+    private void sendLUsers(IRCConnection connection, IRCMessage initiator) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                "There are %d users and %d invisible on 1 servers"
+                        .formatted(state.getUserCount(), state.getInvisibleUserCount()),
+                IRCMessage251::new);
+        send(connection, server(), initiator, me.getNickname(), state.getOperatorCount(), IRCMessage252::new);
+        send(connection, server(), initiator, me.getNickname(), state.getUnknownConnectionCount(), IRCMessage253::new);
+        send(connection, server(), initiator, me.getNickname(), state.getChannelCount(), IRCMessage254::new);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                "I have %d clients and %d servers".formatted(state.getUserCount(), 1),
+                IRCMessage255::new);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                state.getUserCount(),
+                state.getMaxUserCount(),
+                "Current local users %d, max %d".formatted(state.getUserCount(), state.getMaxUserCount()),
+                IRCMessage265::new);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                state.getUserCount(),
+                state.getMaxUserCount(),
+                "Current global users %d, max %d".formatted(state.getUserCount(), state.getMaxUserCount()),
+                IRCMessage266::new);
+    }
+
+    private void sendMOTD(IRCConnection connection, IRCMessage initiator) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        send(
+                connection,
+                server(),
+                initiator,
+                me.getNickname(),
+                "- %s Message of the Day -".formatted(properties.getServer()),
+                IRCMessage375::new);
+        motd.lines().forEach(line -> send(connection, server(), initiator, me.getNickname(), line, IRCMessage372::new));
+        send(connection, server(), initiator, me.getNickname(), IRCMessage376::new);
     }
 
     private <T extends IRCMessage> void sendToTarget(

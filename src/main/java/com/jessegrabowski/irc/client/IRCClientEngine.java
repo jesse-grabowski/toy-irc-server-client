@@ -333,7 +333,13 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageLIST m -> {
                 /* ignore */
             }
+            case IRCMessageLUSERS m -> {
+                /* ignore */
+            }
             case IRCMessageMODE m -> handle(m);
+            case IRCMessageMOTD m -> {
+                /* ignore */
+            }
             case IRCMessageNAMES m -> {
                 /* ignore */
             }
@@ -390,21 +396,12 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage242 m -> {
                 /* ignore */
             }
-            case IRCMessage251 m -> {
-                /* ignore */
-            }
-            case IRCMessage252 m -> {
-                /* ignore */
-            }
-            case IRCMessage253 m -> {
-                /* ignore */
-            }
-            case IRCMessage254 m -> {
-                /* ignore */
-            }
-            case IRCMessage255 m -> {
-                /* ignore */
-            }
+            case IRCMessage251 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage252 m -> terminal.println(makeSystemTerminalMessage(s(m.getOps(), " operators online")));
+            case IRCMessage253 m ->
+                terminal.println(makeSystemTerminalMessage(s(m.getConnections(), " unregistered connections")));
+            case IRCMessage254 m -> terminal.println(makeSystemTerminalMessage(s(m.getChannels(), " channels formed")));
+            case IRCMessage255 m -> terminal.println(makeSystemTerminalMessage(m.getMessage()));
             case IRCMessage256 m -> {
                 /* ignore */
             }
@@ -420,12 +417,8 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage263 m -> {
                 /* ignore */
             }
-            case IRCMessage265 m -> {
-                /* ignore */
-            }
-            case IRCMessage266 m -> {
-                /* ignore */
-            }
+            case IRCMessage265 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
+            case IRCMessage266 m -> terminal.println(makeSystemTerminalMessage(m.getText()));
             case IRCMessage276 m -> {
                 /* ignore */
             }

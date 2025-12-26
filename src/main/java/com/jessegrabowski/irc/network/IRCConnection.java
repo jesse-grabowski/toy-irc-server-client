@@ -74,9 +74,9 @@ public final class IRCConnection implements Closeable {
     private static final ThreadFactory FINALIZER_THREAD_FACTORY =
             Thread.ofVirtual().name("IRCConnection-Finalizer-", 0).factory();
 
-    // arbitrary cap of 20; in practice this should almost always be empty unless there's
+    // arbitrary cap of 50; in practice this should almost always be empty unless there's
     // an issue with the connection
-    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(20);
+    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(50);
 
     private final List<Consumer<String>> ingressHandlers = new CopyOnWriteArrayList<>();
     private final List<Runnable> shutdownHandlers = new CopyOnWriteArrayList<>();
@@ -358,15 +358,20 @@ public final class IRCConnection implements Closeable {
         }
     }
 
+    public String getHostAddress() {
+        return socket.getInetAddress().getHostAddress();
+    }
+
+    public boolean isClosed() {
+        ConnectionState currentState = state.get();
+        return currentState == ConnectionState.CLOSED || currentState == ConnectionState.CLOSING;
+    }
+
     private enum ConnectionState {
         NEW,
         INITIALIZING,
         ACTIVE,
         CLOSING,
         CLOSED
-    }
-
-    public String getHostAddress() {
-        return socket.getInetAddress().getHostAddress();
     }
 }

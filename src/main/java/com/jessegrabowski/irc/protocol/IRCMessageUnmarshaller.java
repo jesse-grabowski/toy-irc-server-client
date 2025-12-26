@@ -126,7 +126,9 @@ public class IRCMessageUnmarshaller {
                 case IRCMessageKICK.COMMAND -> parseKick(parameters);
                 case IRCMessageKILL.COMMAND -> parseExact(parameters, "nickname", "comment", IRCMessageKILL::new);
                 case IRCMessageLIST.COMMAND -> parseList(parameters);
+                case IRCMessageLUSERS.COMMAND -> parseExact(parameters, IRCMessageLUSERS::new);
                 case IRCMessageMODE.COMMAND -> parseMode(parameters);
+                case IRCMessageMOTD.COMMAND -> parseMOTD(parameters);
                 case IRCMessageNAMES.COMMAND -> parseNames(parameters);
                 case IRCMessageNICK.COMMAND -> parseExact(parameters, "nickname", IRCMessageNICK::new);
                 case IRCMessageNOTICE.COMMAND -> parseNotice(parameters);
@@ -519,6 +521,10 @@ public class IRCMessageUnmarshaller {
                 required("target"), optional("modestring"), greedyOptional("mode arguments"), IRCMessageMODE::new);
     }
 
+    private IRCMessageMOTD parseMOTD(Parameters parameters) throws Exception {
+        return parameters.inject(optional("target"), IRCMessageMOTD::new);
+    }
+
     private IRCMessageNAMES parseNames(Parameters parameters) throws Exception {
         return parameters.inject(required("channel", this::splitToList), IRCMessageNAMES::new);
     }
@@ -558,7 +564,9 @@ public class IRCMessageUnmarshaller {
     }
 
     private IRCMessageUSER parseUser(Parameters parameters) throws Exception {
-        return parameters.discard(1, 2).inject(required("username"), required("realname"), IRCMessageUSER::new);
+        return parameters
+                .discard(1, 2)
+                .inject(required("username"), requiredAllowEmpty("realname"), IRCMessageUSER::new);
     }
 
     private IRCMessageUSERHOST parseUserHost(Parameters parameters) throws Exception {
@@ -970,6 +978,10 @@ public class IRCMessageUnmarshaller {
     }
 
     // generic functions to parse the majority of numerics, which are rather simple
+    private <T extends IRCMessage> T parseExact(Parameters parameters, IRCMessageFactory0<T> factory) throws Exception {
+        return parameters.inject(factory);
+    }
+
     private <T extends IRCMessage> T parseExact(
             Parameters parameters, String arg0, IRCMessageFactory1<T, String> factory) throws Exception {
         return parameters.inject(required(arg0), factory);

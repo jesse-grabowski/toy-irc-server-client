@@ -98,6 +98,7 @@ public class IRCServer {
                         IRCServerProperties::setMaxNicknameHistory,
                         "maximum depth of nickname history (default 200)",
                         false)
+                .addResourceFlag('M', "motd", IRCServerProperties::setMotd, "location of MOTD file (.txt)", false)
                 .build();
 
         ArgsTokenizer tokenizer = new ArgsTokenizer();

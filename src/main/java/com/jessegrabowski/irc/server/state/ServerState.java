@@ -86,6 +86,8 @@ public final class ServerState {
     private final IRCServerProperties properties;
 
     private IRCServerParameters parameters;
+    private int userCount = 0;
+    private int maxUserCount = 0;
 
     public ServerState(IRCServerProperties properties, IRCServerParameters parameters) {
         this.properties = properties;
@@ -94,6 +96,36 @@ public final class ServerState {
 
     public Set<IRCConnection> getConnections() {
         return Set.copyOf(users.keySet());
+    }
+
+    public int getUserCount() {
+        return userCount;
+    }
+
+    public int getMaxUserCount() {
+        return maxUserCount;
+    }
+
+    public int getInvisibleUserCount() {
+        return (int) users.values().stream()
+                .filter(u -> u.getModes().contains(IRCUserMode.INVISIBLE))
+                .count();
+    }
+
+    public int getOperatorCount() {
+        return (int) users.values().stream()
+                .filter(u -> u.getModes().contains(IRCUserMode.OPERATOR))
+                .count();
+    }
+
+    public int getUnknownConnectionCount() {
+        return (int) users.values().stream()
+                .filter(u -> u.getState() == ServerConnectionState.NEW)
+                .count();
+    }
+
+    public int getChannelCount() {
+        return channels.size();
     }
 
     public ServerUser getUserForConnection(IRCConnection connection) {
@@ -115,7 +147,9 @@ public final class ServerState {
     public void markQuit(IRCConnection connection, String quitMessage) {
         ServerUser user = findUser(connection);
         user.setQuitMessage(quitMessage);
-        user.setState(ServerConnectionState.QUITTING);
+        if (user.getState() == ServerConnectionState.REGISTERED) {
+            user.setState(ServerConnectionState.QUITTING);
+        }
     }
 
     public void setAway(IRCConnection connection, String awayStatus) throws StateInvariantException {
@@ -518,6 +552,9 @@ public final class ServerState {
                 Transaction.removeLastTransactionally(nicknameHistory);
             }
         }
+        if (user.getState() != ServerConnectionState.NEW) {
+            userCount--;
+        }
     }
 
     public void startCapabilityNegotiation(IRCConnection connection) {
@@ -685,6 +722,8 @@ public final class ServerState {
             return false;
         }
 
+        userCount++;
+        maxUserCount = Math.max(userCount, maxUserCount);
         user.setState(ServerConnectionState.REGISTERED);
         return true;
     }
