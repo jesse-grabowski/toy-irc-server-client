@@ -80,7 +80,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -125,7 +124,7 @@ public class IRCServerEngine implements Closeable {
         ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
                 1,
                 Thread.ofPlatform()
-                        .name("IRCClient-Server") // name the thread so it shows up nicely in our logs
+                        .name("IRCServer-Engine") // name the thread so it shows up nicely in our logs
                         .daemon(false) // we don't want the JVM to terminate until this thread dies
                         .uncaughtExceptionHandler((t, e) -> LOG.log(Level.SEVERE, "Error executing task", e))
                         .factory(),
