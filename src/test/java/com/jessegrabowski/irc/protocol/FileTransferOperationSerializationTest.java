@@ -1,12 +1,42 @@
+/*
+ * This project is licensed under the MIT License.
+ *
+ * In addition to the rights granted under the MIT License, explicit permission
+ * is granted to the faculty, instructors, teaching assistants, and evaluators
+ * of Ritsumeikan University for unrestricted educational evaluation and grading.
+ *
+ * ---------------------------------------------------------------------------
+ *
+ * MIT License
+ *
+ * Copyright (c) 2026 Jesse Grabowski
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package com.jessegrabowski.irc.protocol;
 
-import com.jessegrabowski.irc.protocol.model.*;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import com.jessegrabowski.irc.protocol.model.*;
 import java.io.*;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 public class FileTransferOperationSerializationTest {
     private final FileTransferOperationMarshaller marshaller = new FileTransferOperationMarshaller();
@@ -15,8 +45,8 @@ public class FileTransferOperationSerializationTest {
     @Test
     void roundTrip_hello() throws Exception {
         UUID token = UUID.fromString("f7128efc-9fc5-4aaf-b8e8-108045f72bf7");
-        FileTransferOperationHello op =
-                new FileTransferOperationHello(FileTransferOperationVersion.V1, token, FileTransferOperationRole.SENDER);
+        FileTransferOperationHello op = new FileTransferOperationHello(
+                FileTransferOperationVersion.V1, token, FileTransferOperationRole.SENDER);
 
         FileTransferOperation decoded = roundTrip(op);
 
@@ -28,6 +58,15 @@ public class FileTransferOperationSerializationTest {
     }
 
     @Test
+    void roundTrip_ready() throws Exception {
+        FileTransferOperationReady op = new FileTransferOperationReady();
+
+        FileTransferOperation decoded = roundTrip(op);
+
+        assertInstanceOf(FileTransferOperationReady.class, decoded);
+    }
+
+    @Test
     void roundTrip_iSend() throws Exception {
         FileTransferOperationISend op = new FileTransferOperationISend(123456789L);
 
@@ -35,16 +74,6 @@ public class FileTransferOperationSerializationTest {
 
         assertInstanceOf(FileTransferOperationISend.class, decoded);
         assertEquals(op.getSize(), ((FileTransferOperationISend) decoded).getSize());
-    }
-
-    @Test
-    void roundTrip_iReceive() throws Exception {
-        FileTransferOperationIReceive op = new FileTransferOperationIReceive(9876543210L);
-
-        FileTransferOperation decoded = roundTrip(op);
-
-        assertInstanceOf(FileTransferOperationIReceive.class, decoded);
-        assertEquals(op.getSize(), ((FileTransferOperationIReceive) decoded).getSize());
     }
 
     @Test
@@ -79,7 +108,7 @@ public class FileTransferOperationSerializationTest {
     void unmarshal_misalignedFrame_throwsFramingException() throws Exception {
         byte[] bytes;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
+                DataOutputStream out = new DataOutputStream(baos)) {
 
             out.writeInt(0xCAFEBABE);
             out.writeByte(FileTransferOperationCode.ACK.getValue());
@@ -99,7 +128,7 @@ public class FileTransferOperationSerializationTest {
     void unmarshal_truncatedFrame_throwsFramingExceptionWithCause() throws Exception {
         byte[] bytes;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
+                DataOutputStream out = new DataOutputStream(baos)) {
 
             out.writeInt(0xDEADBEEF);
             out.flush();
@@ -119,7 +148,7 @@ public class FileTransferOperationSerializationTest {
     void unmarshal_unknownOpcode_throwsUnknownOpCodeException() throws Exception {
         byte[] bytes;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
+                DataOutputStream out = new DataOutputStream(baos)) {
 
             out.writeInt(0xDEADBEEF);
             out.writeByte(FileTransferOperationCode.UNKNOWN.getValue());
@@ -138,7 +167,7 @@ public class FileTransferOperationSerializationTest {
 
         byte[] bytes;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
+                DataOutputStream out = new DataOutputStream(baos)) {
 
             out.writeInt(0xDEADBEEF);
             out.writeByte(FileTransferOperationCode.HELLO.getValue());
@@ -162,7 +191,7 @@ public class FileTransferOperationSerializationTest {
     void unmarshal_error_unknownErrorCode_roundTripsAsUnknown() throws Exception {
         byte[] bytes;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
+                DataOutputStream out = new DataOutputStream(baos)) {
 
             out.writeInt(0xDEADBEEF);
             out.writeByte(FileTransferOperationCode.ERROR.getValue());
@@ -181,7 +210,7 @@ public class FileTransferOperationSerializationTest {
     private FileTransferOperation roundTrip(FileTransferOperation op) throws Exception {
         byte[] bytes;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
+                DataOutputStream out = new DataOutputStream(baos)) {
 
             marshaller.marshal(out, op);
             out.flush();

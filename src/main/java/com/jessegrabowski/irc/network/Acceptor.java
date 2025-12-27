@@ -71,7 +71,7 @@ public class Acceptor implements Closeable {
         this.dispatcher = dispatcher;
     }
 
-    public synchronized void start() throws IOException {
+    public synchronized int start() throws IOException {
         if (state != State.NEW) {
             throw new IllegalStateException("server already started or closed");
         }
@@ -92,6 +92,8 @@ public class Acceptor implements Closeable {
         thread = new Thread(this::run, "Acceptor-%s:%d".formatted(address.getHostString(), address.getPort()));
         thread.setDaemon(false); // block shutdown until fully closed
         thread.start();
+
+        return serverSocket.getLocalPort();
     }
 
     private void run() {

@@ -29,13 +29,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol.model;
+package com.jessegrabowski.irc.server.filetransfer;
 
-public final class FileTransferOperationGoodbye extends FileTransferOperation {
-
-    public static final FileTransferOperationCode OP_CODE = FileTransferOperationCode.GOODBYE;
-
-    public FileTransferOperationGoodbye() {
-        super(OP_CODE);
+public class FileTransferTimeoutException extends RuntimeException {
+    public FileTransferTimeoutException(String message) {
+        super(message);
     }
 }

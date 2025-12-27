@@ -31,11 +31,11 @@
  */
 package com.jessegrabowski.irc.protocol.model;
 
-public final class FileTransferOperationGoodbye extends FileTransferOperation {
+public final class FileTransferOperationReady extends FileTransferOperation {
 
-    public static final FileTransferOperationCode OP_CODE = FileTransferOperationCode.GOODBYE;
+    public static final FileTransferOperationCode OP_CODE = FileTransferOperationCode.READY;
 
-    public FileTransferOperationGoodbye() {
+    public FileTransferOperationReady() {
         super(OP_CODE);
     }
 }
