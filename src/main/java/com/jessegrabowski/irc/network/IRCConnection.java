@@ -322,8 +322,8 @@ public final class IRCConnection implements Closeable {
         return closeFuture;
     }
 
-    // wait asynchronously up to 30 seconds for the egress queue
-    // to drain, then interrupt the thread and finish closing
+    // wait up to 5 seconds to give the egress queue time to
+    // drain, then interrupt the thread and shut down
     private void finalizeClose() {
         try {
             egressThread.join(Duration.ofSeconds(5));

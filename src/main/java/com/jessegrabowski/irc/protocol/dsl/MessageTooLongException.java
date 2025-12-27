@@ -29,6 +29,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol;
+package com.jessegrabowski.irc.protocol.dsl;
 
 public class MessageTooLongException extends Exception {}

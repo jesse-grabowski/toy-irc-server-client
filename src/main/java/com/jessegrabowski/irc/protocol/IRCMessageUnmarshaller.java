@@ -42,6 +42,7 @@ import static com.jessegrabowski.irc.protocol.dsl.DSL.splitRequired;
 import static com.jessegrabowski.irc.protocol.dsl.DSL.splitString;
 import static java.util.function.Predicate.not;
 
+import com.jessegrabowski.irc.protocol.dsl.MessageTooLongException;
 import com.jessegrabowski.irc.protocol.dsl.NotEnoughParametersException;
 import com.jessegrabowski.irc.protocol.dsl.ParameterExtractor;
 import com.jessegrabowski.irc.protocol.dsl.ParameterPlanner;
