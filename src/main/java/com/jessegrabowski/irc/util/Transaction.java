@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SequencedSet;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -146,6 +147,29 @@ public final class Transaction {
         map.put(key, value);
         addCompensation(() -> map.remove(key));
         return value;
+    }
+
+    public static <K, V> V computeTransactionally(
+            Map<K, V> map, K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        boolean hadKey = map.containsKey(key);
+        V oldValue = map.get(key);
+        V newValue = remappingFunction.apply(key, oldValue);
+        if (newValue == null) {
+            if (hadKey) {
+                map.remove(key);
+                addCompensation(() -> map.put(key, oldValue));
+            }
+            return null;
+        }
+
+        map.put(key, newValue);
+        if (hadKey) {
+            addCompensation(() -> map.put(key, oldValue));
+        } else {
+            addCompensation(() -> map.remove(key));
+        }
+
+        return newValue;
     }
 
     public static <V> void addTransactionally(List<V> list, V value) {

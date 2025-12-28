@@ -65,6 +65,7 @@ import com.jessegrabowski.irc.server.state.ServerChannel;
 import com.jessegrabowski.irc.server.state.ServerChannelMembership;
 import com.jessegrabowski.irc.server.state.ServerState;
 import com.jessegrabowski.irc.server.state.ServerUser;
+import com.jessegrabowski.irc.server.state.ServerUserDCCSession;
 import com.jessegrabowski.irc.server.state.ServerUserWas;
 import com.jessegrabowski.irc.server.state.StateInvariantException;
 import com.jessegrabowski.irc.util.Glob;
@@ -88,6 +89,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -429,8 +431,8 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
 
     private void handleDisconnect(IRCConnection connection) {
         ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
         try {
-            ServerUser me = state.getUserForConnection(connection);
             MessageTarget target = state.getWatchers(me).exclude(me);
             sendToTarget(
                     me,
@@ -446,6 +448,16 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Error sending QUIT message during disconnect", e);
         }
+
+        try {
+            ServerUserDCCSession session = state.getDccSession(me);
+            if (session != null) {
+                dccRelayEngine.cancel(session.getToken());
+            }
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Error canceling in-flight DCC request during disconnect", e);
+        }
+
         state.disconnect(connection);
     }
 
@@ -467,6 +479,7 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
                 case IRCMessageCAPREQ m -> handle(connection, m);
                 case IRCMessageCTCPAction m ->
                     handlePrivmsg(connection, m, m.getTargets(), m.getText(), IRCMessageCTCPAction::new);
+                case IRCMessageCTCPDCCSend m -> handle(connection, m);
                 case IRCMessageHELP m -> sendHelp(connection, m, m.getSubject());
                 case IRCMessageHELPOP m -> sendHelp(connection, m, m.getSubject());
                 case IRCMessageINFO m -> sendInfo(connection, m);
@@ -672,6 +685,60 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
                     unknownDisableCapabilities,
                     IRCMessageCAPNAK::new);
         }
+    }
+
+    private void handle(IRCConnection connection, IRCMessageCTCPDCCSend message) throws Exception {
+        ServerState state = serverStateGuard.getState();
+        ServerUser me = state.getUserForConnection(connection);
+        if (message.getPort() != 0) {
+            handlePrivmsg(
+                    connection,
+                    message,
+                    message.getTargets(),
+                    "*",
+                    (raw, tags, nick, user, host, tar, _) -> new IRCMessageCTCPDCCSend(
+                            raw,
+                            tags,
+                            nick,
+                            user,
+                            host,
+                            tar,
+                            message.getFilename(),
+                            message.getHost(),
+                            message.getPort(),
+                            message.getFileSize()));
+            return;
+        }
+        if (message.getTargets().size() != 1) {
+            send(
+                    connection,
+                    server(),
+                    message,
+                    state.getNickname(connection),
+                    message.getTargets(),
+                    "Transfer failed, requires single recipient",
+                    IRCMessage407::new);
+        }
+        ServerUser target =
+                state.getExistingUser(connection, message.getTargets().getFirst());
+        ServerUserDCCSession existingSession = state.getDccSession(me);
+        if (existingSession != null) {
+            dccRelayEngine.cancel(existingSession.getToken());
+            send(
+                    connection,
+                    server(),
+                    message,
+                    List.of(me.getNickname()),
+                    "Your previous file transfer '%s' to %s has been cancelled."
+                            .formatted(
+                                    existingSession.getFilename(),
+                                    existingSession.getTarget().getNickname()),
+                    IRCMessageNOTICE::new);
+        }
+        ServerUserDCCSession newSession = new ServerUserDCCSession(
+                UUID.randomUUID(), message.getFilename(), target, message.getFileSize(), message);
+        state.setDccSession(me, newSession);
+        dccRelayEngine.openForReceiver(newSession.getToken());
     }
 
     private void handle(IRCConnection connection, IRCMessageINVITE message) throws StateInvariantException {
@@ -2026,7 +2093,40 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
         }
     }
 
-    private void handle(DCCEventReceiverOpened event) {}
+    private void handle(DCCEventReceiverOpened event) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser sender = state.getDccSender(event.getToken());
+        if (sender == null) {
+            LOG.log(Level.WARNING, "Opened DCC receiver port for token {0} with unknown sender", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUserDCCSession session = state.getDccSession(sender);
+        if (session == null) {
+            LOG.log(Level.WARNING, "Opened DCC receiver port for token {0} with unknown session", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUser receiver = session.getTarget();
+        send(
+                state.getConnectionForUser(receiver),
+                sender,
+                session.getInitiator(),
+                List.of(receiver.getNickname()),
+                session.getFilename(),
+                properties.getHost(),
+                event.getPort(),
+                session.getFileSize(),
+                IRCMessageCTCPDCCSend::new);
+        send(
+                state.getConnectionForUser(sender),
+                server(),
+                session.getInitiator(),
+                List.of(sender.getNickname()),
+                "Preparing to send '%s' - waiting for %s to accept."
+                        .formatted(session.getFilename(), receiver.getNickname()),
+                IRCMessageNOTICE::new);
+    }
 
     private void handle(DCCEventReceiverConnected event) {}
 

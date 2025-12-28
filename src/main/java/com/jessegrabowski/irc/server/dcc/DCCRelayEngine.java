@@ -213,6 +213,10 @@ public class DCCRelayEngine implements Closeable {
         });
     }
 
+    public void cancel(UUID token) {
+        executor.execute(() -> finalizePipe(token));
+    }
+
     private void finalizePipe(UUID token) {
         Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
         DCCPipeHolder holder = pipes.remove(token);

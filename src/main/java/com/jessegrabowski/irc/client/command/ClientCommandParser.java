@@ -214,6 +214,14 @@ public class ClientCommandParser {
                         .addGreedyStringPositional(0, ClientCommandQuit::setReason, "reason for disconnection", false)
                         .build());
         parsers.put(
+                "/send",
+                ArgsParser.builder(ClientCommandSend::new, false, "send a file to another user")
+                        .addUsageExample("/send <nickname> <file>")
+                        .addUsageExample("/send taro example.txt")
+                        .addStringPositional(0, ClientCommandSend::setTarget, "nickname of receiver", true)
+                        .addGreedyResourcePositional(1, ClientCommandSend::setFile, "path to file to send", true)
+                        .build());
+        parsers.put(
                 "/topic",
                 ArgsParser.builder(ClientCommandTopic::new, false, "view or set a channel's topic")
                         .addUsageExample("/topic <channel> [<topic>]")

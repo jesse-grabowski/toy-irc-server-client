@@ -61,6 +61,7 @@ public final class ServerUser implements MessageSource {
     private String realName;
     private String awayStatus;
     private String quitMessage;
+    private ServerUserDCCSession dccSession;
 
     ServerUser(String hostAddress) {
         this.hostAddress = hostAddress;
@@ -252,5 +253,15 @@ public final class ServerUser implements MessageSource {
         }
 
         return channels.stream().anyMatch(c -> user.getChannels().contains(c));
+    }
+
+    ServerUserDCCSession getDccSession() {
+        return dccSession;
+    }
+
+    void setDccSession(ServerUserDCCSession dccSession) {
+        ServerUserDCCSession oldDccSession = this.dccSession;
+        Transaction.addCompensation(() -> this.dccSession = oldDccSession);
+        this.dccSession = dccSession;
     }
 }

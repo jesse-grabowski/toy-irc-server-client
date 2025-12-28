@@ -189,6 +189,14 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     }
 
     @Override
+    public ArgsParserBuilder<T> addGreedyResourcePositional(
+            int position, BiConsumer<T, Resource> propertiesSetter, String description, boolean required) {
+        addPositionalSpec(new PositionalSpec<>(
+                position, propertiesSetter, Resource::of, description, required, TokenConsumption.DRAIN_RAW));
+        return this;
+    }
+
+    @Override
     public ArgsParserBuilder<T> addCommaSeparatedListPositional(
             int position, BiConsumer<T, List<String>> propertiesSetter, String description, boolean required) {
         addPositionalSpec(new PositionalSpec<>(

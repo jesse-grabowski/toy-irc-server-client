@@ -52,4 +52,5 @@ public sealed interface ClientCommand extends ArgsProperties
                 ClientCommandOper,
                 ClientCommandPart,
                 ClientCommandQuit,
+                ClientCommandSend,
                 ClientCommandTopic {}

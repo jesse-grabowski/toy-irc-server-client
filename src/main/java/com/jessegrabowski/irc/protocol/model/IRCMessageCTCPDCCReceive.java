@@ -35,7 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.SequencedMap;
 
-public final class IRCMessageCTCPDCCSend extends IRCMessage {
+public final class IRCMessageCTCPDCCReceive extends IRCMessage {
 
     public static final String COMMAND = "PRIVMSG";
 
@@ -45,7 +45,7 @@ public final class IRCMessageCTCPDCCSend extends IRCMessage {
     private final int port;
     private final Long fileSize;
 
-    public IRCMessageCTCPDCCSend(
+    public IRCMessageCTCPDCCReceive(
             String rawMessage,
             SequencedMap<String, String> tags,
             String prefixName,
@@ -64,7 +64,7 @@ public final class IRCMessageCTCPDCCSend extends IRCMessage {
         this.fileSize = fileSize;
     }
 
-    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port, Long fileSize) {
+    public IRCMessageCTCPDCCReceive(List<String> targets, String filename, String host, int port, Long fileSize) {
         this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port, fileSize);
     }
 

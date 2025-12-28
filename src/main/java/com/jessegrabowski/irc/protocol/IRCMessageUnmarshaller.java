@@ -235,6 +235,7 @@ public class IRCMessageUnmarshaller {
                 case IRCMessage404.COMMAND -> parseExact(parameters, "client", "channel", "text", IRCMessage404::new);
                 case IRCMessage405.COMMAND -> parseExact(parameters, "client", "channel", "text", IRCMessage405::new);
                 case IRCMessage406.COMMAND -> parseExact(parameters, "client", "nickname", "text", IRCMessage406::new);
+                case IRCMessage407.COMMAND -> parse407(parameters);
                 case IRCMessage409.COMMAND -> parseExact(parameters, "client", "text", IRCMessage409::new);
                 case IRCMessage410.COMMAND -> parseExact(parameters, "client", "command", "text", IRCMessage410::new);
                 case IRCMessage411.COMMAND -> parseExact(parameters, "client", "text", IRCMessage411::new);
@@ -867,6 +868,11 @@ public class IRCMessageUnmarshaller {
         return parameters.inject(required("client"), greedyRequired("command"), required("info"), IRCMessage400::new);
     }
 
+    private IRCMessage407 parse407(Parameters parameters) throws Exception {
+        return parameters.inject(
+                required("client"), required("target", this::splitToList), required("text"), IRCMessage407::new);
+    }
+
     private IRCMessage472 parse472(Parameters parameters) throws Exception {
         return parameters.inject(
                 required("client"), required("modechar", s -> s.charAt(0)), required("text"), IRCMessage472::new);
@@ -888,6 +894,7 @@ public class IRCMessageUnmarshaller {
                 .ifIndex(1, isCTCPCommand("ACTION"), this::parseCTCPAction)
                 .ifIndex(1, isCTCPCommand("CLIENTINFO"), this::parseCTCPClientInfo)
                 .ifIndex(1, isCTCPCommand("DCC SEND"), this::parseCTCPDCCSend)
+                .ifIndex(1, isCTCPCommand("DCC RECV"), this::parseCTCPDCCReceive)
                 .ifIndex(1, isCTCPCommand("PING"), this::parseCTCPPing)
                 .ifIndex(1, isCTCPCommand("VERSION"), this::parseCTCPVersion)
                 .ifNoneMatch(p -> p.inject(
@@ -920,17 +927,30 @@ public class IRCMessageUnmarshaller {
                 .inject();
     }
 
-    private IRCMessage parseCTCPDCCSend(Parameters parameters) throws Exception {
+    private IRCMessageCTCPDCCSend parseCTCPDCCSend(Parameters parameters) throws Exception {
         return parameters
-                .hoist(1, this::tokenizeDCCSend)
+                .hoist(1, this::tokenizeDCCSendAndReceive)
                 .discard(1, 2) // drop DCC SEND
                 .inject(
                         required("target", this::splitToList),
                         required("filename"),
                         required("host"),
                         required("port", Integer::parseInt),
-                        optional("filesize", Integer::parseInt, null),
+                        optional("filesize", Long::parseLong, null),
                         IRCMessageCTCPDCCSend::new);
+    }
+
+    private IRCMessageCTCPDCCReceive parseCTCPDCCReceive(Parameters parameters) throws Exception {
+        return parameters
+                .hoist(1, this::tokenizeDCCSendAndReceive)
+                .discard(1, 2) // drop DCC SEND
+                .inject(
+                        required("target", this::splitToList),
+                        required("filename"),
+                        required("host"),
+                        required("port", Integer::parseInt),
+                        optional("filesize", Long::parseLong, null),
+                        IRCMessageCTCPDCCReceive::new);
     }
 
     private IRCMessage parseCTCPPing(Parameters parameters) throws Exception {
@@ -974,7 +994,7 @@ public class IRCMessageUnmarshaller {
         };
     }
 
-    private List<String> tokenizeDCCSend(String body) {
+    private List<String> tokenizeDCCSendAndReceive(String body) {
         String stripped = body.replaceAll("^\u0001|\u0001$", "");
         List<String> tokens = new ArrayList<>();
 

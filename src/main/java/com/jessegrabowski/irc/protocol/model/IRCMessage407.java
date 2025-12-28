@@ -31,60 +31,39 @@
  */
 package com.jessegrabowski.irc.protocol.model;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.SequencedMap;
 
-public final class IRCMessageCTCPDCCSend extends IRCMessage {
+public final class IRCMessage407 extends IRCMessage {
+    public static final String COMMAND = "407";
+    private final String client;
+    private final List<String> target;
+    private final String text;
 
-    public static final String COMMAND = "PRIVMSG";
-
-    private final List<String> targets;
-    private final String filename;
-    private final String host;
-    private final int port;
-    private final Long fileSize;
-
-    public IRCMessageCTCPDCCSend(
+    public IRCMessage407(
             String rawMessage,
             SequencedMap<String, String> tags,
             String prefixName,
             String prefixUser,
             String prefixHost,
-            List<String> targets,
-            String filename,
-            String host,
-            int port,
-            Long fileSize) {
+            String client,
+            List<String> target,
+            String text) {
         super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.targets = targets;
-        this.filename = filename;
-        this.host = host;
-        this.port = port;
-        this.fileSize = fileSize;
+        this.client = client;
+        this.target = target;
+        this.text = text;
     }
 
-    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port, Long fileSize) {
-        this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port, fileSize);
+    public String getClient() {
+        return client;
     }
 
-    public List<String> getTargets() {
-        return targets;
+    public List<String> getTarget() {
+        return target;
     }
 
-    public String getFilename() {
-        return filename;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public Long getFileSize() {
-        return fileSize;
+    public String getText() {
+        return text;
     }
 }

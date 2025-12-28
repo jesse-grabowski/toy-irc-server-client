@@ -49,6 +49,10 @@ public sealed interface Resource permits Resource.ClasspathResource, Resource.Fi
 
     InputStream getInputStream() throws IOException;
 
+    Long getFileSize() throws IOException;
+
+    String getFileName();
+
     static Resource of(String path) {
         if (path.startsWith("classpath:")) {
             return new ClasspathResource(path.substring("classpath:".length()));
@@ -86,6 +90,18 @@ public sealed interface Resource permits Resource.ClasspathResource, Resource.Fi
         public InputStream getInputStream() throws IOException {
             return resource.openStream();
         }
+
+        @Override
+        public Long getFileSize() throws IOException {
+            return null;
+        }
+
+        @Override
+        public String getFileName() {
+            String path = resource.getPath();
+            int lastSlash = path.lastIndexOf('/');
+            return lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        }
     }
 
     final class FileSystemResource implements Resource {
@@ -105,6 +121,16 @@ public sealed interface Resource permits Resource.ClasspathResource, Resource.Fi
         @Override
         public InputStream getInputStream() throws IOException {
             return Files.newInputStream(path, StandardOpenOption.READ);
+        }
+
+        @Override
+        public Long getFileSize() throws IOException {
+            return Files.size(path);
+        }
+
+        @Override
+        public String getFileName() {
+            return path.getFileName().toString();
         }
     }
 }

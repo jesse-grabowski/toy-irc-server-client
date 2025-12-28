@@ -29,62 +29,43 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol.model;
+package com.jessegrabowski.irc.server.state;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.SequencedMap;
+import com.jessegrabowski.irc.protocol.model.IRCMessage;
+import java.util.UUID;
 
-public final class IRCMessageCTCPDCCSend extends IRCMessage {
-
-    public static final String COMMAND = "PRIVMSG";
-
-    private final List<String> targets;
+public class ServerUserDCCSession {
+    private final UUID token;
     private final String filename;
-    private final String host;
-    private final int port;
+    private final ServerUser target;
     private final Long fileSize;
+    private final IRCMessage initiator;
 
-    public IRCMessageCTCPDCCSend(
-            String rawMessage,
-            SequencedMap<String, String> tags,
-            String prefixName,
-            String prefixUser,
-            String prefixHost,
-            List<String> targets,
-            String filename,
-            String host,
-            int port,
-            Long fileSize) {
-        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.targets = targets;
+    public ServerUserDCCSession(UUID token, String filename, ServerUser target, Long fileSize, IRCMessage initiator) {
+        this.token = token;
         this.filename = filename;
-        this.host = host;
-        this.port = port;
+        this.target = target;
         this.fileSize = fileSize;
+        this.initiator = initiator;
     }
 
-    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port, Long fileSize) {
-        this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port, fileSize);
-    }
-
-    public List<String> getTargets() {
-        return targets;
+    public UUID getToken() {
+        return token;
     }
 
     public String getFilename() {
         return filename;
     }
 
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
+    public ServerUser getTarget() {
+        return target;
     }
 
     public Long getFileSize() {
         return fileSize;
+    }
+
+    public IRCMessage getInitiator() {
+        return initiator;
     }
 }

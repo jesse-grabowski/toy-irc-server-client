@@ -121,6 +121,14 @@ public class IRCClientState {
         user.setHostname(hostname);
     }
 
+    public String getHostname(String nickname) {
+        User user = findUser(nickname);
+        if (user == null) {
+            return "0.0.0.0";
+        }
+        return user.getHostname();
+    }
+
     public boolean isAway(String nickname) {
         User user = findUser(nickname);
         if (user == null) {

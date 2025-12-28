@@ -64,6 +64,7 @@ public class IRCMessageMarshaller {
             case IRCMessageCTCPClientInfoRequest m -> marshal(m, this::marshalCTCPClientInfoRequest);
             case IRCMessageCTCPClientInfoResponse m -> marshal(m, this::marshalCTCPClientInfoResponse);
             case IRCMessageCTCPDCCSend m -> marshal(m, this::marshalCTCPDCCSend);
+            case IRCMessageCTCPDCCReceive m -> marshal(m, this::marshalCTCPDCCReceive);
             case IRCMessageCTCPPingRequest m -> marshal(m, this::marshalCTCPPingRequest);
             case IRCMessageCTCPPingResponse m -> marshal(m, this::marshalCTCPPingResponse);
             case IRCMessageCTCPVersionRequest m -> marshal(m, this::marshalCTCPVersionRequest);
@@ -179,6 +180,7 @@ public class IRCMessageMarshaller {
             case IRCMessage404 m -> marshal(m, this::marshal404);
             case IRCMessage405 m -> marshal(m, this::marshal405);
             case IRCMessage406 m -> marshal(m, this::marshal406);
+            case IRCMessage407 m -> marshal(m, this::marshal407);
             case IRCMessage409 m -> marshal(m, this::marshal409);
             case IRCMessage410 m -> marshal(m, this::marshal410);
             case IRCMessage411 m -> marshal(m, this::marshal411);
@@ -373,6 +375,20 @@ public class IRCMessageMarshaller {
                         l(
                                 "DCC",
                                 "SEND",
+                                quoteWhitespace(message.getFilename()),
+                                message.getHost(),
+                                message.getPort(),
+                                message.getFileSize())))));
+    }
+
+    private List<String> marshalCTCPDCCReceive(IRCMessageCTCPDCCReceive message) {
+        return l(
+                delimited(",", message.getTargets()),
+                trailing(ctcp(delimited(
+                        " ",
+                        l(
+                                "DCC",
+                                "RECV",
                                 quoteWhitespace(message.getFilename()),
                                 message.getHost(),
                                 message.getPort(),
@@ -929,6 +945,10 @@ public class IRCMessageMarshaller {
 
     private List<String> marshal406(IRCMessage406 message) {
         return l(message.getClient(), message.getNick(), trailing(message.getText()));
+    }
+
+    private List<String> marshal407(IRCMessage407 message) {
+        return l(message.getClient(), delimited(",", message.getTarget()), trailing(message.getText()));
     }
 
     private List<String> marshal409(IRCMessage409 message) {

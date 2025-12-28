@@ -67,8 +67,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class ServerState {
 
@@ -79,6 +81,8 @@ public final class ServerState {
     private final Map<IRCConnection, ServerUser> users = new HashMap<>();
     private final Map<ServerUser, IRCConnection> connectionsByUser = new HashMap<>();
     private final Map<String, ServerUser> usersByNickname = new HashMap<>();
+    private final Map<UUID, ServerUser> usersByDccSession = new HashMap<>();
+    private final Map<ServerUser, Set<UUID>> dccSessionsByRecipient = new HashMap<>();
     private final Deque<ServerUserWas> nicknameHistory = new ArrayDeque<>();
 
     private final Map<String, ServerChannel> channels = new HashMap<>();
@@ -531,6 +535,7 @@ public final class ServerState {
         if (user.getNickname() != null) {
             Transaction.removeTransactionally(usersByNickname, user.getNickname());
         }
+        setDccSession(user, null);
         for (ServerChannel channel : user.getChannels()) {
             channel.part(user);
             if (channel.isEmpty()) {
@@ -1123,5 +1128,38 @@ public final class ServerState {
     void clearChannelInvite(ServerChannel channel, ServerUser user) {
         channel.clearInvited(user);
         user.clearInvited(channel);
+    }
+
+    public ServerUserDCCSession getDccSession(ServerUser serverUser) {
+        return serverUser.getDccSession();
+    }
+
+    public void setDccSession(ServerUser serverUser, ServerUserDCCSession dccSession) {
+        ServerUserDCCSession oldSession = serverUser.getDccSession();
+        if (oldSession != null) {
+            Transaction.removeTransactionally(usersByDccSession, oldSession.getToken());
+            Set<UUID> transfers = Transaction.computeTransactionally(
+                    dccSessionsByRecipient,
+                    oldSession.getTarget(),
+                    (k, v) -> v == null
+                            ? null
+                            : v.stream().filter(u -> u != oldSession.getToken()).collect(Collectors.toSet()));
+            if (transfers == null || transfers.isEmpty()) {
+                Transaction.removeTransactionally(dccSessionsByRecipient, oldSession.getTarget());
+            }
+        }
+        serverUser.setDccSession(dccSession);
+        Transaction.putTransactionally(usersByDccSession, dccSession.getToken(), serverUser);
+        Transaction.computeTransactionally(
+                dccSessionsByRecipient,
+                dccSession.getTarget(),
+                (k, v) -> v == null
+                        ? Set.of(dccSession.getToken())
+                        : Stream.concat(v.stream(), Stream.of(dccSession.getToken()))
+                                .collect(Collectors.toSet()));
+    }
+
+    public ServerUser getDccSender(UUID token) {
+        return usersByDccSession.get(token);
     }
 }

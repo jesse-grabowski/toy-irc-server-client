@@ -29,62 +29,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol.model;
+package com.jessegrabowski.irc.client.command.model;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.SequencedMap;
+import com.jessegrabowski.irc.util.Resource;
 
-public final class IRCMessageCTCPDCCSend extends IRCMessage {
+public final class ClientCommandSend implements ClientCommand {
+    private String target;
+    private Resource file;
 
-    public static final String COMMAND = "PRIVMSG";
+    @Override
+    public void validate() {}
 
-    private final List<String> targets;
-    private final String filename;
-    private final String host;
-    private final int port;
-    private final Long fileSize;
-
-    public IRCMessageCTCPDCCSend(
-            String rawMessage,
-            SequencedMap<String, String> tags,
-            String prefixName,
-            String prefixUser,
-            String prefixHost,
-            List<String> targets,
-            String filename,
-            String host,
-            int port,
-            Long fileSize) {
-        super(COMMAND, rawMessage, tags, prefixName, prefixUser, prefixHost);
-        this.targets = targets;
-        this.filename = filename;
-        this.host = host;
-        this.port = port;
-        this.fileSize = fileSize;
+    public String getTarget() {
+        return target;
     }
 
-    public IRCMessageCTCPDCCSend(List<String> targets, String filename, String host, int port, Long fileSize) {
-        this(null, new LinkedHashMap<>(), null, null, null, targets, filename, host, port, fileSize);
+    public void setTarget(String target) {
+        this.target = target;
     }
 
-    public List<String> getTargets() {
-        return targets;
+    public Resource getFile() {
+        return file;
     }
 
-    public String getFilename() {
-        return filename;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public Long getFileSize() {
-        return fileSize;
+    public void setFile(Resource file) {
+        this.file = file;
     }
 }

@@ -47,9 +47,11 @@ import com.jessegrabowski.irc.protocol.*;
 import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.server.IRCServerParametersUnmarshaller;
+import com.jessegrabowski.irc.util.Resource;
 import com.jessegrabowski.irc.util.StateGuard;
 import java.awt.Color;
 import java.io.Closeable;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -307,6 +309,9 @@ public class IRCClientEngine implements Closeable {
                 /* ignore */
             }
             case IRCMessageCTCPDCCSend m -> {
+                /* ignore */
+            }
+            case IRCMessageCTCPDCCReceive m -> {
                 /* ignore */
             }
             case IRCMessageCTCPPingRequest m -> {
@@ -570,6 +575,7 @@ public class IRCClientEngine implements Closeable {
             case IRCMessage404 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage405 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage406 m -> terminal.println(makeSystemErrorMessage(m.getText()));
+            case IRCMessage407 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage409 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage410 m -> terminal.println(makeSystemErrorMessage(m.getText()));
             case IRCMessage411 m -> terminal.println(makeSystemErrorMessage(m.getText()));
@@ -1311,6 +1317,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandOper c -> handle(c);
             case ClientCommandPart c -> handle(c);
             case ClientCommandQuit c -> handle(c);
+            case ClientCommandSend c -> handle(c);
             case ClientCommandTopic c -> handle(c);
         }
         updateStatusAndPrompt();
@@ -1453,6 +1460,27 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandQuit command) {
         send(new IRCMessageQUIT(command.getReason()));
+    }
+
+    private void handle(ClientCommandSend command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not send file -- connection not yet registered"));
+            return;
+        }
+        Resource resource = command.getFile();
+        terminal.println(makeSystemTerminalMessage(
+                f(Color.ORANGE, s("Preparing to send '", f(resource.getFileName()), "' to ", f(command.getTarget())))));
+        try {
+            send(new IRCMessageCTCPDCCSend(
+                    List.of(command.getTarget()),
+                    resource.getFileName(),
+                    state.getHostname(state.getMe()),
+                    0,
+                    resource.getFileSize()));
+        } catch (IOException e) {
+            terminal.println(makeSystemErrorMessage("Failed to send file: " + e.getMessage()));
+        }
     }
 
     private void handle(ClientCommandTopic command) {

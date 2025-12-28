@@ -93,6 +93,9 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
     ArgsParserBuilder<T> addInetAddressPositional(
             int position, BiConsumer<T, InetAddress> propertiesSetter, String description, boolean required);
 
+    ArgsParserBuilder<T> addGreedyResourcePositional(
+            int position, BiConsumer<T, Resource> propertiesSetter, String description, boolean required);
+
     ArgsParserBuilder<T> addCommaSeparatedListPositional(
             int position, BiConsumer<T, List<String>> propertiesSetter, String description, boolean required);
 

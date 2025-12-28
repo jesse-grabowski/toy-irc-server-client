@@ -205,6 +205,9 @@ public class Acceptor implements Closeable {
 
         state = State.CLOSED;
 
+        InetSocketAddress address = (InetSocketAddress) serverSocket.getLocalSocketAddress();
+        LOG.info("No longer listening on " + address);
+
         // interrupt serverSocket.accept()
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {
