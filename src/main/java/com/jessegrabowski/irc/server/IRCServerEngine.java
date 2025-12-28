@@ -458,7 +458,11 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
             LOG.log(Level.WARNING, "Error canceling in-flight DCC request during disconnect", e);
         }
 
-        state.disconnect(connection);
+        try {
+            state.disconnect(connection);
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Error disconnecting client", e);
+        }
     }
 
     private void parseAndHandleAsync(IRCConnection client, String line) {

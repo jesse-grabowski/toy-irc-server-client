@@ -1149,14 +1149,16 @@ public final class ServerState {
             }
         }
         serverUser.setDccSession(dccSession);
-        Transaction.putTransactionally(usersByDccSession, dccSession.getToken(), serverUser);
-        Transaction.computeTransactionally(
-                dccSessionsByRecipient,
-                dccSession.getTarget(),
-                (k, v) -> v == null
-                        ? Set.of(dccSession.getToken())
-                        : Stream.concat(v.stream(), Stream.of(dccSession.getToken()))
-                                .collect(Collectors.toSet()));
+        if (dccSession != null) {
+            Transaction.putTransactionally(usersByDccSession, dccSession.getToken(), serverUser);
+            Transaction.computeTransactionally(
+                    dccSessionsByRecipient,
+                    dccSession.getTarget(),
+                    (k, v) -> v == null
+                            ? Set.of(dccSession.getToken())
+                            : Stream.concat(v.stream(), Stream.of(dccSession.getToken()))
+                                    .collect(Collectors.toSet()));
+        }
     }
 
     public ServerUser getDccSender(UUID token) {
