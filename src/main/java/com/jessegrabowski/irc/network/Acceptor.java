@@ -38,7 +38,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -52,7 +51,7 @@ public class Acceptor implements Closeable {
 
     private final InetAddress host;
     private final Port port;
-    private final Consumer<Socket> dispatcher;
+    private final Dispatcher dispatcher;
     private final Supplier<Thread.Builder> threadBuilder;
 
     private volatile State state = State.NEW;
@@ -72,7 +71,7 @@ public class Acceptor implements Closeable {
      *                   based on the server configuration and then dispatch it to a
      *                   separate thread for processing.
      */
-    public Acceptor(InetAddress host, Port port, Consumer<Socket> dispatcher) {
+    public Acceptor(InetAddress host, Port port, Dispatcher dispatcher) {
         this(host, port, dispatcher, () -> Thread.ofPlatform().daemon(false));
     }
 
@@ -87,7 +86,7 @@ public class Acceptor implements Closeable {
      *                   the thread created by {@code threadBuilder}.
      * @param threadBuilder builds the thread used to accept incoming connections.
      */
-    public Acceptor(InetAddress host, Port port, Consumer<Socket> dispatcher, Supplier<Thread.Builder> threadBuilder) {
+    public Acceptor(InetAddress host, Port port, Dispatcher dispatcher, Supplier<Thread.Builder> threadBuilder) {
         this.host = host;
         this.port = port;
         this.dispatcher = dispatcher;
@@ -148,7 +147,10 @@ public class Acceptor implements Closeable {
                 try {
                     Socket socket = serverSocket.accept();
                     try {
-                        dispatcher.accept(socket);
+                        if (!dispatcher.dispatch(socket)) {
+                            LOG.info("Dispatcher returned false, closing server socket");
+                            return;
+                        }
                     } catch (Exception e) {
                         LogRecord record =
                                 new LogRecord(Level.WARNING, "Error in socket dispatch with remote address {0}");

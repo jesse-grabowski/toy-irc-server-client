@@ -36,6 +36,7 @@ import com.jessegrabowski.irc.args.ArgsParserHelpRequestedException;
 import com.jessegrabowski.irc.args.ArgsToken;
 import com.jessegrabowski.irc.args.ArgsTokenizer;
 import com.jessegrabowski.irc.network.Acceptor;
+import com.jessegrabowski.irc.server.dcc.DCCRelayEngine;
 import com.jessegrabowski.irc.util.LoggingConfigurer;
 import java.io.IOException;
 import java.util.List;
@@ -47,8 +48,9 @@ public class IRCServer {
 
         LoggingConfigurer.configure(properties.getLogFile(), Level.parse(properties.getLogLevel()), true);
 
-        IRCServerEngine engine = new IRCServerEngine(properties);
-        Acceptor acceptor = new Acceptor(null, properties.getPort(), engine::accept);
+        DCCRelayEngine dccEngine = new DCCRelayEngine(properties);
+        IRCServerEngine ircEngine = new IRCServerEngine(properties, dccEngine);
+        Acceptor acceptor = new Acceptor(null, properties.getPort(), ircEngine::accept);
         acceptor.start();
     }
 
@@ -101,7 +103,7 @@ public class IRCServer {
                 .addPortFlag(
                         'D',
                         "dcc-port",
-                        IRCServerProperties::setDccPort,
+                        IRCServerProperties::setDccPortRange,
                         "port for DCC connections (default 49152-65535)",
                         false)
                 .build();

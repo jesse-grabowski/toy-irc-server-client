@@ -49,6 +49,14 @@ import com.jessegrabowski.irc.protocol.IRCMessageMarshaller;
 import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.*;
+import com.jessegrabowski.irc.server.dcc.DCCEvent;
+import com.jessegrabowski.irc.server.dcc.DCCEventListener;
+import com.jessegrabowski.irc.server.dcc.DCCEventReceiverConnected;
+import com.jessegrabowski.irc.server.dcc.DCCEventReceiverOpened;
+import com.jessegrabowski.irc.server.dcc.DCCEventSenderConnected;
+import com.jessegrabowski.irc.server.dcc.DCCEventSenderOpened;
+import com.jessegrabowski.irc.server.dcc.DCCEventTransferClosed;
+import com.jessegrabowski.irc.server.dcc.DCCRelayEngine;
 import com.jessegrabowski.irc.server.state.InvalidPasswordException;
 import com.jessegrabowski.irc.server.state.MessageSource;
 import com.jessegrabowski.irc.server.state.MessageTarget;
@@ -89,7 +97,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Gatherers;
 
-public class IRCServerEngine implements Closeable {
+public class IRCServerEngine implements Closeable, DCCEventListener {
 
     private static final Instant START_TIME = Instant.now();
 
@@ -105,11 +113,15 @@ public class IRCServerEngine implements Closeable {
     private final ScheduledExecutorService executor;
     private final IRCServerProperties properties;
     private final IRCServerParameters parameters;
+    private final DCCRelayEngine dccRelayEngine;
     private final String motd;
 
     // there's a lot going on here but I'll try to call out the important bits
-    public IRCServerEngine(IRCServerProperties properties) throws IOException {
+    public IRCServerEngine(IRCServerProperties properties, DCCRelayEngine dccRelayEngine) throws IOException {
         this.properties = properties;
+
+        this.dccRelayEngine = dccRelayEngine;
+        dccRelayEngine.addListener(this);
 
         this.parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
         ServerState state = new ServerState(properties, parameters);
@@ -143,9 +155,11 @@ public class IRCServerEngine implements Closeable {
                     this::ping, 0, properties.getPingFrequencyMilliseconds(), TimeUnit.MILLISECONDS);
         }));
         this.executor = executor;
+
+        LOG.info("Started IRC Server Engine");
     }
 
-    public void accept(Socket socket) {
+    public boolean accept(Socket socket) {
         executor.execute(spy(() -> {
             IRCConnection connection = new IRCConnection(socket);
             connection.addIngressHandler(line -> parseAndHandleAsync(connection, line));
@@ -161,6 +175,7 @@ public class IRCServerEngine implements Closeable {
                 connection.close();
             }
         }));
+        return true;
     }
 
     private void send(IRCConnection receiver, IRCMessage message) {
@@ -1995,6 +2010,31 @@ public class IRCServerEngine implements Closeable {
             }
         };
     }
+
+    @Override
+    public void onEvent(DCCEvent event) {
+        executor.execute(() -> handle(event));
+    }
+
+    private void handle(DCCEvent event) {
+        switch (event) {
+            case DCCEventReceiverOpened e -> handle(e);
+            case DCCEventReceiverConnected e -> handle(e);
+            case DCCEventSenderOpened e -> handle(e);
+            case DCCEventSenderConnected e -> handle(e);
+            case DCCEventTransferClosed e -> handle(e);
+        }
+    }
+
+    private void handle(DCCEventReceiverOpened event) {}
+
+    private void handle(DCCEventReceiverConnected event) {}
+
+    private void handle(DCCEventSenderOpened event) {}
+
+    private void handle(DCCEventSenderConnected event) {}
+
+    private void handle(DCCEventTransferClosed event) {}
 
     private enum IRCServerEngineState {
         ACTIVE,

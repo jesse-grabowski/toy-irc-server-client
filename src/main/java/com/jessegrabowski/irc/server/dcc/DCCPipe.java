@@ -36,36 +36,79 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class DCCPipe implements Closeable {
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicReference<Socket> sender = new AtomicReference<>();
+    private final AtomicReference<Socket> receiver = new AtomicReference<>();
 
-    private volatile Socket sender;
-    private volatile Socket receiver;
+    private final CyclicBarrier barrier = new CyclicBarrier(2);
+    private final AtomicInteger shutdownCounter = new AtomicInteger(2);
 
     DCCPipe() {}
 
-    void bindSource(Socket socket) {
-        this.sender = socket;
+    boolean bindSender(Socket socket) {
+        return sender.compareAndSet(null, socket);
     }
 
-    void bindDestination(Socket socket) {
-        this.receiver = socket;
+    boolean bindReceiver(Socket socket) {
+        return receiver.compareAndSet(null, socket);
     }
 
-    boolean isBound() {
-        return sender != null && receiver != null;
+    boolean waitForPartner(long timeout, TimeUnit unit) {
+        if (closed.get()) {
+            return false;
+        }
+        try {
+            barrier.await(timeout, unit);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (BrokenBarrierException | TimeoutException e) {
+            return false;
+        }
     }
 
-    void pipeSenderToReceiver() throws IOException {
+    boolean pipeSenderToReceiver() throws IOException {
+        Socket source = sender.get();
+        Socket dest = receiver.get();
+        if (source == null || dest == null) {
+            close();
+            throw new IllegalStateException("DCCPipe not fully bound");
+        }
         // large buffer since we're sending file data
-        transmit(sender, receiver, 32 * 1024);
+        try {
+            transmit(source, dest, 32 * 1024);
+            return shutdownCounter.decrementAndGet() == 0;
+        } catch (IOException | RuntimeException e) {
+            shutdownCounter.decrementAndGet();
+            throw e;
+        }
     }
 
-    void pipeReceiverToSender() throws IOException {
+    boolean pipeReceiverToSender() throws IOException {
+        Socket source = receiver.get();
+        Socket dest = sender.get();
+        if (source == null || dest == null) {
+            close();
+            throw new IllegalStateException("DCCPipe not fully bound");
+        }
         // tiny buffer since acks are small
-        transmit(receiver, sender, 1024);
+        try {
+            transmit(source, dest, 1024);
+            return shutdownCounter.decrementAndGet() == 0;
+        } catch (IOException | RuntimeException e) {
+            shutdownCounter.decrementAndGet();
+            throw e;
+        }
     }
 
     private void transmit(Socket src, Socket dest, int bufferLength) throws IOException {
@@ -108,16 +151,19 @@ public class DCCPipe implements Closeable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        if (sender != null) {
+        barrier.reset();
+        Socket senderSocket = sender.getAndSet(null);
+        if (senderSocket != null) {
             try {
-                sender.close();
+                senderSocket.close();
             } catch (IOException _) {
                 // ignore
             }
         }
-        if (receiver != null) {
+        Socket receiverSocket = receiver.getAndSet(null);
+        if (receiverSocket != null) {
             try {
-                receiver.close();
+                receiverSocket.close();
             } catch (IOException _) {
                 // ignore
             }

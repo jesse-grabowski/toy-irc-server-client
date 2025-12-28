@@ -52,7 +52,7 @@ public class IRCServerProperties implements ArgsProperties {
     private int maxNicknameHistory = 200;
     private Resource motd = Resource.of("classpath:/motd.txt");
     // use the IANA dynamic/private port range by default
-    private Port dccPort = new Port.PortRange(49152, 65535);
+    private Port dccPortRange = new Port.PortRange(49152, 65535);
 
     @Override
     public void validate() {
@@ -75,6 +75,13 @@ public class IRCServerProperties implements ArgsProperties {
         }
         if (maxNicknameHistory < 1) {
             throw new IllegalArgumentException("maxNicknameHistory must be greater than 0");
+        }
+        if (dccPortRange instanceof Port.PortRange(int start, int end)) {
+            if (end - start < 32) {
+                throw new IllegalArgumentException("dccPortRange must contain at least 32 ports");
+            }
+        } else {
+            throw new IllegalArgumentException("dccPortRange must be a range of ports");
         }
     }
 
@@ -182,11 +189,11 @@ public class IRCServerProperties implements ArgsProperties {
         this.motd = motd;
     }
 
-    public Port getDccPort() {
-        return dccPort;
+    public Port getDccPortRange() {
+        return dccPortRange;
     }
 
-    public void setDccPort(Port dccPort) {
-        this.dccPort = dccPort;
+    public void setDccPortRange(Port dccPortRange) {
+        this.dccPortRange = dccPortRange;
     }
 }
