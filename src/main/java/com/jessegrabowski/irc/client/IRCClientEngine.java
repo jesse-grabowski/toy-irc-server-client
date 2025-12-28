@@ -38,6 +38,8 @@ import static com.jessegrabowski.irc.client.tui.RichString.j;
 import static com.jessegrabowski.irc.client.tui.RichString.s;
 
 import com.jessegrabowski.irc.client.command.model.*;
+import com.jessegrabowski.irc.client.dcc.DCCDownloader;
+import com.jessegrabowski.irc.client.dcc.DCCUploader;
 import com.jessegrabowski.irc.client.tui.RichString;
 import com.jessegrabowski.irc.client.tui.TerminalMessage;
 import com.jessegrabowski.irc.client.tui.TerminalUI;
@@ -65,6 +67,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -308,12 +311,8 @@ public class IRCClientEngine implements Closeable {
             case IRCMessageCTCPClientInfoResponse m -> {
                 /* ignore */
             }
-            case IRCMessageCTCPDCCSend m -> {
-                /* ignore */
-            }
-            case IRCMessageCTCPDCCReceive m -> {
-                /* ignore */
-            }
+            case IRCMessageCTCPDCCSend m -> handle(m);
+            case IRCMessageCTCPDCCReceive m -> handle(m);
             case IRCMessageCTCPPingRequest m -> {
                 /* ignore */
             }
@@ -821,6 +820,52 @@ public class IRCClientEngine implements Closeable {
         state.touch(message.getPrefixName());
     }
 
+    private void handle(IRCMessageCTCPDCCSend message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        String token = state.registerDownload(
+                message.getFilename(), message.getHost(), message.getPort(), message.getFileSize());
+        terminal.println(makeSystemTerminalMessage(s(
+                "Incoming file transfer from ",
+                f(message.getPrefixName()),
+                ": ",
+                message.getFilename(),
+                " (",
+                token,
+                ")")));
+        terminal.println(makeSystemTerminalMessage(s("Type '/accept ", token, "' to receive the file")));
+    }
+
+    private void handle(IRCMessageCTCPDCCReceive message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+        LOG.info("Received DCC SEND request from " + message.getPrefixName());
+        Optional<IRCClientState.PendingUpload> optional =
+                state.getUpload(message.getPrefixName(), message.getFilename());
+        if (optional.isEmpty()) {
+            terminal.println(makeSystemErrorMessage(s(
+                    f(message.getPrefixName()),
+                    " tried to request a file (",
+                    message.getFilename(),
+                    ") that you are not currently sending")));
+            return;
+        }
+
+        IRCClientState.PendingUpload upload = optional.get();
+        new DCCUploader(
+                        upload.getFile(),
+                        upload.getFilename(),
+                        message.getHost(),
+                        message.getPort(),
+                        message.getFileSize())
+                .pushAsync();
+    }
+
     private void handle(IRCMessageERROR message) {
         terminal.println(makeSystemErrorMessage(message.getReason()));
     }
@@ -1297,6 +1342,7 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommand command) {
         switch (command) {
+            case ClientCommandAccept c -> handle(c);
             case ClientCommandAction c -> handle(c);
             case ClientCommandAfk c -> handle(c);
             case ClientCommandBack c -> handle(c);
@@ -1318,9 +1364,32 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandPart c -> handle(c);
             case ClientCommandQuit c -> handle(c);
             case ClientCommandSend c -> handle(c);
+            case ClientCommandSending c -> handle(c);
             case ClientCommandTopic c -> handle(c);
         }
         updateStatusAndPrompt();
+    }
+
+    private void handle(ClientCommandAccept command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        Optional<IRCClientState.PendingDownload> optional = state.getDownload(command.getToken());
+        if (optional.isEmpty()) {
+            terminal.println(makeSystemErrorMessage(s("No pending download for token ", command.getToken())));
+            return;
+        }
+
+        IRCClientState.PendingDownload download = optional.get();
+        new DCCDownloader(
+                        properties.getDownloadDirectory(),
+                        download.getFilename(),
+                        download.getHost(),
+                        download.getPort(),
+                        download.getSize())
+                .fetchAsync();
     }
 
     private void handle(ClientCommandAction command) {
@@ -1469,18 +1538,54 @@ public class IRCClientEngine implements Closeable {
             return;
         }
         Resource resource = command.getFile();
+        String filename = resource.getFileName();
         terminal.println(makeSystemTerminalMessage(
-                f(Color.ORANGE, s("Preparing to send '", f(resource.getFileName()), "' to ", f(command.getTarget())))));
+                f(Color.ORANGE, s("Preparing to send '", f(filename), "' to ", f(command.getTarget())))));
         try {
             send(new IRCMessageCTCPDCCSend(
                     List.of(command.getTarget()),
-                    resource.getFileName(),
+                    filename,
                     state.getHostname(state.getMe()),
                     0,
                     resource.getFileSize()));
         } catch (IOException e) {
             terminal.println(makeSystemErrorMessage("Failed to send file: " + e.getMessage()));
+            return;
         }
+
+        String token = state.registerUpload(resource, command.getTarget(), filename);
+        terminal.println(makeSystemTerminalMessage(
+                s("View in-flight files with '/sending' or cancel this send with '/sending -c ", token, "'")));
+    }
+
+    private void handle(ClientCommandSending command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not view in-flight files -- connection not yet registered"));
+            return;
+        }
+
+        if (command.getCancelToken() == null) {
+            Set<IRCClientState.PendingUpload> uploads = state.getPendingUploads();
+            if (uploads.isEmpty()) {
+                terminal.println(makeSystemTerminalMessage("No in-flight files to view"));
+                return;
+            }
+            terminal.println(makeSystemTerminalMessage(s("In-flight files:")));
+            uploads.forEach(upload -> terminal.println(makeSystemTerminalMessage(
+                    s("  ", upload.getToken(), ": ", upload.getFilename(), " -> ", f(upload.getNickname())))));
+            return;
+        }
+
+        Optional<IRCClientState.PendingUpload> optional = state.getUpload(command.getCancelToken());
+        if (!optional.isPresent()) {
+            terminal.println(makeSystemErrorMessage("No in-flight file with token " + command.getCancelToken()));
+            return;
+        }
+
+        state.clearUpload(command.getCancelToken());
+        terminal.println(
+                makeSystemTerminalMessage(s("Cancelled in-flight file with token ", command.getCancelToken())));
     }
 
     private void handle(ClientCommandTopic command) {

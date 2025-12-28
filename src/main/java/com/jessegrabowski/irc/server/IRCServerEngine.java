@@ -2128,13 +2128,78 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
                 IRCMessageNOTICE::new);
     }
 
-    private void handle(DCCEventReceiverConnected event) {}
+    private void handle(DCCEventReceiverConnected event) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser sender = state.getDccSender(event.getToken());
+        if (sender == null) {
+            LOG.log(Level.WARNING, "Connected DCC receiver port for token {0} with unknown sender", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUserDCCSession session = state.getDccSession(sender);
+        if (session == null) {
+            LOG.log(Level.WARNING, "Connected DCC receiver port for token {0} with unknown session", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        dccRelayEngine.openForSender(session.getToken());
+    }
 
-    private void handle(DCCEventSenderOpened event) {}
+    private void handle(DCCEventSenderOpened event) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser sender = state.getDccSender(event.getToken());
+        if (sender == null) {
+            LOG.log(Level.WARNING, "Opened DCC sender port for token {0} with unknown sender", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUserDCCSession session = state.getDccSession(sender);
+        if (session == null) {
+            LOG.log(Level.WARNING, "Opened DCC sender port for token {0} with unknown session", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUser receiver = session.getTarget();
+        send(
+                state.getConnectionForUser(sender),
+                receiver,
+                session.getInitiator(),
+                List.of(sender.getNickname()),
+                session.getFilename(),
+                properties.getHost(),
+                event.getPort(),
+                session.getFileSize(),
+                IRCMessageCTCPDCCReceive::new);
+    }
 
-    private void handle(DCCEventSenderConnected event) {}
+    private void handle(DCCEventSenderConnected event) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser sender = state.getDccSender(event.getToken());
+        if (sender == null) {
+            LOG.log(Level.WARNING, "Connected DCC sender port for token {0} with unknown sender", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUserDCCSession session = state.getDccSession(sender);
+        if (session == null) {
+            LOG.log(Level.WARNING, "Connected DCC sender port for token {0} with unknown session", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+        }
+    }
 
-    private void handle(DCCEventTransferClosed event) {}
+    private void handle(DCCEventTransferClosed event) {
+        ServerState state = serverStateGuard.getState();
+        ServerUser sender = state.getDccSender(event.getToken());
+        if (sender == null) {
+            LOG.log(Level.WARNING, "Opened DCC sender port for token {0} with unknown sender", event.getToken());
+            dccRelayEngine.cancel(event.getToken());
+            return;
+        }
+        ServerUserDCCSession session = state.getDccSession(sender);
+        if (session != null && Objects.equals(session.getToken(), event.getToken())) {
+            state.setDccSession(sender, null);
+        }
+    }
 
     private enum IRCServerEngineState {
         ACTIVE,

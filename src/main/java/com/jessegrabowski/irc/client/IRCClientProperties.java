@@ -32,6 +32,7 @@
 package com.jessegrabowski.irc.client;
 
 import com.jessegrabowski.irc.args.ArgsProperties;
+import com.jessegrabowski.irc.util.Directory;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -53,6 +54,7 @@ public class IRCClientProperties implements ArgsProperties {
     private String logFile = "irc-client.log";
     private String logLevel = Level.INFO.getName();
     private InetAddress myAddress;
+    private Directory downloadDirectory = new Directory("downloads");
 
     @Override
     public void validate() {
@@ -172,5 +174,13 @@ public class IRCClientProperties implements ArgsProperties {
 
     public void setMyAddress(InetAddress myAddress) {
         this.myAddress = myAddress;
+    }
+
+    public Directory getDownloadDirectory() {
+        return downloadDirectory;
+    }
+
+    public void setDownloadDirectory(Directory downloadDirectory) {
+        this.downloadDirectory = downloadDirectory;
     }
 }

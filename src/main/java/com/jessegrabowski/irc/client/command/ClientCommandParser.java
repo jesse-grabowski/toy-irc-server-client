@@ -56,6 +56,14 @@ public class ClientCommandParser {
 
         parsers = new LinkedHashMap<>();
         parsers.put(
+                "/accept",
+                ArgsParser.builder(ClientCommandAccept::new, false, "accept a file transfer")
+                        .addUsageExample("/accept <token>")
+                        .addUsageExample("/accept 1234")
+                        .addStringPositional(
+                                0, ClientCommandAccept::setToken, "token matching the file to accept", true)
+                        .build());
+        parsers.put(
                 "/afk",
                 ArgsParser.builder(ClientCommandAfk::new, false, "mark self away")
                         .addUsageExample("/afk [<message>]")
@@ -220,6 +228,14 @@ public class ClientCommandParser {
                         .addUsageExample("/send taro example.txt")
                         .addStringPositional(0, ClientCommandSend::setTarget, "nickname of receiver", true)
                         .addGreedyResourcePositional(1, ClientCommandSend::setFile, "path to file to send", true)
+                        .build());
+        parsers.put(
+                "/sending",
+                ArgsParser.builder(ClientCommandSending::new, false, "view or cancel in-flight file transfers")
+                        .addUsageExample("/sending [-c <token>]")
+                        .addUsageExample("/sending")
+                        .addUsageExample("/sending -c 1234")
+                        .addStringFlag('c', "cancel", ClientCommandSending::setCancelToken, "token to cancel", false)
                         .build());
         parsers.put(
                 "/topic",

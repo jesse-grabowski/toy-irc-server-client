@@ -33,6 +33,7 @@ package com.jessegrabowski.irc.client;
 
 import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.server.IRCServerParameters;
+import com.jessegrabowski.irc.util.Resource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,6 +45,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedSet;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 
 public class IRCClientState {
@@ -53,6 +55,10 @@ public class IRCClientState {
 
     private final Map<String, User> users = new HashMap<>();
     private final Map<String, Channel> channels = new HashMap<>();
+
+    private final Map<String, PendingDownload> pendingDownloads = new HashMap<>();
+    private final Map<String, PendingUploadKey> pendingUploadIndex = new HashMap<>();
+    private final Map<PendingUploadKey, PendingUpload> pendingUploads = new HashMap<>();
 
     private String me;
 
@@ -451,6 +457,62 @@ public class IRCClientState {
         return parameters;
     }
 
+    public String registerUpload(Resource file, String nickname, String filename) {
+        String token = "impossible";
+        for (int i = 0; i < 100 && !pendingUploadIndex.containsKey(token); i++) {
+            token = String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
+        }
+
+        String normalizedNickname = canonicalizeNickname(nickname);
+        PendingUpload upload = new PendingUpload(token, file, normalizedNickname, filename);
+        PendingUploadKey key = new PendingUploadKey(normalizedNickname, filename);
+
+        pendingUploads.put(key, upload);
+        pendingUploadIndex.put(token, key);
+
+        return token;
+    }
+
+    public boolean clearUpload(String token) {
+        PendingUploadKey key = pendingUploadIndex.remove(token);
+        if (key == null) {
+            return false;
+        }
+        return pendingUploads.remove(key) != null;
+    }
+
+    public Optional<PendingUpload> getUpload(String nickname, String filename) {
+        return Optional.ofNullable(pendingUploads.get(new PendingUploadKey(canonicalizeNickname(nickname), filename)));
+    }
+
+    public Optional<PendingUpload> getUpload(String token) {
+        return Optional.ofNullable(pendingUploads.get(pendingUploadIndex.get(token)));
+    }
+
+    public Set<PendingUpload> getPendingUploads() {
+        return Set.copyOf(pendingUploads.values());
+    }
+
+    public String registerDownload(String filename, String host, int port, Long size) {
+        String token = "impossible";
+        for (int i = 0; i < 100 && !pendingDownloads.containsKey(token); i++) {
+            token = String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
+        }
+
+        PendingDownload download = new PendingDownload(token, filename, host, port, size);
+        pendingDownloads.put(token, download);
+
+        return token;
+    }
+
+    public boolean clearDownload(String token) {
+        return pendingDownloads.remove(token) != null;
+    }
+
+    public Optional<PendingDownload> getDownload(String token) {
+        return Optional.ofNullable(pendingDownloads.get(token));
+    }
+
     public static final class Channel {
         private String name;
         private String topic;
@@ -690,4 +752,85 @@ public class IRCClientState {
                     && valuePredicate.test(activeCapabilities.get(capability));
         }
     }
+
+    public static final class PendingDownload {
+        private final long expiresAt = System.currentTimeMillis() + 1000 * 60 * 3;
+
+        private final String token;
+        private final String filename;
+        private final String host;
+        private final int port;
+        private final Long size;
+
+        public PendingDownload(String token, String filename, String host, int port, Long size) {
+            this.token = token;
+            this.filename = filename;
+            this.host = host;
+            this.port = port;
+            this.size = size;
+        }
+
+        public long getExpiresAt() {
+            return expiresAt;
+        }
+
+        public String getToken() {
+            return token;
+        }
+
+        public String getFilename() {
+            return filename;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public Long getSize() {
+            return size;
+        }
+    }
+
+    public static final class PendingUpload {
+
+        private final long expiresAt = System.currentTimeMillis() + 1000 * 60 * 3;
+
+        private final String token;
+        private final Resource file;
+        private final String nickname;
+        private final String filename;
+
+        public PendingUpload(String token, Resource file, String nickname, String filename) {
+            this.token = token;
+            this.file = file;
+            this.nickname = nickname;
+            this.filename = filename;
+        }
+
+        public long getExpiresAt() {
+            return expiresAt;
+        }
+
+        public String getToken() {
+            return token;
+        }
+
+        public Resource getFile() {
+            return file;
+        }
+
+        public String getNickname() {
+            return nickname;
+        }
+
+        public String getFilename() {
+            return filename;
+        }
+    }
+
+    private record PendingUploadKey(String nickname, String filename) {}
 }

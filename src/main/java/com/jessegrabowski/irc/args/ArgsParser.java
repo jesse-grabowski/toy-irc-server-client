@@ -32,6 +32,7 @@
 package com.jessegrabowski.irc.args;
 
 import com.jessegrabowski.irc.network.Port;
+import com.jessegrabowski.irc.util.Directory;
 import com.jessegrabowski.irc.util.Resource;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -169,6 +170,17 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             String description,
             boolean required) {
         addFlagSpec(new FlagSpec<>(shortKey, longKey, true, propertiesSetter, Resource::of, description, required));
+        return this;
+    }
+
+    @Override
+    public ArgsParserBuilder<T> addDirectoryFlag(
+            char shortKey,
+            String longKey,
+            BiConsumer<T, Directory> propertiesSetter,
+            String description,
+            boolean required) {
+        addFlagSpec(new FlagSpec<>(shortKey, longKey, true, propertiesSetter, Directory::new, description, required));
         return this;
     }
 
