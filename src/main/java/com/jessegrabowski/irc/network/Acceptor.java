@@ -37,7 +37,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -45,30 +47,51 @@ import java.util.logging.Logger;
 // somewhat based on Tomcat's acceptor, but simpler
 public class Acceptor implements Closeable {
 
-    private final Logger LOG = Logger.getLogger(Acceptor.class.getName());
+    private static final int SOCKET_BACKLOG = 50;
+    private static final Logger LOG = Logger.getLogger(Acceptor.class.getName());
 
-    private final InetSocketAddress address;
+    private final InetAddress host;
+    private final Port port;
     private final Consumer<Socket> dispatcher;
+    private final Supplier<Thread.Builder> threadBuilder;
 
     private volatile State state = State.NEW;
     private volatile ServerSocket serverSocket;
     private volatile Thread thread;
 
     /**
-     * Initializes our acceptor loop. After this, call {@code #start()}
+     * Initializes our acceptor loop. After this, call {@code #start()}. By default, this
+     * uses a non-daemon thread (blocking shutdown).
      *
      * @param host the {@link InetAddress} representing the host on which the server
      *             will listen for connections.
-     * @param port the port number on which the server will accept client connections.
-     *             Must be between 0 and 65535.
+     * @param port the port on which the socket will listen, or a port range. See
+     *             {@link Port} for more details.
      * @param dispatcher handles incoming {@link Socket} connections. This MUST be
      *                   non-blocking and should simply set appropriate socket options
      *                   based on the server configuration and then dispatch it to a
      *                   separate thread for processing.
      */
-    public Acceptor(InetAddress host, int port, Consumer<Socket> dispatcher) {
-        this.address = new InetSocketAddress(host, port);
+    public Acceptor(InetAddress host, Port port, Consumer<Socket> dispatcher) {
+        this(host, port, dispatcher, () -> Thread.ofPlatform().daemon(false));
+    }
+
+    /**
+     * Initializes our acceptor loop. After this, call {@code #start()}
+     *
+     * @param host the {@link InetAddress} representing the host on which the server
+     *             will listen for connections.
+     * @param port the port on which the socket will listen, or a port range. See
+     *             {@link Port} for more details.
+     * @param dispatcher handles incoming {@link Socket} connections. This blocks
+     *                   the thread created by {@code threadBuilder}.
+     * @param threadBuilder builds the thread used to accept incoming connections.
+     */
+    public Acceptor(InetAddress host, Port port, Consumer<Socket> dispatcher, Supplier<Thread.Builder> threadBuilder) {
+        this.host = host;
+        this.port = port;
         this.dispatcher = dispatcher;
+        this.threadBuilder = threadBuilder;
     }
 
     public synchronized int start() throws IOException {
@@ -80,8 +103,10 @@ public class Acceptor implements Closeable {
             serverSocket = new ServerSocket();
             // allow for quick restart
             serverSocket.setReuseAddress(true);
-            // relatively low backlog since we expect few connections
-            serverSocket.bind(address, 50);
+            switch (port) {
+                case Port.FixedPort p -> serverSocket.bind(new InetSocketAddress(host, p.port()), SOCKET_BACKLOG);
+                case Port.PortRange p -> bindInRange(serverSocket, p.start(), p.end());
+            }
         } catch (IOException e) {
             close();
             throw e;
@@ -89,11 +114,31 @@ public class Acceptor implements Closeable {
 
         state = State.RUNNING;
 
-        thread = new Thread(this::run, "Acceptor-%s:%d".formatted(address.getHostString(), address.getPort()));
-        thread.setDaemon(false); // block shutdown until fully closed
-        thread.start();
+        InetSocketAddress address = (InetSocketAddress) serverSocket.getLocalSocketAddress();
+        LOG.info("Listening on " + address);
+        thread = threadBuilder
+                .get()
+                .name("Acceptor-%s:%d".formatted(address.getHostString(), address.getPort()))
+                .start(this::run);
 
         return serverSocket.getLocalPort();
+    }
+
+    // try random ports until we find one that is available
+    private void bindInRange(ServerSocket socket, int startPort, int endPort) throws IOException {
+        int range = endPort - startPort + 1;
+
+        for (int i = 0; i < range; i++) {
+            int port = startPort + ThreadLocalRandom.current().nextInt(range);
+            try {
+                socket.bind(new InetSocketAddress(host, port), SOCKET_BACKLOG);
+                return;
+            } catch (IOException e) {
+                LOG.log(Level.FINEST, "Failed to bind to port " + port, e);
+            }
+        }
+
+        throw new IOException("Failed to bind port in range " + startPort + "-" + endPort);
     }
 
     private void run() {

@@ -31,6 +31,7 @@
  */
 package com.jessegrabowski.irc.args;
 
+import com.jessegrabowski.irc.network.Port;
 import com.jessegrabowski.irc.util.Resource;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
@@ -68,6 +69,9 @@ public interface ArgsParserBuilder<T extends ArgsProperties> {
             BiConsumer<T, Integer> propertiesSetter,
             String description,
             boolean required);
+
+    ArgsParserBuilder<T> addPortFlag(
+            char shortKey, String longKey, BiConsumer<T, Port> propertiesSetter, String description, boolean required);
 
     ArgsParserBuilder<T> addCharsetFlag(
             char shortKey,

@@ -33,10 +33,13 @@ package com.jessegrabowski.irc.args;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.jessegrabowski.irc.network.Port;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class ArgsParserTest {
 
@@ -103,6 +106,15 @@ class ArgsParserTest {
         TestProps props = parse(parser, "--count", "42");
 
         assertEquals(42, props.count);
+    }
+
+    @Test
+    void parsesPortFlag() throws ArgsParserHelpRequestedException {
+        ArgsParserBuilder<TestProps> parser = newParser().addPortFlag('p', "port", (p, v) -> p.port = v, "port", false);
+
+        TestProps props = parse(parser, "--port", "42");
+
+        assertEquals(new Port.FixedPort(42), props.port);
     }
 
     @Test
@@ -712,6 +724,14 @@ class ArgsParserTest {
         assertThrows(ArgsParserHelpRequestedException.class, () -> parse(builder, "-h"));
     }
 
+    @ParameterizedTest(name = "port={0}")
+    @CsvSource({"-1-200", "1-200-", "-50", "70000"})
+    void badPortRangeThrowsCorrectException(String value) {
+        ArgsParserBuilder<TestProps> parser = newParser().addPortFlag('p', "port", (p, v) -> p.port = v, "port", false);
+
+        assertThrows(IllegalArgumentException.class, () -> parse(parser, "--port", value));
+    }
+
     private static class TestProps implements ArgsProperties {
         boolean verbose;
         String output;
@@ -720,6 +740,7 @@ class ArgsParserTest {
         String message;
         List<String> extraArgs;
         Charset charset;
+        Port port;
 
         @Override
         public void validate() {

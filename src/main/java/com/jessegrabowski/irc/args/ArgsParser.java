@@ -31,6 +31,7 @@
  */
 package com.jessegrabowski.irc.args;
 
+import com.jessegrabowski.irc.network.Port;
 import com.jessegrabowski.irc.util.Resource;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -137,6 +138,14 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             boolean required) {
         addFlagSpec(
                 new FlagSpec<>(shortKey, longKey, true, propertiesSetter, this::tryParseInt, description, required));
+        return this;
+    }
+
+    @Override
+    public ArgsParserBuilder<T> addPortFlag(
+            char shortKey, String longKey, BiConsumer<T, Port> propertiesSetter, String description, boolean required) {
+        addFlagSpec(
+                new FlagSpec<>(shortKey, longKey, true, propertiesSetter, this::tryParsePort, description, required));
         return this;
     }
 
@@ -249,6 +258,20 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("expected integer but got '%s'".formatted(value), e);
+        }
+    }
+
+    private Port tryParsePort(String value) {
+        try {
+            if (value.length() > 1 && value.substring(1).contains("-")) {
+                String[] parts = value.split("-", 2);
+                return new Port.PortRange(tryParseInt(parts[0]), tryParseInt(parts[1]));
+            } else {
+                return new Port.FixedPort(Integer.parseInt(value));
+            }
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "expected port (123) or range (123-321) but got '%s'".formatted(value), e);
         }
     }
 

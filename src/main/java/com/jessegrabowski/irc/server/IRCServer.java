@@ -56,8 +56,7 @@ public class IRCServer {
         ArgsParser<IRCServerProperties> argsParser = ArgsParser.builder(
                         IRCServerProperties::new, true, "Pure-Java IRC Server")
                 .addUsageExample("java -cp [jarfile] com.jessegrabowski.irc.server.IRCServer [options] [args]")
-                .addIntegerFlag(
-                        'p', "port", IRCServerProperties::setPort, "port of the IRC server (default 6667)", false)
+                .addPortFlag('p', "port", IRCServerProperties::setPort, "port of the IRC server (default 6667)", false)
                 .addStringFlag(
                         'H',
                         "host",
@@ -99,6 +98,12 @@ public class IRCServer {
                         "maximum depth of nickname history (default 200)",
                         false)
                 .addResourceFlag('M', "motd", IRCServerProperties::setMotd, "location of MOTD file (.txt)", false)
+                .addPortFlag(
+                        'D',
+                        "dcc-port",
+                        IRCServerProperties::setDccPort,
+                        "port for DCC connections (default 49152-65535)",
+                        false)
                 .build();
 
         ArgsTokenizer tokenizer = new ArgsTokenizer();

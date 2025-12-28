@@ -32,6 +32,7 @@
 package com.jessegrabowski.irc.server;
 
 import com.jessegrabowski.irc.args.ArgsProperties;
+import com.jessegrabowski.irc.network.Port;
 import com.jessegrabowski.irc.util.Resource;
 import java.nio.file.Paths;
 import java.util.logging.Level;
@@ -39,7 +40,7 @@ import java.util.logging.Level;
 public class IRCServerProperties implements ArgsProperties {
     private String host = "127.0.0.1";
     private String server = "ritsirc";
-    private int port = 6667;
+    private Port port = new Port.FixedPort(6667);
     private String password;
     private String logFile = "irc-server.log";
     private String logLevel = Level.INFO.getName();
@@ -50,12 +51,11 @@ public class IRCServerProperties implements ArgsProperties {
     private String operatorPassword = "password";
     private int maxNicknameHistory = 200;
     private Resource motd = Resource.of("classpath:/motd.txt");
+    // use the IANA dynamic/private port range by default
+    private Port dccPort = new Port.PortRange(49152, 65535);
 
     @Override
     public void validate() {
-        if (port < 0 || port > 65535) {
-            throw new IllegalArgumentException("port must be between 0 and 65535");
-        }
         try {
             Paths.get(logFile);
         } catch (Exception e) {
@@ -94,11 +94,11 @@ public class IRCServerProperties implements ArgsProperties {
         this.server = server;
     }
 
-    public int getPort() {
+    public Port getPort() {
         return port;
     }
 
-    public void setPort(int port) {
+    public void setPort(Port port) {
         this.port = port;
     }
 
@@ -180,5 +180,13 @@ public class IRCServerProperties implements ArgsProperties {
 
     public void setMotd(Resource motd) {
         this.motd = motd;
+    }
+
+    public Port getDccPort() {
+        return dccPort;
+    }
+
+    public void setDccPort(Port dccPort) {
+        this.dccPort = dccPort;
     }
 }

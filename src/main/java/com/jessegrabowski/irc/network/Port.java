@@ -29,13 +29,28 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.protocol.model;
+package com.jessegrabowski.irc.network;
 
-public final class FileTransferOperationGoodbye extends FileTransferOperation {
+public sealed interface Port {
+    record FixedPort(int port) implements Port {
+        public FixedPort {
+            if (port < 0 || port > 65535) {
+                throw new IllegalArgumentException("Port must be between 0 and 65535");
+            }
+        }
+    }
 
-    public static final FileTransferOperationCode OP_CODE = FileTransferOperationCode.GOODBYE;
-
-    public FileTransferOperationGoodbye() {
-        super(OP_CODE);
+    record PortRange(int start, int end) implements Port {
+        public PortRange {
+            if (start < 0 || start > 65535) {
+                throw new IllegalArgumentException("Start port must be between 0 and 65535");
+            }
+            if (end < 0 || end > 65535) {
+                throw new IllegalArgumentException("End port must be between 0 and 65535");
+            }
+            if (start > end) {
+                throw new IllegalArgumentException("Start port must be less than end port");
+            }
+        }
     }
 }
