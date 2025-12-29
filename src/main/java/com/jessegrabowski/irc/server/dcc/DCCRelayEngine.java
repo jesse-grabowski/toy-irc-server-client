@@ -36,11 +36,14 @@ import com.jessegrabowski.irc.server.IRCServerProperties;
 import com.jessegrabowski.irc.util.StateGuard;
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.Socket;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -49,6 +52,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -99,118 +105,82 @@ public class DCCRelayEngine implements Closeable {
         listeners.forEach(listener -> listener.onEvent(event));
     }
 
-    private DCCPipeHolder createPipeHolder(UUID token) {
-        DCCPipeHolder holder = new DCCPipeHolder(new DCCPipe());
-        holder.finalizerTask = executor.schedule(() -> finalizePipe(token), 10, TimeUnit.MINUTES);
-        return holder;
-    }
-
-    public void openForReceiver(UUID token) {
+    public CompletableFuture<Integer> openForReceiver(UUID token) {
         if (closed.get()) {
             throw new IllegalStateException("DCC Engine is closed");
         }
 
-        executor.execute(() -> {
-            Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
-            DCCPipeHolder holder = pipes.computeIfAbsent(token, this::createPipeHolder);
-            if (holder.receiverAcceptor != null) {
-                return;
-            }
-
-            final DCCPipe pipe = holder.pipe;
-            holder.receiverAcceptor = new Acceptor(
-                    null,
-                    properties.getDccPortRange(),
-                    socket -> {
-                        executor.execute(() -> sendEvent(new DCCEventReceiverConnected(token)));
-                        if (!pipe.bindReceiver(socket)) {
-                            // this really shouldn't be possible but just in case something goes weird
-                            LOG.log(Level.WARNING, "Failed to bind DCC receiver socket to pipe");
-                            return false;
-                        }
-                        if (!pipe.waitForPartner(3, TimeUnit.MINUTES)) {
-                            LOG.log(Level.WARNING, "Timed out waiting for DCC sender to connect");
-                            executor.execute(() -> finalizePipe(token));
-                            return false;
-                        }
-                        try {
-                            boolean bothSidesFinished = pipe.pipeReceiverToSender();
-                            if (bothSidesFinished) {
-                                executor.execute(() -> finalizePipe(token));
-                            }
-                        } catch (IOException e) {
-                            LOG.log(Level.WARNING, "Error relaying DCC data (receiver -> sender)", e);
-                            executor.execute(() -> finalizePipe(token));
-                        }
-                        return false;
-                    },
-                    Thread::ofVirtual);
-
-            int port;
-            try {
-                port = holder.receiverAcceptor.start();
-            } catch (IOException e) {
-                LOG.log(Level.WARNING, "Error starting receiver acceptor", e);
-                finalizePipe(token);
-                return;
-            }
-
-            sendEvent(new DCCEventReceiverOpened(token, port));
-        });
+        return CompletableFuture.supplyAsync(
+                () -> openPipe(
+                        token,
+                        DCCPipeHolder::getReceiverAcceptor,
+                        DCCPipeHolder::setReceiverAcceptor,
+                        DCCEventReceiverConnected::new,
+                        DCCEventReceiverOpened::new),
+                executor);
     }
 
-    public void openForSender(UUID token) {
+    public CompletableFuture<Integer> openForSender(UUID token) {
         if (closed.get()) {
             throw new IllegalStateException("DCC Engine is closed");
         }
 
-        executor.execute(() -> {
-            Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
-            DCCPipeHolder holder = pipes.computeIfAbsent(token, this::createPipeHolder);
-            if (holder.senderAcceptor != null) {
-                return;
-            }
+        return CompletableFuture.supplyAsync(
+                () -> openPipe(
+                        token,
+                        DCCPipeHolder::getSenderAcceptor,
+                        DCCPipeHolder::setSenderAcceptor,
+                        DCCEventSenderConnected::new,
+                        DCCEventSenderOpened::new),
+                executor);
+    }
 
-            final DCCPipe pipe = holder.pipe;
-            holder.senderAcceptor = new Acceptor(
-                    null,
-                    properties.getDccPortRange(),
-                    socket -> {
-                        executor.execute(() -> sendEvent(new DCCEventSenderConnected(token)));
-                        if (!pipe.bindSender(socket)) {
-                            // this really shouldn't be possible but just in case something goes weird
-                            LOG.log(Level.WARNING, "Failed to bind DCC sender socket to pipe");
-                            return false;
-                        }
-                        if (!pipe.waitForPartner(3, TimeUnit.MINUTES)) {
-                            LOG.log(Level.WARNING, "Timed out waiting for DCC receiver to connect");
-                            executor.execute(() -> finalizePipe(token));
-                            return false;
-                        }
-                        try {
-                            boolean bothSidesFinished = pipe.pipeSenderToReceiver();
-                            if (bothSidesFinished) {
-                                executor.execute(() -> finalizePipe(token));
-                            }
-                        } catch (IOException e) {
-                            LOG.log(Level.WARNING, "Error relaying DCC data (sender -> receiver)", e);
-                            executor.execute(() -> finalizePipe(token));
-                        }
-                        return false;
-                    },
-                    Thread::ofVirtual);
+    private int openPipe(
+            UUID token,
+            Function<DCCPipeHolder, Acceptor> accepterGetter,
+            BiConsumer<DCCPipeHolder, Acceptor> accepterSetter,
+            Function<UUID, DCCEvent> connectedEventFactory,
+            BiFunction<UUID, Integer, DCCEvent> openedEventFactory) {
+        Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
+        DCCPipeHolder holder = pipes.computeIfAbsent(token, this::createPipeHolder);
+        if (accepterGetter.apply(holder) != null) {
+            return -1;
+        }
 
-            int port;
-            try {
-                port = holder.senderAcceptor.start();
-            } catch (IOException e) {
-                LOG.log(Level.WARNING, "Error starting sender acceptor", e);
-                finalizePipe(token);
-                return;
-            }
+        Acceptor acceptor = new Acceptor(
+                null,
+                properties.getDccPortRange(),
+                socket -> doPipe(socket, token, holder, connectedEventFactory),
+                Thread::ofVirtual);
 
-            sendEvent(new DCCEventSenderOpened(token, port));
-        });
+        accepterSetter.accept(holder, acceptor);
+
+        int port;
+        try {
+            port = acceptor.start();
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Error starting acceptor", e);
+            finalizePipe(token);
+            return -1;
+        }
+
+        sendEvent(openedEventFactory.apply(token, port));
+        return port;
+    }
+
+    private boolean doPipe(
+            Socket socket, UUID token, DCCPipeHolder holder, Function<UUID, DCCEvent> connectedEventFactory) {
+        try (socket) {
+            holder.getSockets().add(socket);
+            DCCRelayPipe pipe = holder.getPipe();
+            executor.execute(() -> sendEvent(connectedEventFactory.apply(token)));
+            pipe.join(socket, 3, TimeUnit.MINUTES);
+            executor.execute(() -> finalizePipe(token));
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Error relaying DCC data", e);
+            executor.execute(() -> finalizePipe(token));
+        }
+        return false;
     }
 
     public void cancel(UUID token) {
@@ -223,8 +193,17 @@ public class DCCRelayEngine implements Closeable {
         if (holder == null) {
             return;
         }
-        if (holder.finalizerTask != null) {
-            holder.finalizerTask.cancel(false);
+        if (holder.getFinalizerTask() != null) {
+            holder.getFinalizerTask().cancel(false);
+        }
+        for (Socket socket : Set.copyOf(holder.getSockets())) {
+            if (!socket.isClosed()) {
+                try {
+                    socket.close();
+                } catch (IOException _) {
+                    // ignored
+                }
+            }
         }
         if (holder.senderAcceptor != null) {
             holder.senderAcceptor.close();
@@ -232,8 +211,13 @@ public class DCCRelayEngine implements Closeable {
         if (holder.receiverAcceptor != null) {
             holder.receiverAcceptor.close();
         }
-        holder.pipe.close();
         sendEvent(new DCCEventTransferClosed(token));
+    }
+
+    private DCCPipeHolder createPipeHolder(UUID token) {
+        DCCPipeHolder holder = new DCCPipeHolder(new DCCRelayPipe());
+        holder.setFinalizerTask(executor.schedule(() -> finalizePipe(token), 10, TimeUnit.MINUTES));
+        return holder;
     }
 
     private Runnable spy(Runnable runnable) {
@@ -272,14 +256,49 @@ public class DCCRelayEngine implements Closeable {
     }
 
     private class DCCPipeHolder {
-        private final DCCPipe pipe;
+
+        private final Set<Socket> sockets = ConcurrentHashMap.newKeySet(2);
+
+        private final DCCRelayPipe pipe;
 
         private Acceptor senderAcceptor;
         private Acceptor receiverAcceptor;
         private ScheduledFuture<?> finalizerTask;
 
-        public DCCPipeHolder(DCCPipe pipe) {
+        public DCCPipeHolder(DCCRelayPipe pipe) {
             this.pipe = pipe;
+        }
+
+        public Acceptor getSenderAcceptor() {
+            return senderAcceptor;
+        }
+
+        public void setSenderAcceptor(Acceptor senderAcceptor) {
+            this.senderAcceptor = senderAcceptor;
+        }
+
+        public Acceptor getReceiverAcceptor() {
+            return receiverAcceptor;
+        }
+
+        public void setReceiverAcceptor(Acceptor receiverAcceptor) {
+            this.receiverAcceptor = receiverAcceptor;
+        }
+
+        public ScheduledFuture<?> getFinalizerTask() {
+            return finalizerTask;
+        }
+
+        public void setFinalizerTask(ScheduledFuture<?> finalizerTask) {
+            this.finalizerTask = finalizerTask;
+        }
+
+        public DCCRelayPipe getPipe() {
+            return pipe;
+        }
+
+        public Set<Socket> getSockets() {
+            return sockets;
         }
     }
 }

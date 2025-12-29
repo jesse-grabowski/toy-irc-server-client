@@ -148,7 +148,7 @@ public class Acceptor implements Closeable {
                     Socket socket = serverSocket.accept();
                     try {
                         if (!dispatcher.dispatch(socket)) {
-                            LOG.info("Dispatcher returned false, closing server socket");
+                            LOG.fine("Dispatcher returned false, closing server socket");
                             return;
                         }
                     } catch (Exception e) {
