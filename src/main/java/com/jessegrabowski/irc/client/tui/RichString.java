@@ -35,6 +35,7 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -113,7 +114,7 @@ public abstract sealed class RichString
 
     public abstract RichString substring(int start, int end);
 
-    public static final class TextRichString extends RichString {
+    static final class TextRichString extends RichString {
         private final String text;
 
         TextRichString(String text) {
@@ -153,9 +154,21 @@ public abstract sealed class RichString
         public String toString() {
             return text;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            TextRichString that = (TextRichString) o;
+            return Objects.equals(text, that.text);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(text);
+        }
     }
 
-    public static final class BackgroundColorRichString extends RichString {
+    static final class BackgroundColorRichString extends RichString {
         private final Color color;
         private final boolean auto;
         private final RichString child;
@@ -204,9 +217,21 @@ public abstract sealed class RichString
         public String toString() {
             return child.toString();
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            BackgroundColorRichString that = (BackgroundColorRichString) o;
+            return auto == that.auto && Objects.equals(color, that.color) && Objects.equals(child, that.child);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(color, auto, child);
+        }
     }
 
-    public static final class ForegroundColorRichString extends RichString {
+    static final class ForegroundColorRichString extends RichString {
         private final Color color;
         private final boolean auto;
         private final RichString child;
@@ -255,9 +280,21 @@ public abstract sealed class RichString
         public String toString() {
             return child.toString();
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            ForegroundColorRichString that = (ForegroundColorRichString) o;
+            return auto == that.auto && Objects.equals(color, that.color) && Objects.equals(child, that.child);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(color, auto, child);
+        }
     }
 
-    public static final class BoldRichString extends RichString {
+    static final class BoldRichString extends RichString {
 
         private final RichString child;
 
@@ -295,9 +332,21 @@ public abstract sealed class RichString
         public String toString() {
             return child.toString();
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            BoldRichString that = (BoldRichString) o;
+            return Objects.equals(child, that.child);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(child);
+        }
     }
 
-    public static final class CompositeRichString extends RichString {
+    static final class CompositeRichString extends RichString {
 
         private final RichString[] children;
 
@@ -389,6 +438,18 @@ public abstract sealed class RichString
         @Override
         public String toString() {
             return Arrays.stream(children).map(RichString::toString).collect(Collectors.joining());
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            CompositeRichString that = (CompositeRichString) o;
+            return Arrays.equals(children, that.children);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(children);
         }
     }
 }

@@ -103,13 +103,21 @@ public class FancyTerminalUI extends TerminalUI {
 
     @Override
     public synchronized void setPrompt(RichString prompt) {
-        this.prompt = (prompt != null) ? prompt : RichString.s("");
+        RichString newPrompt = Objects.requireNonNullElseGet(prompt, () -> RichString.s(""));
+        if (Objects.equals(newPrompt, this.prompt)) {
+            return;
+        }
+        this.prompt = newPrompt;
         renderFooter();
     }
 
     @Override
     public synchronized void setStatus(RichString status) {
-        this.status = (status != null) ? status : RichString.s("");
+        RichString newStatus = Objects.requireNonNullElseGet(status, () -> RichString.s(""));
+        if (Objects.equals(newStatus, this.status)) {
+            return;
+        }
+        this.status = newStatus;
         renderFooter();
     }
 

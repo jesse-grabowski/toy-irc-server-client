@@ -33,11 +33,11 @@ package com.jessegrabowski.irc.server.dcc;
 
 import java.util.UUID;
 
-public final class DCCEventSenderOpened extends DCCEvent {
+public final class DCCServerEventSenderOpened extends DCCServerEvent {
 
     private final int port;
 
-    DCCEventSenderOpened(UUID token, int port) {
+    DCCServerEventSenderOpened(UUID token, int port) {
         super(token);
         this.port = port;
     }

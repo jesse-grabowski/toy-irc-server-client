@@ -58,8 +58,8 @@ import org.junit.jupiter.api.Test;
 class DCCRelayEngineTest {
 
     DCCRelayEngine engine;
-    BlockingQueue<DCCEvent> events;
-    DCCEventListener eventSink;
+    BlockingQueue<DCCServerEvent> events;
+    DCCServerEventListener eventSink;
 
     @BeforeEach
     void setUp() {
@@ -166,7 +166,7 @@ class DCCRelayEngineTest {
 
         engine.cancel(token);
 
-        awaitEvent(DCCEventTransferClosed.class, token, Duration.ofSeconds(2));
+        awaitEvent(DCCServerEventTransferClosed.class, token, Duration.ofSeconds(2));
 
         assertConnectFails(receiverPort);
         assertConnectFails(senderPort);
@@ -184,8 +184,8 @@ class DCCRelayEngineTest {
             receiver.setSoTimeout(2000);
             sender.setSoTimeout(2000);
 
-            awaitEvent(DCCEventReceiverConnected.class, token, Duration.ofSeconds(2));
-            awaitEvent(DCCEventSenderConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(2));
 
             byte[] payload = new byte[256 * 1024];
             Arrays.fill(payload, (byte) 0x5A);
@@ -205,7 +205,7 @@ class DCCRelayEngineTest {
 
             engine.cancel(token);
 
-            awaitEvent(DCCEventTransferClosed.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventTransferClosed.class, token, Duration.ofSeconds(2));
 
             assertEventuallySocketCloses(receiver, Duration.ofSeconds(2));
             assertEventuallySocketCloses(sender, Duration.ofSeconds(2));
@@ -227,8 +227,8 @@ class DCCRelayEngineTest {
 
         try (receiver;
                 sender) {
-            awaitEvent(DCCEventReceiverConnected.class, token, Duration.ofSeconds(2));
-            awaitEvent(DCCEventSenderConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(2));
 
             CompletableFuture<Void> writer = CompletableFuture.runAsync(() -> {
                 try {
@@ -276,10 +276,10 @@ class DCCRelayEngineTest {
             receiverB.setSoTimeout(2000);
             senderB.setSoTimeout(2000);
 
-            awaitEvent(DCCEventReceiverConnected.class, tokenA, Duration.ofSeconds(2));
-            awaitEvent(DCCEventSenderConnected.class, tokenA, Duration.ofSeconds(2));
-            awaitEvent(DCCEventReceiverConnected.class, tokenB, Duration.ofSeconds(2));
-            awaitEvent(DCCEventSenderConnected.class, tokenB, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, tokenA, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, tokenA, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, tokenB, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, tokenB, Duration.ofSeconds(2));
 
             byte[] msgA = "tokenA-HELLO".getBytes();
             byte[] msgB = "tokenB-WORLD".getBytes();
@@ -304,24 +304,24 @@ class DCCRelayEngineTest {
         int receiverPort = engine.openForReceiver(token).get(5, TimeUnit.SECONDS);
         int senderPort = engine.openForSender(token).get(5, TimeUnit.SECONDS);
 
-        DCCEventReceiverOpened ro = awaitEvent(DCCEventReceiverOpened.class, token, Duration.ofSeconds(2));
+        DCCServerEventReceiverOpened ro = awaitEvent(DCCServerEventReceiverOpened.class, token, Duration.ofSeconds(2));
         assertEquals(receiverPort, ro.getPort());
 
-        DCCEventSenderOpened so = awaitEvent(DCCEventSenderOpened.class, token, Duration.ofSeconds(2));
+        DCCServerEventSenderOpened so = awaitEvent(DCCServerEventSenderOpened.class, token, Duration.ofSeconds(2));
         assertEquals(senderPort, so.getPort());
 
         try (Socket receiver = connectLoopback(receiverPort);
                 Socket sender = connectLoopback(senderPort)) {
 
-            awaitEvent(DCCEventReceiverConnected.class, token, Duration.ofSeconds(2));
-            awaitEvent(DCCEventSenderConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(2));
 
             engine.cancel(token);
             engine.cancel(token);
 
-            awaitEvent(DCCEventTransferClosed.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventTransferClosed.class, token, Duration.ofSeconds(2));
 
-            assertFalse(containsAnother(DCCEventTransferClosed.class, token, Duration.ofMillis(250)));
+            assertFalse(containsAnother(DCCServerEventTransferClosed.class, token, Duration.ofMillis(250)));
         }
     }
 
@@ -334,11 +334,11 @@ class DCCRelayEngineTest {
         try (Socket sender = connectLoopback(senderPort)) {
             sender.setSoTimeout(2000);
 
-            awaitEvent(DCCEventSenderConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(2));
 
             engine.cancel(token);
 
-            awaitEvent(DCCEventTransferClosed.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventTransferClosed.class, token, Duration.ofSeconds(2));
 
             assertEventuallySocketCloses(sender, Duration.ofSeconds(2));
         }
@@ -360,8 +360,8 @@ class DCCRelayEngineTest {
 
         try (receiver;
                 sender) {
-            awaitEvent(DCCEventReceiverConnected.class, token, Duration.ofSeconds(2));
-            awaitEvent(DCCEventSenderConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(2));
 
             byte[] payload = new byte[256 * 1024];
             Arrays.fill(payload, (byte) 0x33);
@@ -386,7 +386,7 @@ class DCCRelayEngineTest {
             // we need to drain the queue so that the receiver notices the reset
             receiver.getInputStream().readAllBytes();
 
-            awaitEvent(DCCEventTransferClosed.class, token, Duration.ofSeconds(5));
+            awaitEvent(DCCServerEventTransferClosed.class, token, Duration.ofSeconds(5));
 
             assertEventuallySocketCloses(receiver, Duration.ofSeconds(5));
 
@@ -526,7 +526,8 @@ class DCCRelayEngineTest {
         fail("Socket did not close within " + within);
     }
 
-    private <T extends DCCEvent> T awaitEvent(Class<T> type, UUID token, Duration timeout) throws InterruptedException {
+    private <T extends DCCServerEvent> T awaitEvent(Class<T> type, UUID token, Duration timeout)
+            throws InterruptedException {
         long deadline = System.nanoTime() + timeout.toNanos();
         while (true) {
             long remaining = deadline - System.nanoTime();
@@ -535,7 +536,7 @@ class DCCRelayEngineTest {
             }
 
             long waitMs = Math.min(TimeUnit.NANOSECONDS.toMillis(remaining), 250);
-            DCCEvent e = events.poll(waitMs, TimeUnit.MILLISECONDS);
+            DCCServerEvent e = events.poll(waitMs, TimeUnit.MILLISECONDS);
             if (e == null) {
                 continue;
             }
@@ -548,11 +549,11 @@ class DCCRelayEngineTest {
         }
     }
 
-    private boolean containsAnother(Class<? extends DCCEvent> type, UUID token, Duration within)
+    private boolean containsAnother(Class<? extends DCCServerEvent> type, UUID token, Duration within)
             throws InterruptedException {
         long deadline = System.nanoTime() + within.toNanos();
         while (System.nanoTime() < deadline) {
-            DCCEvent e = events.poll(25, TimeUnit.MILLISECONDS);
+            DCCServerEvent e = events.poll(25, TimeUnit.MILLISECONDS);
             if (e == null) {
                 continue;
             }

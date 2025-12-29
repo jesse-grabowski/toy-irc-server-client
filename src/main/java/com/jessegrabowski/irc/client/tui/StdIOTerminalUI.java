@@ -34,6 +34,9 @@ package com.jessegrabowski.irc.client.tui;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class StdIOTerminalUI extends TerminalUI {
@@ -41,46 +44,67 @@ public class StdIOTerminalUI extends TerminalUI {
     private static final Logger LOG = Logger.getLogger(StdIOTerminalUI.class.getName());
 
     private final BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+    private final AtomicBoolean statusChanged = new AtomicBoolean(false);
+
+    private volatile String prompt = "[Type Something]:";
+    private volatile String status;
 
     @Override
     protected void process() {
         try {
-            // Blocking read. Returns null on EOF.
+            if (statusChanged.compareAndSet(true, false) && status != null && !status.isBlank()) {
+                System.out.println(status);
+            }
+            System.out.print(prompt + " ");
             String line = reader.readLine();
             if (line == null) {
-                // EOF: stop the UI loop gracefully
                 stop();
                 return;
             }
-            dispatchInput(line);
+            dispatchInput(line).get();
+            if (System.console() != null) {
+                for (char c : "|/-\\".repeat(2).toCharArray()) {
+                    System.out.print("\r\033[2K");
+                    System.out.print("\rSending " + c);
+                    System.out.flush();
+                    Thread.sleep(125);
+                }
+                System.out.print("\r\033[2K");
+            }
         } catch (IOException e) {
-            // Treat IO errors as termination
             stop();
         } catch (Exception e) {
-            // If interrupted during blocking read, exit the loop
+            LOG.log(Level.SEVERE, "Error processing input", e);
             if (Thread.currentThread().isInterrupted()) {
+                LOG.log(Level.SEVERE, "IO thread interrupted, terminating...", e);
                 stop();
             }
         }
     }
 
     @Override
-    public void println(TerminalMessage message) {
-        System.out.println(message.message());
+    public synchronized void println(TerminalMessage message) {
+        System.out.printf(
+                "\r%s: (%s) -> (%s): %s%n", message.time(), message.sender(), message.receiver(), message.message());
+        System.out.print(prompt + " ");
     }
 
     @Override
     protected void initialize() {
-        LOG.info("Initializing com.jessegrabowski.irc.client.tui.StdIOTerminalUI");
+        LOG.info("Initializing StdIOTerminalUI");
     }
 
     @Override
-    public void setPrompt(RichString prompt) {
-        // No-op
+    public synchronized void setPrompt(RichString prompt) {
+        this.prompt = prompt.toString();
     }
 
     @Override
-    public void setStatus(RichString status) {
-        // No-op
+    public synchronized void setStatus(RichString status) {
+        if (Objects.equals(status, this.status)) {
+            return;
+        }
+        this.status = status.toString();
+        statusChanged.set(true);
     }
 }

@@ -33,9 +33,9 @@ package com.jessegrabowski.irc.server.dcc;
 
 import java.util.UUID;
 
-public final class DCCEventReceiverConnected extends DCCEvent {
+public final class DCCServerEventReceiverConnected extends DCCServerEvent {
 
-    DCCEventReceiverConnected(UUID token) {
+    DCCServerEventReceiverConnected(UUID token) {
         super(token);
     }
 }

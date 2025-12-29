@@ -88,6 +88,13 @@ public class ClientCommandParser {
                         .addUsageExample("/exit")
                         .build());
         parsers.put(
+                "/focus",
+                ArgsParser.builder(ClientCommandFocus::new, false, "focus a channel")
+                        .addUsageExample("/focus <target>")
+                        .addUsageExample("/focus #channel")
+                        .addStringPositional(0, ClientCommandFocus::setTarget, "channel to focus", true)
+                        .build());
+        parsers.put(
                 "/help",
                 ArgsParser.builder(ClientCommandHelp::new, false, "view information about commands")
                         .addUsageExample("/help [<command>]")

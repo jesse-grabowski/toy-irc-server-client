@@ -69,6 +69,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -242,9 +243,11 @@ public class IRCClientEngine implements Closeable {
         });
     }
 
-    public void accept(ClientCommand command) {
+    public CompletableFuture<Void> accept(ClientCommand command) {
         if (engineState.get() != IRCClientEngineState.CLOSED) {
-            executor.execute(spy(() -> handle(command)));
+            return CompletableFuture.runAsync(spy(() -> handle(command)), executor);
+        } else {
+            return CompletableFuture.completedFuture(null);
         }
     }
 
@@ -1348,6 +1351,7 @@ public class IRCClientEngine implements Closeable {
             case ClientCommandBack c -> handle(c);
             case ClientCommandConnect c -> handle(c);
             case ClientCommandExit c -> handle(c);
+            case ClientCommandFocus c -> handle(c);
             case ClientCommandHelp c -> {
                 /* handled externally */
             }
@@ -1428,6 +1432,23 @@ public class IRCClientEngine implements Closeable {
 
     private void handle(ClientCommandExit command) {
         close();
+    }
+
+    private void handle(ClientCommandFocus command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not focus -- connection not yet registered"));
+            return;
+        }
+
+        if (!state.focusChannel(command.getTarget())) {
+            terminal.println(makeSystemErrorMessage(s(
+                    "Could not focus, you are not in ",
+                    f(command.getTarget()),
+                    " (try '/join ",
+                    command.getTarget(),
+                    "')")));
+        }
     }
 
     private void handle(ClientCommandJoin command) {

@@ -58,7 +58,7 @@ public class IRCClient {
 
         IRCClientEngine engine = new IRCClientEngine(properties, terminalUI);
         ClientCommandDispatcher parser = new ClientCommandDispatcher(terminalUI, engine);
-        terminalUI.addInputHandler(parser::process);
+        terminalUI.addInputHandler(parser);
         engine.start();
     }
 

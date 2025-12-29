@@ -33,23 +33,22 @@ package com.jessegrabowski.irc.client.tui;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
 
 public abstract class TerminalUI {
 
-    private final List<Consumer<String>> inputHandlers = new ArrayList<>();
+    private final List<TerminalInputHandler> inputHandlers = new ArrayList<>();
 
     private volatile boolean running = false;
     private volatile Thread thread;
 
-    public void addInputHandler(Consumer<String> handler) {
+    public void addInputHandler(TerminalInputHandler handler) {
         inputHandlers.add(handler);
     }
 
-    protected void dispatchInput(String line) {
-        for (Consumer<String> handler : inputHandlers) {
-            handler.accept(line);
-        }
+    protected CompletableFuture<Void> dispatchInput(String line) {
+        return CompletableFuture.allOf(
+                inputHandlers.stream().map(handler -> handler.handle(line)).toArray(CompletableFuture[]::new));
     }
 
     public synchronized void start() {

@@ -29,31 +29,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.client.command.model;
+package com.jessegrabowski.irc.client.tui;
 
-import com.jessegrabowski.irc.args.ArgsProperties;
+import java.util.concurrent.CompletableFuture;
 
-public sealed interface ClientCommand extends ArgsProperties
-        permits ClientCommandAccept,
-                ClientCommandAction,
-                ClientCommandAfk,
-                ClientCommandBack,
-                ClientCommandConnect,
-                ClientCommandExit,
-                ClientCommandFocus,
-                ClientCommandHelp,
-                ClientCommandJoin,
-                ClientCommandKick,
-                ClientCommandKill,
-                ClientCommandList,
-                ClientCommandMode,
-                ClientCommandMsg,
-                ClientCommandMsgCurrent,
-                ClientCommandNick,
-                ClientCommandNotice,
-                ClientCommandOper,
-                ClientCommandPart,
-                ClientCommandQuit,
-                ClientCommandSend,
-                ClientCommandSending,
-                ClientCommandTopic {}
+@FunctionalInterface
+public interface TerminalInputHandler {
+    CompletableFuture<Void> handle(String input);
+}

@@ -34,12 +34,14 @@ package com.jessegrabowski.irc.client.command.model;
 import com.jessegrabowski.irc.client.IRCClientEngine;
 import com.jessegrabowski.irc.client.command.ClientCommandParser;
 import com.jessegrabowski.irc.client.tui.RichString;
+import com.jessegrabowski.irc.client.tui.TerminalInputHandler;
 import com.jessegrabowski.irc.client.tui.TerminalMessage;
 import com.jessegrabowski.irc.client.tui.TerminalUI;
 import java.awt.Color;
 import java.time.LocalTime;
+import java.util.concurrent.CompletableFuture;
 
-public class ClientCommandDispatcher {
+public class ClientCommandDispatcher implements TerminalInputHandler {
 
     private final ClientCommandParser parser = new ClientCommandParser();
 
@@ -51,29 +53,31 @@ public class ClientCommandDispatcher {
         this.ircClientEngine = ircClientEngine;
     }
 
-    public void process(String line) {
+    public CompletableFuture<Void> handle(String line) {
         ClientCommand command;
         try {
             command = parser.parse(line);
         } catch (Exception e) {
             terminalUI.println(new TerminalMessage(
                     LocalTime.now(), RichString.f(Color.YELLOW, "SYSTEM"), null, RichString.s(e.getMessage())));
-            return;
+            return CompletableFuture.completedFuture(null);
         }
 
-        switch (command) {
+        return switch (command) {
             case ClientCommandHelp help
             when help.getCommand() != null -> {
                 String helpText = parser.getHelpText(help.getCommand());
                 terminalUI.println(new TerminalMessage(
                         LocalTime.now(), RichString.f(Color.YELLOW, "SYSTEM"), null, RichString.s(helpText)));
+                yield CompletableFuture.completedFuture(null);
             }
-            case ClientCommandHelp help -> {
+            case ClientCommandHelp _ -> {
                 String helpText = parser.getHelpText();
                 terminalUI.println(new TerminalMessage(
                         LocalTime.now(), RichString.f(Color.YELLOW, "SYSTEM"), null, RichString.s(helpText)));
+                yield CompletableFuture.completedFuture(null);
             }
             default -> ircClientEngine.accept(command);
-        }
+        };
     }
 }

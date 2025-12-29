@@ -62,7 +62,7 @@ public class DCCRelayEngine implements Closeable {
 
     private static final Logger LOG = Logger.getLogger(DCCRelayEngine.class.getName());
 
-    private final List<DCCEventListener> listeners = new CopyOnWriteArrayList<>();
+    private final List<DCCServerEventListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     private final StateGuard<Map<UUID, DCCPipeHolder>> pipesGuard = new StateGuard<>(new HashMap<>());
@@ -97,11 +97,11 @@ public class DCCRelayEngine implements Closeable {
         LOG.info("Started DCC Relay Engine");
     }
 
-    public void addListener(DCCEventListener listener) {
+    public void addListener(DCCServerEventListener listener) {
         listeners.add(listener);
     }
 
-    private void sendEvent(DCCEvent event) {
+    private void sendEvent(DCCServerEvent event) {
         listeners.forEach(listener -> listener.onEvent(event));
     }
 
@@ -115,8 +115,8 @@ public class DCCRelayEngine implements Closeable {
                         token,
                         DCCPipeHolder::getReceiverAcceptor,
                         DCCPipeHolder::setReceiverAcceptor,
-                        DCCEventReceiverConnected::new,
-                        DCCEventReceiverOpened::new),
+                        DCCServerEventReceiverConnected::new,
+                        DCCServerEventReceiverOpened::new),
                 executor);
     }
 
@@ -130,8 +130,8 @@ public class DCCRelayEngine implements Closeable {
                         token,
                         DCCPipeHolder::getSenderAcceptor,
                         DCCPipeHolder::setSenderAcceptor,
-                        DCCEventSenderConnected::new,
-                        DCCEventSenderOpened::new),
+                        DCCServerEventSenderConnected::new,
+                        DCCServerEventSenderOpened::new),
                 executor);
     }
 
@@ -139,8 +139,8 @@ public class DCCRelayEngine implements Closeable {
             UUID token,
             Function<DCCPipeHolder, Acceptor> accepterGetter,
             BiConsumer<DCCPipeHolder, Acceptor> accepterSetter,
-            Function<UUID, DCCEvent> connectedEventFactory,
-            BiFunction<UUID, Integer, DCCEvent> openedEventFactory) {
+            Function<UUID, DCCServerEvent> connectedEventFactory,
+            BiFunction<UUID, Integer, DCCServerEvent> openedEventFactory) {
         Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
         DCCPipeHolder holder = pipes.computeIfAbsent(token, this::createPipeHolder);
         if (accepterGetter.apply(holder) != null) {
@@ -169,7 +169,7 @@ public class DCCRelayEngine implements Closeable {
     }
 
     private boolean doPipe(
-            Socket socket, UUID token, DCCPipeHolder holder, Function<UUID, DCCEvent> connectedEventFactory) {
+            Socket socket, UUID token, DCCPipeHolder holder, Function<UUID, DCCServerEvent> connectedEventFactory) {
         try (socket) {
             holder.getSockets().add(socket);
             DCCRelayPipe pipe = holder.getPipe();
@@ -211,7 +211,7 @@ public class DCCRelayEngine implements Closeable {
         if (holder.receiverAcceptor != null) {
             holder.receiverAcceptor.close();
         }
-        sendEvent(new DCCEventTransferClosed(token));
+        sendEvent(new DCCServerEventTransferClosed(token));
     }
 
     private DCCPipeHolder createPipeHolder(UUID token) {

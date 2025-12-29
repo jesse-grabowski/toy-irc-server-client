@@ -49,14 +49,14 @@ import com.jessegrabowski.irc.protocol.IRCMessageMarshaller;
 import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.*;
-import com.jessegrabowski.irc.server.dcc.DCCEvent;
-import com.jessegrabowski.irc.server.dcc.DCCEventListener;
-import com.jessegrabowski.irc.server.dcc.DCCEventReceiverConnected;
-import com.jessegrabowski.irc.server.dcc.DCCEventReceiverOpened;
-import com.jessegrabowski.irc.server.dcc.DCCEventSenderConnected;
-import com.jessegrabowski.irc.server.dcc.DCCEventSenderOpened;
-import com.jessegrabowski.irc.server.dcc.DCCEventTransferClosed;
 import com.jessegrabowski.irc.server.dcc.DCCRelayEngine;
+import com.jessegrabowski.irc.server.dcc.DCCServerEvent;
+import com.jessegrabowski.irc.server.dcc.DCCServerEventListener;
+import com.jessegrabowski.irc.server.dcc.DCCServerEventReceiverConnected;
+import com.jessegrabowski.irc.server.dcc.DCCServerEventReceiverOpened;
+import com.jessegrabowski.irc.server.dcc.DCCServerEventSenderConnected;
+import com.jessegrabowski.irc.server.dcc.DCCServerEventSenderOpened;
+import com.jessegrabowski.irc.server.dcc.DCCServerEventTransferClosed;
 import com.jessegrabowski.irc.server.state.InvalidPasswordException;
 import com.jessegrabowski.irc.server.state.MessageSource;
 import com.jessegrabowski.irc.server.state.MessageTarget;
@@ -99,7 +99,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Gatherers;
 
-public class IRCServerEngine implements Closeable, DCCEventListener {
+public class IRCServerEngine implements Closeable, DCCServerEventListener {
 
     private static final Instant START_TIME = Instant.now();
 
@@ -2083,21 +2083,21 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
     }
 
     @Override
-    public void onEvent(DCCEvent event) {
+    public void onEvent(DCCServerEvent event) {
         executor.execute(() -> handle(event));
     }
 
-    private void handle(DCCEvent event) {
+    private void handle(DCCServerEvent event) {
         switch (event) {
-            case DCCEventReceiverOpened e -> handle(e);
-            case DCCEventReceiverConnected e -> handle(e);
-            case DCCEventSenderOpened e -> handle(e);
-            case DCCEventSenderConnected e -> handle(e);
-            case DCCEventTransferClosed e -> handle(e);
+            case DCCServerEventReceiverOpened e -> handle(e);
+            case DCCServerEventReceiverConnected e -> handle(e);
+            case DCCServerEventSenderOpened e -> handle(e);
+            case DCCServerEventSenderConnected e -> handle(e);
+            case DCCServerEventTransferClosed e -> handle(e);
         }
     }
 
-    private void handle(DCCEventReceiverOpened event) {
+    private void handle(DCCServerEventReceiverOpened event) {
         ServerState state = serverStateGuard.getState();
         ServerUser sender = state.getDccSender(event.getToken());
         if (sender == null) {
@@ -2132,7 +2132,7 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
                 IRCMessageNOTICE::new);
     }
 
-    private void handle(DCCEventReceiverConnected event) {
+    private void handle(DCCServerEventReceiverConnected event) {
         ServerState state = serverStateGuard.getState();
         ServerUser sender = state.getDccSender(event.getToken());
         if (sender == null) {
@@ -2149,7 +2149,7 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
         dccRelayEngine.openForSender(session.getToken());
     }
 
-    private void handle(DCCEventSenderOpened event) {
+    private void handle(DCCServerEventSenderOpened event) {
         ServerState state = serverStateGuard.getState();
         ServerUser sender = state.getDccSender(event.getToken());
         if (sender == null) {
@@ -2176,7 +2176,7 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
                 IRCMessageCTCPDCCReceive::new);
     }
 
-    private void handle(DCCEventSenderConnected event) {
+    private void handle(DCCServerEventSenderConnected event) {
         ServerState state = serverStateGuard.getState();
         ServerUser sender = state.getDccSender(event.getToken());
         if (sender == null) {
@@ -2191,7 +2191,7 @@ public class IRCServerEngine implements Closeable, DCCEventListener {
         }
     }
 
-    private void handle(DCCEventTransferClosed event) {
+    private void handle(DCCServerEventTransferClosed event) {
         ServerState state = serverStateGuard.getState();
         ServerUser sender = state.getDccSender(event.getToken());
         if (sender == null) {

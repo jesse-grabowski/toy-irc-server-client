@@ -31,6 +31,11 @@
  */
 package com.jessegrabowski.irc.server.dcc;
 
-public interface DCCEventListener {
-    void onEvent(DCCEvent event);
+import java.util.UUID;
+
+public final class DCCServerEventTransferClosed extends DCCServerEvent {
+
+    DCCServerEventTransferClosed(UUID token) {
+        super(token);
+    }
 }
