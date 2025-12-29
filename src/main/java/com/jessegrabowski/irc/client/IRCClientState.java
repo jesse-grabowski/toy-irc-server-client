@@ -31,6 +31,8 @@
  */
 package com.jessegrabowski.irc.client;
 
+import com.jessegrabowski.irc.client.dcc.DCCDownloader;
+import com.jessegrabowski.irc.client.dcc.DCCUploader;
 import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.util.Resource;
@@ -56,9 +58,9 @@ public class IRCClientState {
     private final Map<String, User> users = new HashMap<>();
     private final Map<String, Channel> channels = new HashMap<>();
 
-    private final Map<String, PendingDownload> pendingDownloads = new HashMap<>();
+    private final Map<String, DCCDownload> pendingDownloads = new HashMap<>();
     private final Map<String, PendingUploadKey> pendingUploadIndex = new HashMap<>();
-    private final Map<PendingUploadKey, PendingUpload> pendingUploads = new HashMap<>();
+    private final Map<PendingUploadKey, DCCUpload> pendingUploads = new HashMap<>();
 
     private String me;
 
@@ -464,7 +466,7 @@ public class IRCClientState {
         }
 
         String normalizedNickname = canonicalizeNickname(nickname);
-        PendingUpload upload = new PendingUpload(token, file, normalizedNickname, filename);
+        DCCUpload upload = new DCCUpload(token, file, normalizedNickname, filename);
         PendingUploadKey key = new PendingUploadKey(normalizedNickname, filename);
 
         pendingUploads.put(key, upload);
@@ -478,19 +480,38 @@ public class IRCClientState {
         if (key == null) {
             return false;
         }
-        return pendingUploads.remove(key) != null;
+        DCCUpload upload = pendingUploads.remove(key);
+        if (upload != null && upload.isStarted()) {
+            upload.getUploader().cancel();
+        }
+        return upload != null;
     }
 
-    public Optional<PendingUpload> getUpload(String nickname, String filename) {
+    public Optional<DCCUpload> getUpload(String nickname, String filename) {
         return Optional.ofNullable(pendingUploads.get(new PendingUploadKey(canonicalizeNickname(nickname), filename)));
     }
 
-    public Optional<PendingUpload> getUpload(String token) {
+    public Optional<DCCUpload> getUpload(String token) {
         return Optional.ofNullable(pendingUploads.get(pendingUploadIndex.get(token)));
     }
 
-    public Set<PendingUpload> getPendingUploads() {
+    public Set<DCCUpload> getUploads() {
         return Set.copyOf(pendingUploads.values());
+    }
+
+    public void startUpload(DCCUpload upload, DCCUploader uploader) {
+        if (upload.isStarted()) {
+            throw new IllegalStateException("Upload already started");
+        }
+        upload.setUploader(uploader);
+        uploader.start();
+    }
+
+    public void progressUpload(String token, long progress, Long total) {
+        getUpload(token).ifPresent(upload -> {
+            upload.setProgress(progress);
+            upload.setTotal(total);
+        });
     }
 
     public String registerDownload(String filename, String host, int port, Long size) {
@@ -499,7 +520,7 @@ public class IRCClientState {
             token = String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
         }
 
-        PendingDownload download = new PendingDownload(token, filename, host, port, size);
+        DCCDownload download = new DCCDownload(token, filename, host, port, size);
         pendingDownloads.put(token, download);
 
         return token;
@@ -509,7 +530,7 @@ public class IRCClientState {
         return pendingDownloads.remove(token) != null;
     }
 
-    public Optional<PendingDownload> getDownload(String token) {
+    public Optional<DCCDownload> getDownload(String token) {
         return Optional.ofNullable(pendingDownloads.get(token));
     }
 
@@ -753,7 +774,7 @@ public class IRCClientState {
         }
     }
 
-    public static final class PendingDownload {
+    public static final class DCCDownload {
         private final long expiresAt = System.currentTimeMillis() + 1000 * 60 * 3;
 
         private final String token;
@@ -762,7 +783,9 @@ public class IRCClientState {
         private final int port;
         private final Long size;
 
-        public PendingDownload(String token, String filename, String host, int port, Long size) {
+        private DCCDownloader downloader;
+
+        public DCCDownload(String token, String filename, String host, int port, Long size) {
             this.token = token;
             this.filename = filename;
             this.host = host;
@@ -793,9 +816,17 @@ public class IRCClientState {
         public Long getSize() {
             return size;
         }
+
+        void setDownloader(DCCDownloader downloader) {
+            this.downloader = downloader;
+        }
+
+        DCCDownloader getDownloader() {
+            return downloader;
+        }
     }
 
-    public static final class PendingUpload {
+    public static final class DCCUpload {
 
         private final long expiresAt = System.currentTimeMillis() + 1000 * 60 * 3;
 
@@ -804,7 +835,11 @@ public class IRCClientState {
         private final String nickname;
         private final String filename;
 
-        public PendingUpload(String token, Resource file, String nickname, String filename) {
+        private long progress;
+        private Long total;
+        private DCCUploader uploader;
+
+        public DCCUpload(String token, Resource file, String nickname, String filename) {
             this.token = token;
             this.file = file;
             this.nickname = nickname;
@@ -829,6 +864,34 @@ public class IRCClientState {
 
         public String getFilename() {
             return filename;
+        }
+
+        void setUploader(DCCUploader uploader) {
+            this.uploader = uploader;
+        }
+
+        DCCUploader getUploader() {
+            return uploader;
+        }
+
+        public boolean isStarted() {
+            return uploader != null;
+        }
+
+        public long getProgress() {
+            return progress;
+        }
+
+        void setProgress(long progress) {
+            this.progress = progress;
+        }
+
+        public Long getTotal() {
+            return total;
+        }
+
+        void setTotal(Long total) {
+            this.total = total;
         }
     }
 

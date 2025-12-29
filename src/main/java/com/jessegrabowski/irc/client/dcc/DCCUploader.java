@@ -42,95 +42,122 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class DCCUploader {
 
     private static final Logger LOG = Logger.getLogger(DCCUploader.class.getName());
-    private static final Executor EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static final ThreadFactory THREAD_FACTORY =
+            Thread.ofVirtual().name("IRCClient-DCCUploader-", 0).factory();
+
+    private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean cancelled = new AtomicBoolean();
+    private final AtomicReference<Socket> socketHolder = new AtomicReference<>();
+
+    private final String token;
+    private final DCCClientEventListener listener;
 
     private final Resource file;
-    private final String filename;
     private final String host;
     private final int port;
     private final Long length;
 
-    public DCCUploader(Resource file, String filename, String host, int port, Long length) {
+    public DCCUploader(
+            String token, DCCClientEventListener listener, Resource file, String host, int port, Long length) {
+        this.token = token;
+        this.listener = listener;
         this.file = file;
-        this.filename = filename;
         this.host = host;
         this.port = port;
         this.length = length;
     }
 
-    public void pushAsync() {
-        EXECUTOR.execute(this::upload);
+    public void start() {
+        if (!started.compareAndSet(false, true)) {
+            throw new IllegalStateException("Upload already in progress");
+        }
+        if (cancelled.get()) {
+            return;
+        }
+
+        THREAD_FACTORY.newThread(this::upload).start();
+    }
+
+    public void cancel() {
+        cancelled.set(true);
+        Socket socket = socketHolder.get();
+        if (socket != null) {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                LOG.log(Level.WARNING, "Error closing socket on upload cancellation", e);
+            }
+        }
     }
 
     private void upload() {
-        long totalLength = resolveLength();
+        Long resolvedLength = resolveLength();
+        long acked = 0;
+        long sent = 0;
 
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 15000);
+            socketHolder.set(socket);
             socket.setSoTimeout(60000);
+            socket.setKeepAlive(true);
+            socket.connect(new InetSocketAddress(host, port), 15000);
 
             try (InputStream fileIn = new BufferedInputStream(file.getInputStream());
                     OutputStream socketOut = new BufferedOutputStream(socket.getOutputStream());
                     DataInputStream socketIn = new DataInputStream(new BufferedInputStream(socket.getInputStream()))) {
 
-                byte[] buf = new byte[64 * 1024];
-                long sent = 0L;
-                long lastAck = 0L;
+                byte[] buffer = new byte[16 * 1024];
 
                 while (true) {
-                    int n = fileIn.read(buf);
-                    if (n == -1) break;
+                    if (cancelled.get()) {
+                        throw new IOException("Upload cancelled");
+                    }
+                    int n = fileIn.read(buffer);
+                    if (n == -1) {
+                        break;
+                    }
 
-                    socketOut.write(buf, 0, n);
+                    socketOut.write(buffer, 0, n);
+                    socketOut.flush();
                     sent += n;
 
-                    if ((sent & ((256L * 1024L) - 1L)) == 0L) {
-                        socketOut.flush();
-                    }
+                    acked = drainAvailableAcks(socketIn, acked);
 
-                    lastAck = drainAvailableAcks(socketIn, lastAck);
+                    listener.onEvent(new DCCClientUploadProgressEvent(token, sent, acked, resolvedLength));
                 }
 
-                socketOut.flush();
-
-                if (totalLength > 0 && totalLength <= 0xFFFF_FFFFL) {
-                    long expected = totalLength;
-
-                    long deadlineMs = System.currentTimeMillis() + 10_000;
-                    while (lastAck < expected && System.currentTimeMillis() < deadlineMs) {
-                        if (socketIn.available() >= 4) {
-                            lastAck = readAck(socketIn);
-                        } else {
-                            try {
-                                Thread.sleep(20);
-                            } catch (InterruptedException ie) {
-                                Thread.currentThread().interrupt();
-                                break;
-                            }
-                        }
-                    }
-
-                    if (lastAck < expected) {
-                        LOG.warning("Upload finished but final ACK is short: ack=" + lastAck + " expected=" + expected);
-                    }
+                if (resolvedLength == null) {
+                    resolvedLength = sent;
                 }
 
-                LOG.info("Successfully uploaded " + filename + " (" + sent + " bytes) to " + host + ":" + port);
+                socket.shutdownOutput();
+
+                while (acked < resolvedLength) {
+                    if (cancelled.get()) {
+                        throw new IOException("Upload cancelled");
+                    }
+                    acked = readAck(socketIn);
+                }
+
+                listener.onEvent(new DCCClientUploadCompletedEvent(token));
             }
         } catch (SocketTimeoutException e) {
             LOG.log(Level.WARNING, "Upload timed out", e);
+            listener.onEvent(new DCCClientUploadFailedEvent(token, "Upload timed out"));
         } catch (EOFException e) {
             LOG.log(Level.WARNING, "Connection closed unexpectedly during upload", e);
+            listener.onEvent(new DCCClientUploadFailedEvent(token, "Connection closed unexpectedly"));
         } catch (IOException e) {
             LOG.log(Level.WARNING, "Error uploading file", e);
+            listener.onEvent(new DCCClientUploadFailedEvent(token, e.getMessage()));
         }
     }
 
@@ -142,19 +169,18 @@ public class DCCUploader {
     }
 
     private static long readAck(DataInputStream in) throws IOException {
-        int ack32 = in.readInt();
-        return ack32 & 0xFFFF_FFFFL;
+        return Integer.toUnsignedLong(in.readInt());
     }
 
-    private long resolveLength() {
-        if (length != null && length > 0) return length;
-
-        try {
-            Long s = file.getFileSize();
-            if (s != null && s > 0) return s;
-        } catch (IOException ignored) {
+    private Long resolveLength() {
+        if (length != null && length > 0) {
+            return length;
         }
 
-        return -1L;
+        try {
+            return file.getFileSize();
+        } catch (IOException _) {
+            return null;
+        }
     }
 }
