@@ -101,8 +101,8 @@ public class DCCUploader {
 
     private void upload() {
         Long resolvedLength = resolveLength();
-        long acked = 0;
         long sent = 0;
+        AckState ack = new AckState();
 
         try (Socket socket = new Socket()) {
             socketHolder.set(socket);
@@ -116,6 +116,7 @@ public class DCCUploader {
 
                 byte[] buffer = new byte[16 * 1024];
 
+                long lastProgressAlert = 0;
                 while (true) {
                     if (cancelled.get()) {
                         throw new IOException("Upload cancelled");
@@ -129,22 +130,22 @@ public class DCCUploader {
                     socketOut.flush();
                     sent += n;
 
-                    acked = drainAvailableAcks(socketIn, acked);
+                    drainAvailableAcks(socketIn, ack);
 
-                    listener.onEvent(new DCCClientUploadProgressEvent(token, sent, acked, resolvedLength));
-                }
-
-                if (resolvedLength == null) {
-                    resolvedLength = sent;
+                    long now = System.currentTimeMillis();
+                    if (lastProgressAlert + 500 < now) {
+                        listener.onEvent(new DCCClientUploadProgressEvent(token, sent, ack.total, resolvedLength));
+                        lastProgressAlert = now;
+                    }
                 }
 
                 socket.shutdownOutput();
 
-                while (acked < resolvedLength) {
+                while (ack.total < sent) {
                     if (cancelled.get()) {
                         throw new IOException("Upload cancelled");
                     }
-                    acked = readAck(socketIn);
+                    consumeAck(socketIn, ack);
                 }
 
                 listener.onEvent(new DCCClientUploadCompletedEvent(token));
@@ -161,19 +162,25 @@ public class DCCUploader {
         }
     }
 
-    private static long drainAvailableAcks(DataInputStream in, long lastAck) throws IOException {
+    private static void drainAvailableAcks(DataInputStream in, AckState ack) throws IOException {
         while (in.available() >= 4) {
-            lastAck = readAck(in);
+            consumeAck(in, ack);
         }
-        return lastAck;
     }
 
-    private static long readAck(DataInputStream in) throws IOException {
-        return Integer.toUnsignedLong(in.readInt());
+    // this is a bit convoluted but DCC acks are 32 bit and we need to handle wraparound
+    // on the off chance someone tries to send a larger file
+    private static void consumeAck(DataInputStream in, AckState s) throws IOException {
+        long ack32 = Integer.toUnsignedLong(in.readInt());
+        if (ack32 < s.last32) {
+            s.base += (1L << Integer.SIZE);
+        }
+        s.last32 = ack32;
+        s.total = s.base + ack32;
     }
 
     private Long resolveLength() {
-        if (length != null && length > 0) {
+        if (length != null && length >= 0) {
             return length;
         }
 
@@ -182,5 +189,11 @@ public class DCCUploader {
         } catch (IOException _) {
             return null;
         }
+    }
+
+    private static final class AckState {
+        long base;
+        long last32;
+        long total;
     }
 }

@@ -31,9 +31,18 @@
  */
 package com.jessegrabowski.irc.client.dcc;
 
+import java.nio.file.Path;
+
 public final class DCCClientDownloadCompletedEvent extends DCCClientEvent {
 
-    public DCCClientDownloadCompletedEvent(String token) {
+    private final Path fullPath;
+
+    public DCCClientDownloadCompletedEvent(String token, Path fullPath) {
         super(token);
+        this.fullPath = fullPath;
+    }
+
+    public Path getFullPath() {
+        return fullPath;
     }
 }

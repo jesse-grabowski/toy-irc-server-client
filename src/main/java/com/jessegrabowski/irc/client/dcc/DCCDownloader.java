@@ -45,15 +45,24 @@ import java.net.SocketTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class DCCDownloader {
 
     private static final Logger LOG = Logger.getLogger(DCCDownloader.class.getName());
-    private static final Executor EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static final ThreadFactory THREAD_FACTORY =
+            Thread.ofVirtual().name("IRCClient-DCCDownloader-", 0).factory();
+
+    private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean cancelled = new AtomicBoolean();
+    private final AtomicReference<Socket> socketHolder = new AtomicReference<>();
+
+    private final String token;
+    private final DCCClientEventListener listener;
 
     private final Directory downloadDirectory;
     private final String filename;
@@ -61,7 +70,16 @@ public class DCCDownloader {
     private final int port;
     private final Long length;
 
-    public DCCDownloader(Directory downloadDirectory, String filename, String host, int port, Long length) {
+    public DCCDownloader(
+            String token,
+            DCCClientEventListener listener,
+            Directory downloadDirectory,
+            String filename,
+            String host,
+            int port,
+            Long length) {
+        this.token = token;
+        this.listener = listener;
         this.downloadDirectory = downloadDirectory;
         this.filename = filename;
         this.host = host;
@@ -69,62 +87,104 @@ public class DCCDownloader {
         this.length = length;
     }
 
-    public void fetchAsync() {
-        EXECUTOR.execute(this::download);
+    public void start() {
+        if (!started.compareAndSet(false, true)) {
+            throw new IllegalStateException("Download already in progress");
+        }
+        if (cancelled.get()) {
+            return;
+        }
+
+        THREAD_FACTORY.newThread(this::download).start();
+    }
+
+    public void cancel() {
+        cancelled.set(true);
+        Socket socket = socketHolder.get();
+        if (socket != null) {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                LOG.log(Level.WARNING, "Error closing socket on download cancellation", e);
+            }
+        }
     }
 
     private void download() {
-        Path file = null;
+        long received = 0;
+        Path outPath = null;
+
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 60000);
+            socketHolder.set(socket);
             socket.setSoTimeout(60000);
+            socket.setKeepAlive(true);
+            socket.setTcpNoDelay(true);
+            socket.connect(new InetSocketAddress(host, port), 15000);
 
-            file = downloadDirectory.createFile(filename);
-            Files.createDirectories(file.getParent());
+            outPath = downloadDirectory.createFile(filename);
 
-            try (InputStream socketIn = new BufferedInputStream(socket.getInputStream());
+            try (OutputStream fileOut =
+                            new BufferedOutputStream(Files.newOutputStream(outPath, StandardOpenOption.WRITE));
+                    InputStream socketIn = new BufferedInputStream(socket.getInputStream());
                     DataOutputStream socketOut =
-                            new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-                    OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(
-                            file,
-                            StandardOpenOption.CREATE,
-                            StandardOpenOption.TRUNCATE_EXISTING,
-                            StandardOpenOption.WRITE))) {
+                            new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()))) {
 
-                byte[] buf = new byte[64 * 1024];
-                long received = 0L;
-                int ackCounter = 0;
+                byte[] buffer = new byte[16 * 1024];
 
+                long lastProgressAlert = 0;
                 while (true) {
-                    int n = socketIn.read(buf);
-                    if (n == -1) break;
-
-                    fileOut.write(buf, 0, n);
-                    received += n;
-
-                    int ack = (int) (received & 0xFFFF_FFFFL);
-                    socketOut.writeInt(ack);
-
-                    if ((++ackCounter & 0x0F) == 0) { // every 16 chunks
-                        socketOut.flush();
+                    if (cancelled.get()) {
+                        throw new IOException("Download cancelled");
                     }
 
-                    if (length != null && length > 0 && received >= length) break;
+                    int n = socketIn.read(buffer);
+                    if (n == -1) {
+                        break;
+                    }
+
+                    fileOut.write(buffer, 0, n);
+                    fileOut.flush();
+                    received += n;
+
+                    // intentionally truncate to lower half
+                    socketOut.writeInt((int) received);
+                    socketOut.flush();
+
+                    long now = System.currentTimeMillis();
+                    if (lastProgressAlert + 500 < now) {
+                        listener.onEvent(new DCCClientDownloadProgressEvent(token, received, length));
+                        lastProgressAlert = now;
+                    }
                 }
 
-                fileOut.flush();
-                socketOut.flush();
-
-                if (length != null && length > 0 && received < length) {
-                    throw new EOFException("Connection closed early: received " + received + " / expected " + length);
+                if (length != null && length >= 0 && received < length) {
+                    throw new EOFException("Connection closed unexpectedly");
                 }
 
-                LOG.info("Successfully downloaded " + filename + " (" + received + " bytes) to " + file);
+                listener.onEvent(new DCCClientDownloadCompletedEvent(token, outPath));
             }
         } catch (SocketTimeoutException e) {
-            LOG.log(Level.WARNING, "Download timed out" + (file != null ? " (" + file + ")" : ""), e);
+            LOG.log(Level.WARNING, "Download timed out", e);
+            cleanupPartial(outPath);
+            listener.onEvent(new DCCClientDownloadFailedEvent(token, "Download timed out"));
+        } catch (EOFException e) {
+            LOG.log(Level.WARNING, "Connection closed unexpectedly during download", e);
+            cleanupPartial(outPath);
+            listener.onEvent(new DCCClientDownloadFailedEvent(token, "Connection closed unexpectedly"));
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "Error downloading file" + (file != null ? " (" + file + ")" : ""), e);
+            LOG.log(Level.WARNING, "Error downloading file", e);
+            cleanupPartial(outPath);
+            listener.onEvent(new DCCClientDownloadFailedEvent(token, e.getMessage()));
+        }
+    }
+
+    private static void cleanupPartial(Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException _) {
         }
     }
 }

@@ -384,7 +384,10 @@ class DCCRelayEngineTest {
             sender.close();
 
             // we need to drain the queue so that the receiver notices the reset
-            receiver.getInputStream().readAllBytes();
+            try {
+                receiver.getInputStream().readAllBytes();
+            } catch (IOException _) {
+            }
 
             awaitEvent(DCCServerEventTransferClosed.class, token, Duration.ofSeconds(5));
 

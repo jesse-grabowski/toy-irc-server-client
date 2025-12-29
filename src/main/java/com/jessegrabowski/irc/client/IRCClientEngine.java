@@ -874,6 +874,7 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
                     message.getFilename(),
                     ") but you are already uploading it")));
         }
+
         DCCUploader uploader = new DCCUploader(
                 upload.getToken(), this, upload.getFile(), message.getHost(), message.getPort(), message.getFileSize());
         state.startUpload(upload, uploader);
@@ -1397,13 +1398,20 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
         }
 
         IRCClientState.DCCDownload download = optional.get();
-        new DCCDownloader(
-                        properties.getDownloadDirectory(),
-                        download.getFilename(),
-                        download.getHost(),
-                        download.getPort(),
-                        download.getSize())
-                .fetchAsync();
+        if (download.isStarted()) {
+            terminal.println(makeSystemErrorMessage(s("Download already in progress for token ", command.getToken())));
+            return;
+        }
+
+        DCCDownloader downloader = new DCCDownloader(
+                download.getToken(),
+                this,
+                properties.getDownloadDirectory(),
+                download.getFilename(),
+                download.getHost(),
+                download.getPort(),
+                download.getSize());
+        state.startDownload(download, downloader);
     }
 
     private void handle(ClientCommandAction command) {
@@ -1736,10 +1744,28 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
                                 })
                                 .toArray(RichString[]::new));
                 uploadPart = uploadPart.isEmpty() ? s("") : s("[Sending: ", uploadPart, "] ");
+                RichString downloadPart = j(
+                        ",",
+                        state.getDownloads().stream()
+                                .sorted(Comparator.comparing(IRCClientState.DCCDownload::getToken))
+                                .map(download -> {
+                                    if (download.isStarted()) {
+                                        return s(
+                                                f(download.getToken()),
+                                                ":",
+                                                download.getProgress(),
+                                                "/",
+                                                download.getTotal() != null ? download.getTotal() : "?");
+                                    } else {
+                                        return s(f(download.getToken()), ":PENDING");
+                                    }
+                                })
+                                .toArray(RichString[]::new));
+                downloadPart = downloadPart.isEmpty() ? s("") : s("[Receiving: ", downloadPart, "] ");
                 RichString operPart = state.isOperator(state.getMe()) ? b(Color.RED, f(Color.WHITE, "[OPER]")) : s("");
                 RichString mePart = state.isAway(state.getMe()) ? f(Color.GRAY, state.getMe()) : f(state.getMe());
                 IRCClientState.Channel channel = state.getFocusedChannel().orElse(null);
-                status = s(uploadPart, status);
+                status = s(uploadPart, downloadPart, status);
                 prompt = s(operPart, "[", mePart, "@", f(properties.getHost().getHostName()), "]:");
                 if (channel != null) {
                     String topic = state.getChannelTopic(channel.getName());
@@ -1762,6 +1788,7 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
                             .toArray(RichString[]::new);
                     status = s(
                             uploadPart,
+                            downloadPart,
                             "Chatting in ",
                             f(channel.getName()),
                             members.length > 0 ? s(" with ", j(", ", members), " ") : " all alone ",
@@ -1849,11 +1876,56 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
         updateStatusAndPrompt();
     }
 
-    private void handle(DCCClientDownloadProgressEvent event) {}
+    private void handle(DCCClientDownloadProgressEvent event) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
 
-    private void handle(DCCClientDownloadFailedEvent event) {}
+        state.progressDownload(event.getToken(), event.getBytesReceived(), event.getBytesTotal());
+    }
 
-    private void handle(DCCClientDownloadCompletedEvent event) {}
+    private void handle(DCCClientDownloadFailedEvent event) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(
+                    makeSystemErrorMessage(s("Failed to receive file ", event.getToken(), ": ", event.getError())));
+            return;
+        }
+
+        Optional<IRCClientState.DCCDownload> optional = state.getDownload(event.getToken());
+        if (!optional.isPresent()) {
+            terminal.println(
+                    makeSystemErrorMessage(s("Failed to receive file ", event.getToken(), ": ", event.getError())));
+            return;
+        }
+
+        IRCClientState.DCCDownload upload = optional.get();
+        terminal.println(
+                makeSystemErrorMessage(s("Failed to receive file '", upload.getFilename(), "': ", event.getError())));
+        state.clearDownload(event.getToken());
+    }
+
+    private void handle(DCCClientDownloadCompletedEvent event) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            return;
+        }
+
+        Optional<IRCClientState.DCCDownload> optional = state.getDownload(event.getToken());
+        if (!optional.isPresent()) {
+            return;
+        }
+
+        IRCClientState.DCCDownload upload = optional.get();
+        terminal.println(makeSystemTerminalMessage(s(
+                "Successfully received file '",
+                f(upload.getFilename()),
+                "'! (",
+                event.getFullPath().toAbsolutePath(),
+                ")")));
+        state.clearDownload(event.getToken());
+    }
 
     private void handle(DCCClientUploadProgressEvent event) {
         IRCClientState state = clientStateGuard.getState();

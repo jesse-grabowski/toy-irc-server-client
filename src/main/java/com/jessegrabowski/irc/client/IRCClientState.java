@@ -527,11 +527,34 @@ public class IRCClientState {
     }
 
     public boolean clearDownload(String token) {
-        return pendingDownloads.remove(token) != null;
+        DCCDownload download = pendingDownloads.remove(token);
+        if (download != null && download.isStarted()) {
+            download.getDownloader().cancel();
+        }
+        return download != null;
     }
 
     public Optional<DCCDownload> getDownload(String token) {
         return Optional.ofNullable(pendingDownloads.get(token));
+    }
+
+    public Set<DCCDownload> getDownloads() {
+        return Set.copyOf(pendingDownloads.values());
+    }
+
+    public void startDownload(DCCDownload download, DCCDownloader downloader) {
+        if (download.isStarted()) {
+            throw new IllegalStateException("Upload already started");
+        }
+        download.setDownloader(downloader);
+        downloader.start();
+    }
+
+    public void progressDownload(String token, long progress, Long total) {
+        getDownload(token).ifPresent(download -> {
+            download.setProgress(progress);
+            download.setTotal(total);
+        });
     }
 
     public static final class Channel {
@@ -783,6 +806,8 @@ public class IRCClientState {
         private final int port;
         private final Long size;
 
+        private long progress;
+        private Long total;
         private DCCDownloader downloader;
 
         public DCCDownload(String token, String filename, String host, int port, Long size) {
@@ -823,6 +848,26 @@ public class IRCClientState {
 
         DCCDownloader getDownloader() {
             return downloader;
+        }
+
+        public boolean isStarted() {
+            return downloader != null;
+        }
+
+        public long getProgress() {
+            return progress;
+        }
+
+        void setProgress(long progress) {
+            this.progress = progress;
+        }
+
+        public Long getTotal() {
+            return total;
+        }
+
+        void setTotal(Long total) {
+            this.total = total;
         }
     }
 
