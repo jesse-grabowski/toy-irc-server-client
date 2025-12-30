@@ -53,10 +53,12 @@ import com.jessegrabowski.irc.client.tui.TerminalMessage;
 import com.jessegrabowski.irc.client.tui.TerminalUI;
 import com.jessegrabowski.irc.network.IRCClientConnectionFactory;
 import com.jessegrabowski.irc.network.IRCConnection;
+import com.jessegrabowski.irc.network.IRCDisconnectHandler;
+import com.jessegrabowski.irc.network.IRCIngressHandler;
 import com.jessegrabowski.irc.protocol.*;
+import com.jessegrabowski.irc.protocol.IRCServerParameters;
+import com.jessegrabowski.irc.protocol.IRCServerParametersUnmarshaller;
 import com.jessegrabowski.irc.protocol.model.*;
-import com.jessegrabowski.irc.server.IRCServerParameters;
-import com.jessegrabowski.irc.server.IRCServerParametersUnmarshaller;
 import com.jessegrabowski.irc.util.Resource;
 import com.jessegrabowski.irc.util.StateGuard;
 import java.awt.Color;
@@ -85,7 +87,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class IRCClientEngine implements DCCClientEventListener, Closeable {
+public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHandler, IRCIngressHandler, Closeable {
 
     private static final DateTimeFormatter FRIENDLY_DATE_FORMAT = DateTimeFormatter.ofPattern(
                     "EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH)
@@ -169,8 +171,8 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
                     properties.getCharset(),
                     properties.getConnectTimeout(),
                     properties.getReadTimeout());
-            connection.addShutdownHandler(this::onDisconnect);
-            connection.addIngressHandler(this::receive);
+            connection.addShutdownHandler(this);
+            connection.addIngressHandler(this);
             connection.start();
 
             connectionHolder.set(connection);
@@ -232,7 +234,7 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
     }
 
     // called by IRC connection as it closes
-    private void onDisconnect() {
+    public void onDisconnect(IRCConnection connection) {
         if (engineState.get() == IRCClientEngineState.CLOSED) {
             return;
         }
@@ -271,7 +273,7 @@ public class IRCClientEngine implements DCCClientEventListener, Closeable {
         return send(MARSHALLER.marshal(message));
     }
 
-    private void receive(String message) {
+    public void receive(IRCConnection connection, String message) {
         if (engineState.get() == IRCClientEngineState.CLOSED) {
             return;
         }

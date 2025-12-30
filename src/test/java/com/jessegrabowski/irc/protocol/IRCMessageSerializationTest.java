@@ -34,7 +34,6 @@ package com.jessegrabowski.irc.protocol;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jessegrabowski.irc.protocol.model.*;
-import com.jessegrabowski.irc.server.IRCServerParameters;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.SequencedMap;

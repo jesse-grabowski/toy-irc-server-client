@@ -49,7 +49,6 @@ import com.jessegrabowski.irc.protocol.dsl.ParameterPlanner;
 import com.jessegrabowski.irc.protocol.dsl.ParserErrorException;
 import com.jessegrabowski.irc.protocol.dsl.SplittingParameterInjector;
 import com.jessegrabowski.irc.protocol.model.*;
-import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.ThrowingFunction;
 import java.net.InetAddress;

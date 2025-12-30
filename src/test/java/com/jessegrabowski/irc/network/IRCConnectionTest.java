@@ -65,8 +65,8 @@ class IRCConnectionTest {
         PipedInputStream is = new PipedInputStream();
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
-        connection.addShutdownHandler(() -> handlerANotified.set(true));
-        connection.addShutdownHandler(() -> handlerBNotified.set(true));
+        connection.addShutdownHandler(_ -> handlerANotified.set(true));
+        connection.addShutdownHandler(_ -> handlerBNotified.set(true));
         connection.start();
         connection.close();
 
@@ -81,7 +81,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(2);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print("line1\r\n");
@@ -100,7 +100,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(2);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         connection.offer("line1");
@@ -118,7 +118,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(1);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print("partial");
@@ -138,7 +138,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(1);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print("\r\n");
@@ -157,7 +157,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(1);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print("a\nb\r\n");
@@ -176,7 +176,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(1);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print("a\rb\r\r\n");
@@ -195,7 +195,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(3);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print("a\r\n\r\nb\r\n");
@@ -217,7 +217,7 @@ class IRCConnectionTest {
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
         LineAccumulator accumulator = new LineAccumulator(1);
-        connection.addIngressHandler(accumulator::add);
+        connection.addIngressHandler((_, line) -> accumulator.add(line));
         connection.start();
 
         inWriter.print(over);
@@ -240,10 +240,10 @@ class IRCConnectionTest {
         PrintWriter inWriter = new PrintWriter(new PipedOutputStream(is));
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
-        connection.addIngressHandler(line -> {
+        connection.addIngressHandler((_, _) -> {
             throw new RuntimeException();
         });
-        connection.addShutdownHandler(() -> {
+        connection.addShutdownHandler(_ -> {
             shutdownNotified.set(true);
             shutdownLatch.countDown();
         });
@@ -267,11 +267,11 @@ class IRCConnectionTest {
         PrintWriter inWriter = new PrintWriter(new PipedOutputStream(is));
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
-        connection.addIngressHandler(line -> {
+        connection.addIngressHandler((_, _) -> {
             throw new RuntimeException("boom");
         });
-        connection.addIngressHandler(line -> laterCalled.set(true));
-        connection.addShutdownHandler(shutdownLatch::countDown);
+        connection.addIngressHandler((_, _) -> laterCalled.set(true));
+        connection.addShutdownHandler(_ -> shutdownLatch.countDown());
         connection.start();
 
         inWriter.print("line\r\n");
@@ -373,7 +373,7 @@ class IRCConnectionTest {
         PipedInputStream is = new PipedInputStream();
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
-        connection.addShutdownHandler(calls::incrementAndGet);
+        connection.addShutdownHandler(_ -> calls.incrementAndGet());
         connection.start();
 
         connection.close();
@@ -401,7 +401,7 @@ class IRCConnectionTest {
         InputStream is = new TimeoutInputStream();
         ByteArrayOutputStream os = new ByteArrayOutputStream(8192);
         IRCConnection connection = new IRCConnection(new Mocket(is, os));
-        connection.addShutdownHandler(() -> {
+        connection.addShutdownHandler(_ -> {
             shutdownNotified.set(true);
             shutdownLatch.countDown();
         });

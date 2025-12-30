@@ -29,12 +29,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.server;
+package com.jessegrabowski.irc.protocol;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jessegrabowski.irc.client.IRCClientState;
-import com.jessegrabowski.irc.protocol.IRCCaseMapping;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Assertions;

@@ -29,7 +29,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.server;
+package com.jessegrabowski.irc.protocol;
 
 import java.util.Collection;
 import java.util.HashMap;

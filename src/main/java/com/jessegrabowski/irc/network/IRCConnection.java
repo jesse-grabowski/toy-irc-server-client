@@ -51,7 +51,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -78,8 +77,8 @@ public final class IRCConnection implements Closeable {
     // an issue with the connection
     private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(50);
 
-    private final List<Consumer<String>> ingressHandlers = new CopyOnWriteArrayList<>();
-    private final List<Runnable> shutdownHandlers = new CopyOnWriteArrayList<>();
+    private final List<IRCIngressHandler> ingressHandlers = new CopyOnWriteArrayList<>();
+    private final List<IRCDisconnectHandler> shutdownHandlers = new CopyOnWriteArrayList<>();
 
     private final AtomicReference<ConnectionState> state = new AtomicReference<>(ConnectionState.NEW);
     private final CompletableFuture<Void> closeFuture = new CompletableFuture<>();
@@ -120,7 +119,7 @@ public final class IRCConnection implements Closeable {
      *
      * @param handler handler to be called
      */
-    public void addIngressHandler(Consumer<String> handler) {
+    public void addIngressHandler(IRCIngressHandler handler) {
         ingressHandlers.add(Objects.requireNonNull(handler, "handler"));
     }
 
@@ -130,7 +129,7 @@ public final class IRCConnection implements Closeable {
      *
      * @param handler handler to be called
      */
-    public void addShutdownHandler(Runnable handler) {
+    public void addShutdownHandler(IRCDisconnectHandler handler) {
         shutdownHandlers.add(Objects.requireNonNull(handler, "handler"));
     }
 
@@ -188,9 +187,9 @@ public final class IRCConnection implements Closeable {
                     LOG.log(Level.FINE, "Received IRC line: {0}", line);
                 }
 
-                for (Consumer<String> handler : ingressHandlers) {
+                for (IRCIngressHandler handler : ingressHandlers) {
                     try {
-                        handler.accept(line);
+                        handler.receive(this, line);
                     } catch (Exception e) {
                         // We don't have a meaningful way to deal with handler failures safely here
                         // so we kill the connection and let the higher-level application decide what
@@ -349,9 +348,9 @@ public final class IRCConnection implements Closeable {
 
         state.set(ConnectionState.CLOSED);
 
-        for (Runnable handler : shutdownHandlers) {
+        for (IRCDisconnectHandler handler : shutdownHandlers) {
             try {
-                handler.run();
+                handler.onDisconnect(this);
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, "Error in IRC shutdown handler", e);
             }

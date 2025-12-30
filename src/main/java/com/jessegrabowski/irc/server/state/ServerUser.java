@@ -33,8 +33,8 @@ package com.jessegrabowski.irc.server.state;
 
 import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.protocol.IRCCaseMapping;
+import com.jessegrabowski.irc.protocol.IRCServerParameters;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
-import com.jessegrabowski.irc.server.IRCServerParameters;
 import com.jessegrabowski.irc.util.Transaction;
 import java.util.Collections;
 import java.util.HashSet;

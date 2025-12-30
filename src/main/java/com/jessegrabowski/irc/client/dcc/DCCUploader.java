@@ -52,7 +52,7 @@ public class DCCUploader {
 
     private static final Logger LOG = Logger.getLogger(DCCUploader.class.getName());
     private static final ThreadFactory THREAD_FACTORY =
-            Thread.ofVirtual().name("IRCClient-DCCUploader-", 0).factory();
+            Thread.ofVirtual().name("IRCDCC-Egress-", 0).factory();
 
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean cancelled = new AtomicBoolean();

@@ -89,7 +89,7 @@ public class FancyTerminalUI extends TerminalUI {
     private static final String COLOR_RULE = COLOR_CYAN;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "com.jessegrabowski.irc.client.tui.FancyTerminalUI-DimensionPoller");
+        Thread t = new Thread(r, "FancyTerminalUI-DimensionPoller");
         t.setDaemon(true);
         return t;
     });

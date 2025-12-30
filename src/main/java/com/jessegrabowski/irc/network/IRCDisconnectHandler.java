@@ -29,32 +29,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.server;
+package com.jessegrabowski.irc.network;
 
-import com.jessegrabowski.irc.protocol.IRCServerParameters;
-import com.jessegrabowski.irc.protocol.IRCServerParametersUnmarshaller;
-import com.jessegrabowski.irc.util.Resource;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
-public final class IRCServerParametersLoader {
-
-    private IRCServerParametersLoader() {}
-
-    public static IRCServerParameters load(Resource resource) throws IOException {
-        try (InputStream is = resource.getInputStream()) {
-            Properties properties = new Properties();
-            properties.load(is);
-
-            IRCServerParameters parameters = new IRCServerParameters();
-            properties.forEach((k, v) -> {
-                if (k != null && v != null) {
-                    IRCServerParametersUnmarshaller.unmarshal(k.toString(), v.toString(), parameters);
-                }
-            });
-
-            return parameters;
-        }
-    }
+@FunctionalInterface
+public interface IRCDisconnectHandler {
+    void onDisconnect(IRCConnection connection);
 }

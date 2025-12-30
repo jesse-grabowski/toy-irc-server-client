@@ -35,7 +35,7 @@ import com.jessegrabowski.irc.args.ArgsParser;
 import com.jessegrabowski.irc.args.ArgsParserHelpRequestedException;
 import com.jessegrabowski.irc.args.ArgsToken;
 import com.jessegrabowski.irc.args.ArgsTokenizer;
-import com.jessegrabowski.irc.client.command.model.ClientCommandDispatcher;
+import com.jessegrabowski.irc.client.command.ClientCommandDispatcher;
 import com.jessegrabowski.irc.client.tui.FancyTerminalUI;
 import com.jessegrabowski.irc.client.tui.STTY;
 import com.jessegrabowski.irc.client.tui.StdIOTerminalUI;

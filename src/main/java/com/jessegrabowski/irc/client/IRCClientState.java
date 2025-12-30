@@ -34,7 +34,7 @@ package com.jessegrabowski.irc.client;
 import com.jessegrabowski.irc.client.dcc.DCCDownloader;
 import com.jessegrabowski.irc.client.dcc.DCCUploader;
 import com.jessegrabowski.irc.protocol.IRCCapability;
-import com.jessegrabowski.irc.server.IRCServerParameters;
+import com.jessegrabowski.irc.protocol.IRCServerParameters;
 import com.jessegrabowski.irc.util.Resource;
 import java.util.ArrayList;
 import java.util.Collections;

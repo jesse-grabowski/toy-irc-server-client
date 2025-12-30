@@ -50,7 +50,7 @@ public class IRCServer {
 
         DCCRelayEngine dccEngine = new DCCRelayEngine(properties);
         IRCServerEngine ircEngine = new IRCServerEngine(properties, dccEngine);
-        Acceptor acceptor = new Acceptor(null, properties.getPort(), ircEngine::accept);
+        Acceptor acceptor = new Acceptor(null, properties.getPort(), ircEngine);
         acceptor.start();
     }
 

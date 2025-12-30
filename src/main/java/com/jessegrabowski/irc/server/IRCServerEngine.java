@@ -31,7 +31,10 @@
  */
 package com.jessegrabowski.irc.server;
 
+import com.jessegrabowski.irc.network.Dispatcher;
 import com.jessegrabowski.irc.network.IRCConnection;
+import com.jessegrabowski.irc.network.IRCDisconnectHandler;
+import com.jessegrabowski.irc.network.IRCIngressHandler;
 import com.jessegrabowski.irc.protocol.IRCCapability;
 import com.jessegrabowski.irc.protocol.IRCChannelFlag;
 import com.jessegrabowski.irc.protocol.IRCChannelList;
@@ -47,6 +50,8 @@ import com.jessegrabowski.irc.protocol.IRCMessageFactory6;
 import com.jessegrabowski.irc.protocol.IRCMessageFactory9;
 import com.jessegrabowski.irc.protocol.IRCMessageMarshaller;
 import com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller;
+import com.jessegrabowski.irc.protocol.IRCServerParameters;
+import com.jessegrabowski.irc.protocol.IRCServerParametersMarshaller;
 import com.jessegrabowski.irc.protocol.IRCUserMode;
 import com.jessegrabowski.irc.protocol.model.*;
 import com.jessegrabowski.irc.server.dcc.DCCRelayEngine;
@@ -99,7 +104,8 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Gatherers;
 
-public class IRCServerEngine implements Closeable, DCCServerEventListener {
+public class IRCServerEngine
+        implements Closeable, Dispatcher, DCCServerEventListener, IRCDisconnectHandler, IRCIngressHandler {
 
     private static final Instant START_TIME = Instant.now();
 
@@ -161,11 +167,12 @@ public class IRCServerEngine implements Closeable, DCCServerEventListener {
         LOG.info("Started IRC Server Engine");
     }
 
-    public boolean accept(Socket socket) {
+    @Override
+    public boolean dispatch(Socket socket) {
         executor.execute(spy(() -> {
             IRCConnection connection = new IRCConnection(socket);
-            connection.addIngressHandler(line -> parseAndHandleAsync(connection, line));
-            connection.addShutdownHandler(() -> executor.execute(() -> handleDisconnect(connection)));
+            connection.addIngressHandler(this);
+            connection.addShutdownHandler(this);
 
             ServerState state = serverStateGuard.getState();
             state.connect(connection);
@@ -178,6 +185,16 @@ public class IRCServerEngine implements Closeable, DCCServerEventListener {
             }
         }));
         return true;
+    }
+
+    @Override
+    public void onDisconnect(IRCConnection connection) {
+        executor.execute(() -> handleDisconnect(connection));
+    }
+
+    @Override
+    public void receive(IRCConnection connection, String line) {
+        parseAndHandleAsync(connection, line);
     }
 
     private void send(IRCConnection receiver, IRCMessage message) {

@@ -55,7 +55,7 @@ public class DCCDownloader {
 
     private static final Logger LOG = Logger.getLogger(DCCDownloader.class.getName());
     private static final ThreadFactory THREAD_FACTORY =
-            Thread.ofVirtual().name("IRCClient-DCCDownloader-", 0).factory();
+            Thread.ofVirtual().name("IRCDCC-Ingress-", 0).factory();
 
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean cancelled = new AtomicBoolean();

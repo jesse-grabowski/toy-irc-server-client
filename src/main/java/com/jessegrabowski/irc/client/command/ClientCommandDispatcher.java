@@ -29,10 +29,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.jessegrabowski.irc.client.command.model;
+package com.jessegrabowski.irc.client.command;
 
 import com.jessegrabowski.irc.client.IRCClientEngine;
-import com.jessegrabowski.irc.client.command.ClientCommandParser;
+import com.jessegrabowski.irc.client.command.model.ClientCommand;
+import com.jessegrabowski.irc.client.command.model.ClientCommandHelp;
 import com.jessegrabowski.irc.client.tui.RichString;
 import com.jessegrabowski.irc.client.tui.TerminalInputHandler;
 import com.jessegrabowski.irc.client.tui.TerminalMessage;
