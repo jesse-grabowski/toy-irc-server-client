@@ -7,17 +7,32 @@ skinparam class {
 top to bottom direction
 
 package client as CLI {
-    package command {
-        class ClientCommandParser {
-            +parse(command : String) : ClientCommand
+    together {
+        package command {
+            class ClientCommandDispatcher {
+                +handle(line : String) : CompletableFuture<Void>
+            }
         }
 
-        class ClientCommandDispatcher {
-            +handle(line : String) : CompletableFuture<Void>
+        package tui as TUI {
+            abstract class TerminalUI {
+                +addInputHandler(handler : TerminalInputHandler) : void
+                +start() : void
+                +stop() : void
+                +setPrompt(prompt : RichString) : void
+                +setStatus(status : RichString) : void
+                +println(message : TerminalMessage) : void
+            }
+
+            interface TerminalInputHandler {
+                +handle(input : String) : CompletableFuture<Void>
+            }
+
+            TerminalUI ..> TerminalInputHandler : inputHandlers
         }
     }
 
-    package dcc {
+    package dcc as CLI_DCC {
 
         interface DCCClientEventListener {
             +onEvent(event : DCCClientEvent) : void
@@ -37,30 +52,13 @@ package client as CLI {
         DCCUploader ..> DCCClientEventListener
     }
 
-    package tui {
-        abstract class TerminalUI {
-            +addInputHandler(handler : TerminalInputHandler) : void
-            +start() : void
-            +stop() : void
-            +setPrompt(prompt : RichString) : void
-            +setStatus(status : RichString) : void
-            +println(message : TerminalMessage) : void
-        }
-
-        interface TerminalInputHandler {
-            +handle(input : String) : CompletableFuture<Void>
-        }
-
-        TerminalUI ..> TerminalInputHandler : inputHandlers
-    }
 
     class IRCClientState <<aggregate>> {}
 
     class IRCClientEngine {
-        +IRCClientEngine(properties : IRCClientProperties, terminal : TerminalUI)
-        +onDisconnect() : void
+        +onDisconnect(connection: IRCConnection) : void
         +accept(command : ClientCommand) : CompletableFuture<Void>
-        +receive(message : String) : void
+        +receive(connection: IRCConnection, message : String) : void
         +start() : void
         +close() : void
         +onEvent(event : DCCClientEvent) : void
@@ -70,16 +68,15 @@ package client as CLI {
 package network as NET {
 
     interface IRCDisconnectHandler {
-        +onDisconnect() : void
+        +onDisconnect(connection : IRCConnection) : void
     }
 
     interface IRCIngressHandler {
-        +receive(line : String) : void
+        +receive(connection : IRCConnection, line : String) : void
     }
 
     class IRCConnection {
         +IRCConnection(socket : Socket)
-        +IRCConnection(socket : Socket, charset : Charset)
         +addIngressHandler(handler : IRCIngressHandler) : void
         +addShutdownHandler(handler : IRCDisconnectHandler) : void
         +offer(line : String) : boolean
@@ -99,7 +96,7 @@ package network as NET {
         +dispatch(socket : Socket) : boolean
     }
 
-    Acceptor ..> Dispatcher
+    Acceptor .right.> Dispatcher
     IRCConnection ..> IRCIngressHandler : ingressHandlers
     IRCConnection ..> IRCDisconnectHandler : shutdownHandlers
 }
@@ -126,7 +123,6 @@ package server as SRV {
     }
 
     class IRCServerEngine {
-        +IRCServerEngine(properties : IRCServerProperties, dccRelayEngine : DCCRelayEngine)
         +accept(socket : Socket) : boolean
         +onDisconnect(connection : IRCConnection) : void
         +receive(connection : IRCConnection, line : String) : void
@@ -135,27 +131,21 @@ package server as SRV {
     }
 }
 
-ClientCommandDispatcher ..|> TerminalInputHandler
-ClientCommandDispatcher ..> ClientCommandParser
-ClientCommandDispatcher ..> TerminalUI
-ClientCommandDispatcher ..> IRCClientEngine
+Dispatcher -[hidden]down-> IRCConnection
+CLI -[hidden]right-> SRV
 
-IRCClientEngine ..|> DCCClientEventListener
-IRCClientEngine ..|> IRCDisconnectHandler
-IRCClientEngine ..|> IRCIngressHandler
-IRCClientEngine ..> TerminalUI
-IRCClientEngine ..> IRCConnection
+ClientCommandDispatcher ..> TerminalUI : print errors
+ClientCommandDispatcher .right.> IRCClientEngine : send commands
+
+IRCClientEngine ..> TerminalUI : print messages
+IRCClientEngine ..> IRCConnection : send messages
 IRCClientEngine ..> IRCClientState
-IRCClientEngine ..> DCCDownloader
-IRCClientEngine ..> DCCUploader
+IRCClientEngine ..> DCCDownloader : receive dcc
+IRCClientEngine ..> DCCUploader : send dcc
 
-IRCServerEngine ..|> DCCServerEventListener
-IRCServerEngine ..|> IRCDisconnectHandler
-IRCServerEngine ..|> IRCIngressHandler
-IRCServerEngine ..> DCCRelayEngine
+IRCServerEngine ..> DCCRelayEngine : proxy dcc
 IRCServerEngine ..> ServerState
-IRCServerEngine ..> IRCConnection
-IRCServerEngine ..|> Dispatcher
+IRCServerEngine ..> IRCConnection : send messages
 
 
 @enduml

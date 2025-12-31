@@ -1,0 +1,19 @@
+@startuml
+participant client
+participant server
+
+activate client
+activate server
+
+alt "password configured"
+    client -> server : PASS <password>
+end
+loop "until good nickname"
+client -> server : NICK bob
+alt "nickname taken"
+    server -> client : 433 ERR_NICKNAMEINUSE
+end
+end
+client -> server : USER bob * * host
+server -> client : 001 RPL_WELCOME (+002-005, 251-266, 375, 372* and 376)
+@enduml

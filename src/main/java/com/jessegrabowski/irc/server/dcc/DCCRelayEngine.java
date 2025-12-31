@@ -232,7 +232,7 @@ public class DCCRelayEngine implements Closeable {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
