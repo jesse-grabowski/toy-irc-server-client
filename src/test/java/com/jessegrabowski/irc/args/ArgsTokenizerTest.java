@@ -185,12 +185,10 @@ class ArgsTokenizerTest {
         ArgsToken t1 = tokens.get(1);
         ArgsToken t2 = tokens.get(2);
 
-        // textual content
         assertEquals("cmd", t0.token());
         assertEquals("a b", t1.token());
         assertEquals("c d", t2.token());
 
-        // spans match raw input, including quotes/backslashes
         assertEquals("cmd", input.substring(t0.startInclusive(), t0.endExclusive()));
         assertEquals("\"a b\"", input.substring(t1.startInclusive(), t1.endExclusive()));
         assertEquals("c\\ d", input.substring(t2.startInclusive(), t2.endExclusive()));
@@ -246,7 +244,6 @@ class ArgsTokenizerTest {
         assertToken(tokens.get(0), "foo bar", 0, 7);
         assertToken(tokens.get(1), "baz", 8, 11);
 
-        // token spans line up with synthetic raw
         assertEquals(
                 "foo bar",
                 raw.substring(tokens.get(0).startInclusive(), tokens.get(0).endExclusive()));

@@ -61,7 +61,7 @@ class ArgsParserTest {
     @Test
     void parsesBooleanShortFlag() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "verbose mode", false);
+                newParser().addBooleanFlag('v', "verbose", TestProps::setVerbose, "verbose mode", false);
 
         TestProps props = parse(parser, "-v");
 
@@ -71,7 +71,7 @@ class ArgsParserTest {
     @Test
     void parsesBooleanLongFlag() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "verbose mode", false);
+                newParser().addBooleanFlag('v', "verbose", TestProps::setVerbose, "verbose mode", false);
 
         TestProps props = parse(parser, "--verbose");
 
@@ -81,7 +81,7 @@ class ArgsParserTest {
     @Test
     void parsesStringFlagWithShortName() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringFlag('o', "output", (p, v) -> p.output = v, "output file", false);
+                newParser().addStringFlag('o', "output", TestProps::setOutput, "output file", false);
 
         TestProps props = parse(parser, "-o", "out.txt");
 
@@ -91,7 +91,7 @@ class ArgsParserTest {
     @Test
     void parsesStringFlagWithLongName() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringFlag('o', "output", (p, v) -> p.output = v, "output file", false);
+                newParser().addStringFlag('o', "output", TestProps::setOutput, "output file", false);
 
         TestProps props = parse(parser, "--output", "out.txt");
 
@@ -101,7 +101,7 @@ class ArgsParserTest {
     @Test
     void parsesIntegerFlag() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addIntegerFlag('n', "count", (p, v) -> p.count = v, "count", false);
+                newParser().addIntegerFlag('n', "count", TestProps::setCount, "count", false);
 
         TestProps props = parse(parser, "--count", "42");
 
@@ -110,7 +110,7 @@ class ArgsParserTest {
 
     @Test
     void parsesPortFlag() throws ArgsParserHelpRequestedException {
-        ArgsParserBuilder<TestProps> parser = newParser().addPortFlag('p', "port", (p, v) -> p.port = v, "port", false);
+        ArgsParserBuilder<TestProps> parser = newParser().addPortFlag('p', "port", TestProps::setPort, "port", false);
 
         TestProps props = parse(parser, "--port", "42");
 
@@ -120,7 +120,7 @@ class ArgsParserTest {
     @Test
     void parsesCharsetFlag() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addCharsetFlag('c', "charset", (p, v) -> p.charset = v, "charset", false);
+                newParser().addCharsetFlag('c', "charset", TestProps::setCharset, "charset", false);
 
         TestProps props = parse(parser, "--charset", "UTF-8");
 
@@ -130,9 +130,9 @@ class ArgsParserTest {
     @Test
     void parsesGroupedBooleanFlags() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser = newParser()
-                .addBooleanFlag('a', "flag-a", (p, v) -> {}, "a", false)
-                .addBooleanFlag('b', "flag-b", (p, v) -> {}, "b", false)
-                .addBooleanFlag('c', "flag-c", (p, v) -> p.verbose = v, "c", false);
+                .addBooleanFlag('a', "flag-a", ArgsParserTest::noop, "a", false)
+                .addBooleanFlag('b', "flag-b", ArgsParserTest::noop, "b", false)
+                .addBooleanFlag('c', "flag-c", TestProps::setVerbose, "c", false);
 
         TestProps props = parse(parser, "-abc");
 
@@ -142,8 +142,8 @@ class ArgsParserTest {
     @Test
     void groupedFlagsAllowSingleValueTakingFlag() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser = newParser()
-                .addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "verbose", false)
-                .addIntegerFlag('n', "count", (p, v) -> p.count = v, "count", false);
+                .addBooleanFlag('v', "verbose", TestProps::setVerbose, "verbose", false)
+                .addIntegerFlag('n', "count", TestProps::setCount, "count", false);
 
         TestProps props = parse(parser, "-vn", "10");
 
@@ -154,8 +154,8 @@ class ArgsParserTest {
     @Test
     void groupedFlagsWithMultipleValueTakingFlagsThrow() {
         ArgsParserBuilder<TestProps> parser = newParser()
-                .addStringFlag('o', "output", (p, v) -> p.output = v, "output", false)
-                .addIntegerFlag('n', "count", (p, v) -> p.count = v, "count", false);
+                .addStringFlag('o', "output", TestProps::setOutput, "output", false)
+                .addIntegerFlag('n', "count", TestProps::setCount, "count", false);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> parse(parser, "-on", "value"));
 
@@ -165,7 +165,7 @@ class ArgsParserTest {
     @Test
     void missingRequiredFlagThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringFlag('o', "output", (p, v) -> p.output = v, "output", true);
+                newParser().addStringFlag('o', "output", TestProps::setOutput, "output", true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> parse(parser));
 
@@ -175,7 +175,7 @@ class ArgsParserTest {
     @Test
     void missingRequiredPositionalThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringPositional(0, (p, v) -> p.input = v, "input file", true);
+                newParser().addStringPositional(0, TestProps::setInput, "input file", true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> parse(parser));
 
@@ -185,7 +185,7 @@ class ArgsParserTest {
     @Test
     void parsesPositionalArgument() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringPositional(0, (p, v) -> p.input = v, "input file", true);
+                newParser().addStringPositional(0, TestProps::setInput, "input file", true);
 
         TestProps props = parse(parser, "input.txt");
 
@@ -195,7 +195,7 @@ class ArgsParserTest {
     @Test
     void unsupportedExtraPositionalThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringPositional(0, (p, v) -> p.input = v, "input file", true);
+                newParser().addStringPositional(0, TestProps::setInput, "input file", true);
 
         IllegalArgumentException ex =
                 assertThrows(IllegalArgumentException.class, () -> parse(parser, "file1", "file2"));
@@ -234,40 +234,14 @@ class ArgsParserTest {
     @Test
     void helpTextForComplexConfiguration_isExactlyAsExpected() {
         ArgsParser<TestProps> parser = newParser()
-                .addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "enable verbose mode", false)
-                .addBooleanFlag(
-                        'q',
-                        "quiet",
-                        (p, v) -> {
-                            /* ignore for test */
-                        },
-                        "suppress all output",
-                        false)
-                .addStringFlag('o', "output", (p, v) -> p.output = v, "path to output file", true)
-                .addIntegerFlag('n', "count", (p, v) -> p.count = v, "number of items to process", false)
-                .addIntegerFlag(
-                        't',
-                        "timeout",
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "timeout in seconds",
-                        true)
-                .addStringPositional(0, (p, v) -> p.input = v, "primary input file", true)
-                .addStringPositional(
-                        1,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "secondary input file",
-                        false)
-                .addStringPositional(
-                        2,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "log directory",
-                        false)
+                .addBooleanFlag('v', "verbose", TestProps::setVerbose, "enable verbose mode", false)
+                .addBooleanFlag('q', "quiet", ArgsParserTest::noop, "suppress all output", false)
+                .addStringFlag('o', "output", TestProps::setOutput, "path to output file", true)
+                .addIntegerFlag('n', "count", TestProps::setCount, "number of items to process", false)
+                .addIntegerFlag('t', "timeout", ArgsParserTest::noop, "timeout in seconds", true)
+                .addStringPositional(0, TestProps::setInput, "primary input file", true)
+                .addStringPositional(1, ArgsParserTest::noop, "secondary input file", false)
+                .addStringPositional(2, ArgsParserTest::noop, "log directory", false)
                 .build();
 
         String help = parser.getHelpText();
@@ -297,22 +271,9 @@ class ArgsParserTest {
     void helpTextForMsgCommandWithGreedyMessage_isExactlyAsExpected() {
         ArgsParser<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/msg: send a message")
                 .addUsageExample("/msg [-server <name>] <target> <message>")
-                .addStringFlag(
-                        's',
-                        "server",
-                        (p, v) -> {
-                            /* ignore in test */
-                        },
-                        "server name",
-                        false)
+                .addStringFlag('s', "server", ArgsParserTest::noop, "server name", false)
                 .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
-                .addGreedyStringPositional(
-                        1,
-                        (p, v) -> {
-                            /* ignore in test */
-                        },
-                        "message text",
-                        true)
+                .addGreedyStringPositional(1, ArgsParserTest::noop, "message text", true)
                 .build();
 
         String help = parser.getHelpText();
@@ -337,9 +298,9 @@ class ArgsParserTest {
     void helpTextForPartCommandWithGreedyChannelList_isExactlyAsExpected() {
         ArgsParser<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/part: leave one or more channels")
                 .addUsageExample("/part [-quiet] <server> <channel> [<channel> ...]")
-                .addBooleanFlag('q', "quiet", (p, v) -> p.verbose = v, "do not send PART messages", false)
-                .addStringPositional(0, (p, v) -> p.input = v, "server name", true)
-                .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "channel names", false)
+                .addBooleanFlag('q', "quiet", TestProps::setVerbose, "do not send PART messages", false)
+                .addStringPositional(0, TestProps::setInput, "server name", true)
+                .addGreedyListPositional(1, p -> p.extraArgs, TestProps::setExtraArgs, "channel names", false)
                 .build();
 
         String help = parser.getHelpText();
@@ -363,13 +324,13 @@ class ArgsParserTest {
     @Test
     void doubleDashStopsFlagParsing() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser = newParser()
-                .addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "verbose", false)
-                .addStringPositional(0, (p, v) -> p.input = v, "input file", true);
+                .addBooleanFlag('v', "verbose", TestProps::setVerbose, "verbose", false)
+                .addStringPositional(0, TestProps::setInput, "input file", true);
 
         TestProps props = parse(parser, "-v", "--", "-notAFlag");
 
         assertTrue(props.verbose);
-        assertEquals("-notAFlag", props.input); // treated as positional, not a flag
+        assertEquals("-notAFlag", props.input);
     }
 
     @Test
@@ -393,7 +354,7 @@ class ArgsParserTest {
     @Test
     void missingValueForShortFlagThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringFlag('o', "output", (p, v) -> p.output = v, "output", false);
+                newParser().addStringFlag('o', "output", TestProps::setOutput, "output", false);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> parse(parser, "-o"));
 
@@ -403,7 +364,7 @@ class ArgsParserTest {
     @Test
     void missingValueForLongFlagThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addStringFlag('o', "output", (p, v) -> p.output = v, "output", false);
+                newParser().addStringFlag('o', "output", TestProps::setOutput, "output", false);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> parse(parser, "--output"));
 
@@ -413,7 +374,7 @@ class ArgsParserTest {
     @Test
     void badIntegerValueIsWrappedWithContext() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addIntegerFlag('n', "count", (p, v) -> p.count = v, "count", false);
+                newParser().addIntegerFlag('n', "count", TestProps::setCount, "count", false);
 
         IllegalArgumentException ex =
                 assertThrows(IllegalArgumentException.class, () -> parse(parser, "--count", "not-a-number"));
@@ -426,7 +387,7 @@ class ArgsParserTest {
     @Test
     void badPositionalValueIsWrappedWithContext() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addInetAddressPositional(0, (p, v) -> p.input = v.toString(), "input file", true);
+                newParser().addInetAddressPositional(0, ArgsParserTest::noop, "input file", true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> parse(parser, "|"));
 
@@ -438,11 +399,11 @@ class ArgsParserTest {
     @Test
     void duplicateShortFlagRegistrationThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addBooleanFlag('v', "verbose", (p, v) -> {}, "verbose", false);
+                newParser().addBooleanFlag('v', "verbose", ArgsParserTest::noop, "verbose", false);
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> parser.addBooleanFlag('v', "version", (p, v) -> {}, "version", false));
+                () -> parser.addBooleanFlag('v', "version", ArgsParserTest::noop, "version", false));
 
         assertTrue(ex.getMessage().contains("already exists"));
     }
@@ -450,21 +411,22 @@ class ArgsParserTest {
     @Test
     void duplicateLongFlagRegistrationThrows() {
         ArgsParserBuilder<TestProps> parser =
-                newParser().addBooleanFlag('v', "verbose", (p, v) -> {}, "verbose", false);
+                newParser().addBooleanFlag('v', "verbose", ArgsParserTest::noop, "verbose", false);
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> parser.addBooleanFlag('q', "verbose", (p, v) -> {}, "another verbose", false));
+                () -> parser.addBooleanFlag('q', "verbose", ArgsParserTest::noop, "another verbose", false));
 
         assertTrue(ex.getMessage().contains("already exists"));
     }
 
     @Test
     void duplicatePositionalRegistrationThrows() {
-        ArgsParserBuilder<TestProps> parser = newParser().addStringPositional(0, (p, v) -> p.input = v, "input", false);
+        ArgsParserBuilder<TestProps> parser = newParser().addStringPositional(0, TestProps::setInput, "input", false);
 
         IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class, () -> parser.addStringPositional(0, (p, v) -> {}, "another", false));
+                IllegalArgumentException.class,
+                () -> parser.addStringPositional(0, ArgsParserTest::noop, "another", false));
 
         assertTrue(ex.getMessage().contains("already exists"));
     }
@@ -473,8 +435,7 @@ class ArgsParserTest {
     void buildFailsWhenPositionalIndicesAreNotContiguous_singleGap() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                // Start at index 1, leaving index 0 empty
-                .addStringPositional(1, (p, v) -> p.input = v, "input file", true);
+                .addStringPositional(1, TestProps::setInput, "input file", true);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, builder::build);
 
@@ -485,20 +446,8 @@ class ArgsParserTest {
     void buildFailsWhenPositionalIndicesAreNotContiguous_multipleGaps() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                .addStringPositional(
-                        0,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg0",
-                        false)
-                .addStringPositional(
-                        2,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg2",
-                        false); // skips index 1
+                .addStringPositional(0, ArgsParserTest::noop, "arg0", false)
+                .addStringPositional(2, ArgsParserTest::noop, "arg2", false);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, builder::build);
 
@@ -509,27 +458,9 @@ class ArgsParserTest {
     void buildSucceedsWhenPositionalIndicesAreContiguous() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                .addStringPositional(
-                        0,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg0",
-                        false)
-                .addStringPositional(
-                        1,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg1",
-                        false)
-                .addStringPositional(
-                        2,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg2",
-                        false);
+                .addStringPositional(0, ArgsParserTest::noop, "arg0", false)
+                .addStringPositional(1, ArgsParserTest::noop, "arg1", false)
+                .addStringPositional(2, ArgsParserTest::noop, "arg2", false);
 
         // Should not throw
         ArgsParser<TestProps> parser = builder.build();
@@ -540,14 +471,8 @@ class ArgsParserTest {
     void buildFailsWhenGreedyStringPositionalIsNotLast() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                .addGreedyStringPositional(0, (p, v) -> p.input = v, "greedy", false)
-                .addStringPositional(
-                        1,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "non-greedy",
-                        false);
+                .addGreedyStringPositional(0, TestProps::setInput, "greedy", false)
+                .addStringPositional(1, ArgsParserTest::noop, "non-greedy", false);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, builder::build);
 
@@ -558,21 +483,9 @@ class ArgsParserTest {
     void buildFailsWhenGreedyListPositionalIsNotLast() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                .addStringPositional(
-                        0,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg0",
-                        false)
-                .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "greedy list", false)
-                .addStringPositional(
-                        2,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg2",
-                        false);
+                .addStringPositional(0, ArgsParserTest::noop, "arg0", false)
+                .addGreedyListPositional(1, p -> p.extraArgs, TestProps::setExtraArgs, "greedy list", false)
+                .addStringPositional(2, ArgsParserTest::noop, "arg2", false);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, builder::build);
 
@@ -583,14 +496,8 @@ class ArgsParserTest {
     void buildSucceedsWhenGreedyStringPositionalIsLast() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                .addStringPositional(
-                        0,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg0",
-                        false)
-                .addGreedyStringPositional(1, (p, v) -> p.input = v, "greedy", false);
+                .addStringPositional(0, ArgsParserTest::noop, "arg0", false)
+                .addGreedyStringPositional(1, TestProps::setInput, "greedy", false);
 
         ArgsParser<TestProps> parser = builder.build();
         assertNotNull(parser);
@@ -600,14 +507,8 @@ class ArgsParserTest {
     void buildSucceedsWhenGreedyListPositionalIsLast() {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("java TestProps [options] [args]")
-                .addStringPositional(
-                        0,
-                        (p, v) -> {
-                            /* ignore */
-                        },
-                        "arg0",
-                        false)
-                .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "greedy list", false);
+                .addStringPositional(0, ArgsParserTest::noop, "arg0", false)
+                .addGreedyListPositional(1, p -> p.extraArgs, TestProps::setExtraArgs, "greedy list", false);
 
         ArgsParser<TestProps> parser = builder.build();
         assertNotNull(parser);
@@ -617,9 +518,9 @@ class ArgsParserTest {
     void parsesMsgCommandWithGreedyMessage() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/msg: send a message")
                 .addUsageExample("/msg [-server <name>] <target> <message>")
-                .addStringFlag('s', "server", (p, v) -> p.output = v, "server name", false)
-                .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
-                .addGreedyStringPositional(1, (p, v) -> p.message = v, "message text", true);
+                .addStringFlag('s', "server", TestProps::setOutput, "server name", false)
+                .addStringPositional(0, TestProps::setInput, "target nick or channel", true)
+                .addGreedyStringPositional(1, TestProps::setMessage, "message text", true);
 
         TestProps props = parse(parser, "-s", "irc.example.org", "nick", "hello", "there", "world");
 
@@ -632,9 +533,9 @@ class ArgsParserTest {
     void parsesMsgCommandWithGreedyQuotedMessage() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/msg: send a message")
                 .addUsageExample("/msg [-server <name>] <target> <message>")
-                .addStringFlag('s', "server", (p, v) -> p.output = v, "server name", false)
-                .addStringPositional(0, (p, v) -> p.input = v, "target nick or channel", true)
-                .addGreedyStringPositional(1, (p, v) -> p.message = v, "message text", true);
+                .addStringFlag('s', "server", TestProps::setOutput, "server name", false)
+                .addStringPositional(0, TestProps::setInput, "target nick or channel", true)
+                .addGreedyStringPositional(1, TestProps::setMessage, "message text", true);
 
         TestProps props = parse(parser, "-s", "irc.example.org", "nick", "\"hello there world\"");
 
@@ -648,9 +549,9 @@ class ArgsParserTest {
         ArgsParserBuilder<TestProps> parser = ArgsParser.builder(
                         TestProps::new, true, "/part: leave one or more channels")
                 .addUsageExample("/part [-quiet] <server> <channel> [<channel> ...]")
-                .addBooleanFlag('q', "quiet", (p, v) -> p.verbose = v, "do not send PART messages", false)
-                .addStringPositional(0, (p, v) -> p.input = v, "server name", true)
-                .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "channel names", true);
+                .addBooleanFlag('q', "quiet", TestProps::setVerbose, "do not send PART messages", false)
+                .addStringPositional(0, TestProps::setInput, "server name", true)
+                .addGreedyListPositional(1, p -> p.extraArgs, TestProps::setExtraArgs, "channel names", true);
 
         TestProps props = parse(parser, "-q", "irc.example.org", "#weechat", "#random", "#offtopic");
 
@@ -667,7 +568,7 @@ class ArgsParserTest {
     void parsesCommaSeparatedListPositional() throws ArgsParserHelpRequestedException {
         ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "/join: join channels")
                 .addUsageExample("/join <channel>[,<channel>...]")
-                .addCommaSeparatedListPositional(0, (p, v) -> p.extraArgs = v, "comma-separated channel list", true);
+                .addCommaSeparatedListPositional(0, TestProps::setExtraArgs, "comma-separated channel list", true);
 
         TestProps props = parse(parser, "#weechat,#random,#offtopic");
 
@@ -680,8 +581,8 @@ class ArgsParserTest {
         ArgsParserBuilder<TestProps> parser = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("MODE <target> <modes> [args...]")
                 .setFlagParsingEnabled(false)
-                .addStringPositional(0, (p, v) -> p.input = v, "command name", true)
-                .addGreedyListPositional(1, p -> p.extraArgs, (p, v) -> p.extraArgs = v, "command arguments", false);
+                .addStringPositional(0, TestProps::setInput, "command name", true)
+                .addGreedyListPositional(1, p -> p.extraArgs, TestProps::setExtraArgs, "command arguments", false);
 
         TestProps props = parse(parser, "MODE", "-ov", "nick1", "nick2");
 
@@ -696,7 +597,7 @@ class ArgsParserTest {
     @Test
     void buildFailsWhenFlagParsingDisabledButFlagsAreDefined() {
         ArgsParserBuilder<TestProps> builder = newParser()
-                .addBooleanFlag('v', "verbose", (p, v) -> p.verbose = v, "verbose", false)
+                .addBooleanFlag('v', "verbose", TestProps::setVerbose, "verbose", false)
                 .setFlagParsingEnabled(false);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, builder::build);
@@ -709,7 +610,7 @@ class ArgsParserTest {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("cmd [args]")
                 .setFlagParsingEnabled(false)
-                .addGreedyStringPositional(0, (p, v) -> p.input = v, "rest", false);
+                .addGreedyStringPositional(0, TestProps::setInput, "rest", false);
 
         assertThrows(ArgsParserHelpRequestedException.class, () -> parse(builder, "--help"));
     }
@@ -719,7 +620,7 @@ class ArgsParserTest {
         ArgsParserBuilder<TestProps> builder = ArgsParser.builder(TestProps::new, true, "test parser")
                 .addUsageExample("cmd [args]")
                 .setFlagParsingEnabled(false)
-                .addGreedyStringPositional(0, (p, v) -> p.input = v, "rest", false);
+                .addGreedyStringPositional(0, TestProps::setInput, "rest", false);
 
         assertThrows(ArgsParserHelpRequestedException.class, () -> parse(builder, "-h"));
     }
@@ -727,7 +628,7 @@ class ArgsParserTest {
     @ParameterizedTest(name = "port={0}")
     @CsvSource({"-1-200", "1-200-", "-50", "70000"})
     void badPortRangeThrowsCorrectException(String value) {
-        ArgsParserBuilder<TestProps> parser = newParser().addPortFlag('p', "port", (p, v) -> p.port = v, "port", false);
+        ArgsParserBuilder<TestProps> parser = newParser().addPortFlag('p', "port", TestProps::setPort, "port", false);
 
         assertThrows(IllegalArgumentException.class, () -> parse(parser, "--port", value));
     }
@@ -743,8 +644,40 @@ class ArgsParserTest {
         Port port;
 
         @Override
-        public void validate() {
-            // no interesting behaviour here
+        public void validate() {}
+
+        public void setVerbose(boolean verbose) {
+            this.verbose = verbose;
+        }
+
+        public void setOutput(String output) {
+            this.output = output;
+        }
+
+        public void setCount(Integer count) {
+            this.count = count;
+        }
+
+        public void setInput(String input) {
+            this.input = input;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public void setExtraArgs(List<String> extraArgs) {
+            this.extraArgs = extraArgs;
+        }
+
+        public void setCharset(Charset charset) {
+            this.charset = charset;
+        }
+
+        public void setPort(Port port) {
+            this.port = port;
         }
     }
+
+    private static void noop(Object p, Object v) {}
 }

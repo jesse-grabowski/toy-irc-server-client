@@ -73,7 +73,7 @@ public class IRCClientState {
     }
 
     private Channel getOrCreateChannel(String rawChannelName) {
-        return channels.computeIfAbsent(canonicalizeChannel(rawChannelName), unused -> {
+        return channels.computeIfAbsent(canonicalizeChannel(rawChannelName), _ -> {
             Channel channel = new Channel();
             channel.name = rawChannelName;
             return channel;
@@ -85,7 +85,7 @@ public class IRCClientState {
     }
 
     private User getOrCreateUser(String rawNickname) {
-        User user = users.computeIfAbsent(canonicalizeNickname(rawNickname), unused -> {
+        User user = users.computeIfAbsent(canonicalizeNickname(rawNickname), _ -> {
             User u = new User();
             u.nickname = rawNickname;
             return u;

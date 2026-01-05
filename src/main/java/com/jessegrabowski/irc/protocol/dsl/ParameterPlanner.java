@@ -80,7 +80,7 @@ public class ParameterPlanner {
         }
         ParameterPlan plan = plans[index];
         return switch (plan) {
-            case DefaultParameterPlan unused -> extractor.getDefaultValue();
+            case DefaultParameterPlan _ -> extractor.getDefaultValue();
             case RangeParameterPlan p -> extractor.extract(p.start(), p.end(), parameters);
         };
     }

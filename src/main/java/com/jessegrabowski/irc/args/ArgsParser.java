@@ -52,12 +52,6 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * "Simple" command line argument parser. I'd love to pull in a library for this, but since we're
- * not using a proper build tool that'll probably be more painful than it's worth.
- *
- * @param <T> properties class type
- */
 public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T> {
 
     private static final Pattern TOKEN_FLAGS_END = Pattern.compile("^--$");
@@ -89,7 +83,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     @Override
     public ArgsParserBuilder<T> addUsageExample(String usageExample) {
         if (built) {
-            throw new IllegalStateException("com.jessegrabowski.irc.args.ArgsParser already built");
+            throw new IllegalStateException("ArgsParser already built");
         }
         usageExamples.add(usageExample);
         return this;
@@ -250,7 +244,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
     @Override
     public ArgsParser<T> build() {
         if (built) {
-            throw new IllegalStateException("com.jessegrabowski.irc.args.ArgsParser already built");
+            throw new IllegalStateException("ArgsParser already built");
         }
         if (positionalSpecs.size()
                 != positionalSpecs.stream()
@@ -317,7 +311,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
 
     private void addFlagSpec(FlagSpec<?> newFlag) {
         if (built) {
-            throw new IllegalStateException("com.jessegrabowski.irc.args.ArgsParser already built");
+            throw new IllegalStateException("ArgsParser already built");
         }
         for (FlagSpec<?> flag : flagSpecs) {
             if (flag.shortKey == newFlag.shortKey) {
@@ -332,7 +326,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
 
     private void addPositionalSpec(PositionalSpec<?> newPositional) {
         if (built) {
-            throw new IllegalStateException("com.jessegrabowski.irc.args.ArgsParser already built");
+            throw new IllegalStateException("ArgsParser already built");
         }
         for (PositionalSpec<?> positional : positionalSpecs) {
             if (positional.getPosition() == newPositional.getPosition()) {
@@ -360,7 +354,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
      */
     public T parse(String raw, List<ArgsToken> tokens) throws ArgsParserHelpRequestedException {
         if (!built) {
-            throw new IllegalStateException("com.jessegrabowski.irc.args.ArgsParser not yet built");
+            throw new IllegalStateException("ArgsParser not yet built");
         }
 
         Set<ArgSpec> usedSpecs = new HashSet<>();
@@ -491,7 +485,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
                 }
                 case DRAIN_RAW -> {
                     spec.apply(raw.substring(token.startInclusive()), properties);
-                    argsIterator.forEachRemaining(t -> {
+                    argsIterator.forEachRemaining(_ -> {
                         /* do nothing */
                     });
                 }
@@ -677,7 +671,7 @@ public class ArgsParser<T extends ArgsProperties> implements ArgsParserBuilder<T
                 boolean required) {
             // pass a fake mapper to the parent to satisfy the constructor, we override apply so it
             // doesn't matter
-            super(position, propertiesSetter, unused -> null, description, required, TokenConsumption.DRAIN_CONSUME);
+            super(position, propertiesSetter, _ -> null, description, required, TokenConsumption.DRAIN_CONSUME);
             this.collectionSupplier = Objects.requireNonNull(collectionSupplier, "collectionSupplier");
             this.propertiesGetter = Objects.requireNonNull(propertiesGetter, "propertiesGetter");
             this.propertiesSetter = Objects.requireNonNull(propertiesSetter, "propertiesSetter");

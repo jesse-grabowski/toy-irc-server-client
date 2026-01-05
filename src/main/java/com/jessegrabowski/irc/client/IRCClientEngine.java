@@ -204,7 +204,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
             if (connection != null) {
                 try {
                     connection.close();
-                } catch (Exception unused) {
+                } catch (Exception _) {
                     // do nothing
                 }
             }
@@ -227,7 +227,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
         if (connection != null) {
             try {
                 connection.close();
-            } catch (Exception unused) {
+            } catch (Exception _) {
                 // do nothing
             }
         }
@@ -1841,7 +1841,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
         if (connection != null) {
             try {
                 connection.close();
-            } catch (Exception unused) {
+            } catch (Exception _) {
                 // do nothing
             }
         }
