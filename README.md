@@ -88,6 +88,8 @@ Default locale: en_US, platform encoding: UTF-8
 OS name: "mac os x", version: "14.7.8", arch: "aarch64", family: "mac"
 ```
 
+If you do not have maven installed, you can use the maven wrapper script included in this project instead. Simply replace all mentions of `mvn` with `./mvnw`.
+
 For managing multiple Java versions on a single machine, I recommend using [jEnv](https://www.jenv.be/). When used with the Maven plugin enabled, jEnv will automatically detect the `.java-version` file in the project root and configure Maven to use the correct Java version.
 
 To build the project and produce a JAR file, run:
