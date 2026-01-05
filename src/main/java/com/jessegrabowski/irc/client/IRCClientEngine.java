@@ -162,6 +162,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
             return;
         }
         connectionHolder.set(null);
+        updateStatusAndPrompt();
 
         IRCConnection connection = null;
         try {
@@ -181,6 +182,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
             }
 
             clientStateGuard.setState(new IRCClientState());
+            updateStatusAndPrompt();
 
             if (properties.getMyAddress() != null) {
                 terminal.println(makeSystemTerminalMessage(s(
