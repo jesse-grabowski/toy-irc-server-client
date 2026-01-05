@@ -39,9 +39,9 @@ build/
 .vscode/
 
 ### Ergo ###
-ergo/config/*
-!ergo/config/
-!ergo/config/ircd.yaml
+test/compat/ergo/config/*
+!test/compat/ergo/config/
+!test/compat/ergo/config/ircd.yaml
 
 *.log
 *.log.*
