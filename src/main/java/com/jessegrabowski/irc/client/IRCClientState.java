@@ -62,6 +62,8 @@ public class IRCClientState {
     private final Map<String, PendingUploadKey> pendingUploadIndex = new HashMap<>();
     private final Map<PendingUploadKey, DCCUpload> pendingUploads = new HashMap<>();
 
+    private boolean listingUsers;
+
     private String me;
 
     private String canonicalizeChannel(String channelName) {
@@ -555,6 +557,18 @@ public class IRCClientState {
             download.setProgress(progress);
             download.setTotal(total);
         });
+    }
+
+    public boolean isListingUsers() {
+        return listingUsers;
+    }
+
+    public void startListingUsers() {
+        listingUsers = true;
+    }
+
+    public void stopListingUsers() {
+        listingUsers = false;
     }
 
     public static final class Channel {

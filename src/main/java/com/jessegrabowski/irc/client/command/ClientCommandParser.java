@@ -255,6 +255,14 @@ public class ClientCommandParser {
                         .addStringFlag('c', "channel", ClientCommandTopic::setChannel, "channel to view/modify", false)
                         .addGreedyStringPositional(0, ClientCommandTopic::setTopic, "topic to set", false)
                         .build());
+        parsers.put(
+                "/who",
+                ArgsParser.builder(ClientCommandWho::new, false, "view users on the server")
+                        .addUsageExample("/who [<mask>]")
+                        .addUsageExample("/who")
+                        .addUsageExample("/who j*")
+                        .addStringPositional(0, ClientCommandWho::setMask, "mask to search by", false)
+                        .build());
 
         List<String> commands = new ArrayList<>(parsers.keySet());
         commands.sort((a, b) -> Integer.compare(b.length(), a.length()));
@@ -290,10 +298,7 @@ public class ClientCommandParser {
         if (parsers.containsKey(cleanCommand)) {
             return parsers.get(cleanCommand).getHelpText();
         } else {
-            return """
-                    Could not find command '%s'
-
-                    %s""".formatted(cleanCommand, parsers.get(cleanCommand).getHelpText());
+            return "Could not find command '%s'".formatted(cleanCommand);
         }
     }
 }

@@ -475,9 +475,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
             case IRCMessage314 m -> {
                 /* ignore */
             }
-            case IRCMessage315 m -> {
-                /* ignore */
-            }
+            case IRCMessage315 m -> handle(m);
             case IRCMessage317 m -> {
                 /* ignore */
             }
@@ -1259,6 +1257,18 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
                 state.getMe(), Objects.requireNonNullElse(state.getAwayStatus(state.getMe()), "Marked AWAY by server"));
     }
 
+    private void handle(IRCMessage315 message) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            return;
+        }
+
+        if (state.isListingUsers()) {
+            terminal.println(makeSystemTerminalMessage("--- End of Users List ---"));
+        }
+        state.stopListingUsers();
+    }
+
     private void handle(IRCMessage331 message) {
         IRCClientState state = clientStateGuard.getState();
         if (state == null) {
@@ -1312,6 +1322,15 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
                             ? Objects.requireNonNullElse(
                                     state.getAwayStatus(message.getNick()), "Marked AWAY by server")
                             : null);
+        }
+
+        if (state.isListingUsers()) {
+            terminal.println(makeSystemTerminalMessage(s(
+                    state.isOperator(message.getNick()) ? f(Color.WHITE, b(Color.RED, "[OPER] ")) : "",
+                    state.isAway(message.getNick()) ? f(Color.GRAY, message.getNick()) : f(message.getNick()),
+                    state.isAway(message.getNick())
+                            ? s(" (Away: ", state.getAwayStatus(message.getNick()), ")")
+                            : "")));
         }
     }
 
@@ -1385,6 +1404,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
             case ClientCommandSend c -> handle(c);
             case ClientCommandSending c -> handle(c);
             case ClientCommandTopic c -> handle(c);
+            case ClientCommandWho c -> handle(c);
         }
         updateStatusAndPrompt();
     }
@@ -1464,12 +1484,18 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
         }
 
         if (!state.focusChannel(command.getTarget())) {
-            terminal.println(makeSystemErrorMessage(s(
-                    "Could not focus, you are not in ",
-                    f(command.getTarget()),
-                    " (try '/join ",
-                    command.getTarget(),
-                    "')")));
+            IRCServerParameters parameters = state.getParameters();
+            if (parameters.getChannelTypes().contains(command.getTarget().charAt(0))) {
+                terminal.println(makeSystemErrorMessage(s(
+                        "Could not focus, you are not in ",
+                        f(command.getTarget()),
+                        " (try '/join ",
+                        command.getTarget(),
+                        "')")));
+            } else {
+                terminal.println(makeSystemErrorMessage(
+                        s("Could not focus ", f(command.getTarget()), ", name is not a channel.")));
+            }
         }
     }
 
@@ -1650,6 +1676,18 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
         } else {
             terminal.println(makeSystemErrorMessage("Failed to set topic -- no channel specified"));
         }
+    }
+
+    private void handle(ClientCommandWho command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not query users -- connection not yet registered"));
+            return;
+        }
+
+        state.startListingUsers();
+        terminal.println(makeSystemTerminalMessage(s("--- Start of Users List (", command.getMask(), ") ---")));
+        send(new IRCMessageWHO(command.getMask()));
     }
 
     private boolean isChannel(IRCClientState state, String target) {

@@ -155,3 +155,85 @@ To start the client for evaluation, run the following command (replacing `192.16
 ```
 java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient -n jesse 192.168.40.129
 ```
+
+## Evaluation
+
+### Getting Started
+
+1. Launch the server and clients as described above. You may start them in any order; in this case I started the clients first to show what happens when a server cannot be found. If you start the server first, the clients will automatically connect to it.
+![getting-started.png](doc/getting-started.png)
+
+2. If a client does not connect to the server automatically, use `/connect` to try again.
+![manual-connect.png](doc/manual-connect.png)
+
+3. If you configure multiple clients to use the same nickname, you may see an error stating that your nickname is already in use. To fix this, select a new nickname using the `/nick <name>` command on the offending client. Note that this is temporary and will be reset when the client reconnects.
+![fix-nickname.png](doc/fix-nickname.png)
+
+4. Once you are fully connected, you will receive some informational messages from the server, including statistics on connected clients, available channels (if any), and a message of the day (MOTD). This guide focuses on the criteria of the assignment, but you can view additional capabilities using the `/help` command.
+![help.png](doc/help.png)
+
+### Listing Users
+
+To view a list of users currently connected to the server, use the `/who` command.
+
+![who.png](doc/who.png)
+
+### Listing Channels
+
+To view a list of channels currently available on the server, use the `/list` command. Note that channels are not created automatically, a user must first `/join` a channel for it to appear in the list.
+
+![list.png](doc/list.png)
+
+### Direct Messages
+
+Direct messages can be sent between clients using the `/msg <nickname> <message>` command.
+
+![msg.png](doc/msg.png)
+
+### Sending Files
+
+Files can be sent between clients using the `/send <nickname> <path>` command. File paths resolve relative to the directory the client was launched from.
+
+![send.png](doc/send.png)
+
+Upon initiating a send, both the sender and receiver will be given a numeric tracking ID that can be used to interact with the transfer (these numbers will likely be different for each client). To accept the transfer, the receiver should use the command `/accept <id>`.
+
+![accept.png](doc/accept.png)
+
+While small files will generally finish quite quickly, larger files may take longer to transfer. In those cases, both the sender and receiver will be able to view transfer progress in the status bar.
+
+![send-progress.png](doc/send-progress.png)
+
+Upon completion, the sender will be shown a success message. The receiver will be given the path to the transferred file. By default, this will be placed into a `downloads` directory relative to the directory the client was launched from.
+
+![send-success.png](doc/send-success.png)
+
+### Channels
+
+Upon joining the server, a user will not be in any channels. If they wish to join or create one, they may do so using the `/join <channel>` command. Generally, IRC channels generally must begin with the prefix `#` or `&`, although this is server-dependent.
+
+![join.png](doc/join.png)
+
+Doing so will cause the channel to be focused (shown in the prompt). Any text typed that isn't a valid command will be send to the focused channel as if the user had typed `/msg <channel> <text>`.
+
+![join-focus.png](doc/join-focus.png)
+
+By default, a channel has no topic. A topic may be set by using `/topic <topic>` and the current topic may be viewed using `/topic`.
+
+![topic.png](doc/topic.png)
+
+Users may focus a different channel using the `/focus <channel>` command.
+
+![focus.png](doc/focus.png)
+
+Finally, users may leave a channel using the `/part <channel>` command. This will cause the client to disconnect from the channel, and their focus will be set to the last channel they interacted with before it, if any.
+
+![part.png](doc/part.png)
+
+### Exiting the Server
+
+Users may gracefully disconnect from the server using the `/quit` command, with an optional message (`/quit <message>`) that will be shown to any users that share a channel with them.
+
+![quit.png](doc/quit.png)
+
+Finally, users may exit the client gracefully by using the `/exit` command. Both the client and server also handle JVM shutdown signals (`CTRL+C`); this is the expected way to close the server.
