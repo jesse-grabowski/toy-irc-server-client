@@ -206,7 +206,7 @@ public class Acceptor implements Closeable {
         state = State.CLOSED;
 
         InetSocketAddress address = (InetSocketAddress) serverSocket.getLocalSocketAddress();
-        LOG.info("No longer listening on " + address);
+        System.err.println("No longer listening on " + address);
 
         // interrupt serverSocket.accept()
         try {
@@ -214,7 +214,8 @@ public class Acceptor implements Closeable {
                 serverSocket.close();
             }
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "Error closing server socket", e);
+            System.err.println("Error closing server socket");
+            e.printStackTrace(System.err);
         }
 
         // break out of failure retry backoff if necessary

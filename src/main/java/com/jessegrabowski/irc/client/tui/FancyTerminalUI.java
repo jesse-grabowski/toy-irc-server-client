@@ -129,7 +129,6 @@ public class FancyTerminalUI extends TerminalUI {
 
         messageBuffer.addLast(message);
 
-        // Enforce max buffer size
         while (messageBuffer.size() > MAX_MESSAGES) {
             messageBuffer.removeFirst();
         }
@@ -179,7 +178,6 @@ public class FancyTerminalUI extends TerminalUI {
         String completedLine = null;
         synchronized (this) {
             switch (c) {
-                // Enter / Return
                 case '\r', '\n' -> {
                     if (!inputBuffer.isEmpty()) {
                         completedLine = inputBuffer.toString();
@@ -187,7 +185,6 @@ public class FancyTerminalUI extends TerminalUI {
                     }
                     renderFooter();
                 }
-                // Backspace / Delete
                 case '\b', 0x7F -> {
                     if (!inputBuffer.isEmpty()) {
                         inputBuffer.deleteCharAt(inputBuffer.length() - 1);
@@ -195,7 +192,6 @@ public class FancyTerminalUI extends TerminalUI {
                     }
                 }
                 default -> {
-                    // Printable ASCII
                     if (c >= 32 && c < 127) {
                         inputBuffer.append(c);
                         renderFooter();
@@ -219,14 +215,14 @@ public class FancyTerminalUI extends TerminalUI {
 
     private synchronized int getRows() {
         return switch (dimensions) {
-            case STTY.UnknownTerminalDimensions d -> 24;
+            case STTY.UnknownTerminalDimensions _ -> 24;
             case STTY.KnownTerminalDimensions d -> d.rows();
         };
     }
 
     private synchronized int getCols() {
         return switch (dimensions) {
-            case STTY.UnknownTerminalDimensions d -> 80;
+            case STTY.UnknownTerminalDimensions _ -> 80;
             case STTY.KnownTerminalDimensions d -> d.cols();
         };
     }
@@ -237,12 +233,10 @@ public class FancyTerminalUI extends TerminalUI {
         renderFooter();
     }
 
-    // Layout: [metadata (METADATA_WIDTH)] [space] [VERTICAL_RULE] [space] [message...]
     private synchronized void renderMessages() {
         int rows = getRows();
         int cols = getCols();
 
-        // figure out how many rows we need to display, terminate early if the terminal is tiny
         int maxMessageRows = rows - FOOTER_ROWS;
         if (maxMessageRows <= 0) {
             return;
@@ -284,7 +278,6 @@ public class FancyTerminalUI extends TerminalUI {
             }
         }
 
-        // trim / pad to the height of the terminal
         while (visualRows.size() < maxMessageRows) {
             visualRows.addFirst("");
         }
@@ -292,7 +285,6 @@ public class FancyTerminalUI extends TerminalUI {
             visualRows.removeFirst();
         }
 
-        // print in order from top to bottom in a single pass
         for (int row = 0; row < visualRows.size(); row++) {
             moveCursor(row + 1, 1);
             clearLine();
@@ -355,7 +347,6 @@ public class FancyTerminalUI extends TerminalUI {
         int rows = getRows();
         int cols = getCols();
 
-        // terminal too small
         if (rows < 3 || cols < METADATA_WIDTH + 3) {
             return;
         }

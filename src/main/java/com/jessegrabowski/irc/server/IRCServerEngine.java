@@ -78,6 +78,7 @@ import com.jessegrabowski.irc.util.Pair;
 import com.jessegrabowski.irc.util.StateGuard;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -134,7 +135,9 @@ public class IRCServerEngine
         this.parameters = IRCServerParametersLoader.load(properties.getIsupportProperties());
         ServerState state = new ServerState(properties, parameters);
 
-        this.motd = new String(properties.getMotd().getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        try (InputStream motdIs = properties.getMotd().getInputStream()) {
+            this.motd = new String(motdIs.readAllBytes(), StandardCharsets.UTF_8);
+        }
 
         this.serverStateGuard = new StateGuard<>(state);
 
@@ -169,6 +172,11 @@ public class IRCServerEngine
 
     @Override
     public boolean dispatch(Socket socket) {
+        if (engineState.get() != IRCServerEngineState.ACTIVE) {
+            LOG.log(Level.WARNING, "Received connection while shutting down engine");
+            return false;
+        }
+
         executor.execute(spy(() -> {
             IRCConnection connection = new IRCConnection(socket);
             connection.addIngressHandler(this);
@@ -184,11 +192,17 @@ public class IRCServerEngine
                 connection.close();
             }
         }));
+
         return true;
     }
 
     @Override
     public void onDisconnect(IRCConnection connection) {
+        if (engineState.get() != IRCServerEngineState.ACTIVE) {
+            LOG.log(Level.FINEST, "Received disconnect while shutting down engine");
+            return;
+        }
+
         executor.execute(() -> handleDisconnect(connection));
     }
 
@@ -483,6 +497,14 @@ public class IRCServerEngine
     }
 
     private void parseAndHandleAsync(IRCConnection client, String line) {
+        if (engineState.get() != IRCServerEngineState.ACTIVE) {
+            LOG.log(Level.WARNING, "Received message while shutting down engine");
+            return;
+        }
+
+        // deserialization is a bit heavy and is stateless so intentionally do it on the calling
+        // thread to mitigate DoS if someone finds a particularly slow request format
+
         IRCMessage message = UNMARSHALLER.unmarshal(parameters, StandardCharsets.UTF_8, line);
         executor.execute(() -> handle(client, message));
     }
@@ -1030,6 +1052,8 @@ public class IRCServerEngine
         }
     }
 
+    // this method is an absolute nightmare, but splitting it into smaller methods makes it
+    // even harder to follow
     private void updateOrViewModes(IRCConnection connection, IRCMessageMODE message) throws Exception {
         List<Character> unknownModes = new ArrayList<>();
         List<Character> addedModes = new ArrayList<>();
@@ -2083,9 +2107,22 @@ public class IRCServerEngine
             return;
         }
 
-        LOG.info("IRCClientEngine shutting down...");
+        System.err.println("IRCServerEngine shutting down...");
 
-        executor.shutdownNow();
+        executor.execute(() -> {
+            ServerState state = serverStateGuard.getState();
+            state.getConnections().forEach(IRCConnection::closeDeferred);
+        });
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.err.println("IRCServerEngine shutdown complete");
     }
 
     private Runnable spy(Runnable runnable) {
@@ -2101,6 +2138,11 @@ public class IRCServerEngine
 
     @Override
     public void onEvent(DCCServerEvent event) {
+        if (engineState.get() == IRCServerEngineState.CLOSED) {
+            LOG.warning("Ignoring DCC event after engine shutdown");
+            return;
+        }
+
         executor.execute(() -> handle(event));
     }
 

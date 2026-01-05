@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.logging.Level;
 
 public class IRCServer {
+
     static void main(String[] args) throws IOException {
         IRCServerProperties properties = parseArgs(args);
 
@@ -52,6 +53,18 @@ public class IRCServer {
         IRCServerEngine ircEngine = new IRCServerEngine(properties, dccEngine);
         Acceptor acceptor = new Acceptor(null, properties.getPort(), ircEngine);
         acceptor.start();
+
+        Runtime.getRuntime()
+                .addShutdownHook(new Thread(
+                        () -> {
+                            // annoying java.util.logging race condition forces us to use
+                            // System.err in here, since our logger might already be closed
+                            System.err.println("Shutting down IRCServer...");
+                            acceptor.close();
+                            ircEngine.close();
+                            dccEngine.close();
+                        },
+                        "IRCServer-ShutdownHook"));
     }
 
     private static IRCServerProperties parseArgs(String[] args) {
@@ -78,6 +91,18 @@ public class IRCServer {
                         "log level, integer or j.u.l.Level well-known name",
                         false)
                 .addStringFlag('P', "password", IRCServerProperties::setPassword, "password for the IRC server", false)
+                .addIntegerFlag(
+                        'f',
+                        "ping-frequency",
+                        IRCServerProperties::setPingFrequencyMilliseconds,
+                        "client heartbeat frequency (ms)",
+                        false)
+                .addIntegerFlag(
+                        'i',
+                        "idle-timeout",
+                        IRCServerProperties::setMaxIdleMilliseconds,
+                        "duration of inactivity before a client is considered dead (ms)",
+                        false)
                 .addResourceFlag(
                         'I',
                         "isupport-properties",

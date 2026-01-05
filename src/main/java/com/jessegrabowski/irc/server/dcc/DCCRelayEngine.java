@@ -237,6 +237,8 @@ public class DCCRelayEngine implements Closeable {
             return;
         }
 
+        System.err.println("Shutting down DCCRelayEngine...");
+
         try {
             executor.submit(() -> {
                         Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
@@ -247,12 +249,23 @@ public class DCCRelayEngine implements Closeable {
                     .get(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            LOG.log(Level.WARNING, "Interrupted while waiting for engine shutdown", e);
+            System.err.println("Interrupted while waiting for engine shutdown");
+            e.printStackTrace(System.err);
         } catch (TimeoutException | ExecutionException e) {
-            LOG.log(Level.WARNING, "Error waiting for engine shutdown", e);
+            System.err.println("Error waiting for engine shutdown");
+            e.printStackTrace(System.err);
         }
 
-        executor.shutdownNow();
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.err.println("DCCRelayEngine shut down");
     }
 
     private class DCCPipeHolder {

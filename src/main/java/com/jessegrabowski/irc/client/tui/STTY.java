@@ -62,8 +62,7 @@ public final class STTY {
     private static final TerminalDimensions UNKNOWN_TERMINAL_DIMENSIONS = new UnknownTerminalDimensions();
 
     // mutable state in a static helper class is a bit gross, but in this case it's probably fine
-    // since it's
-    // guarding the jvm's mutable shutdown hook global state
+    // since it's guarding the jvm's mutable shutdown hook global state
     private static final AtomicBoolean RESTORATION_HOOK_REGISTERED = new AtomicBoolean(false);
 
     // non-instantiable
@@ -164,7 +163,7 @@ public final class STTY {
             throw new IOException("Interrupted while waiting for stty", e);
         }
 
-        LOG.log(Level.FINEST, "com.jessegrabowski.irc.client.tui.STTY: {0} -> {1}", new Object[] {command, output});
+        LOG.log(Level.FINEST, "STTY: {0} -> {1}", new Object[] {command, output});
 
         if (exitCode != 0) {
             throw new IOException("stty exited with code %d: %s".formatted(exitCode, output));
