@@ -132,7 +132,7 @@ public class DCCDownloader {
                 byte[] buffer = new byte[16 * 1024];
 
                 long lastProgressAlert = 0;
-                while (true) {
+                while (length == null || received < length) {
                     if (cancelled.get()) {
                         throw new IOException("Download cancelled");
                     }
@@ -140,6 +140,9 @@ public class DCCDownloader {
                     int n = socketIn.read(buffer);
                     if (n == -1) {
                         break;
+                    }
+                    if (length != null && received + n > length) {
+                        n = (int) (length - received);
                     }
 
                     fileOut.write(buffer, 0, n);

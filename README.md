@@ -156,7 +156,7 @@ To start the client for evaluation, run the following command (replacing `192.16
 java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient -n jesse 192.168.40.129
 ```
 
-## Evaluation
+## Using the Application
 
 ### Getting Started
 
@@ -237,3 +237,219 @@ Users may gracefully disconnect from the server using the `/quit` command, with 
 ![quit.png](doc/quit.png)
 
 Finally, users may exit the client gracefully by using the `/exit` command. Both the client and server also handle JVM shutdown signals (`CTRL+C`); this is the expected way to close the server.
+
+## Understanding the Code
+
+As this application covers the entirety of the modern IRC specification, there is quite a bit of code that is not necessarily relevant to the assignment but is required for specific IRC features to work. To help with evaluation, this section will focus on the overall structure of the project and a suggested approach for understanding the code.
+
+### Packages
+
+This project utilizes a shared codebase for both the client and server, which can be found in the `src/main/java` directory. Each package has a defined purpose, which is outlined below.
+
+#### com.jessegrabowski.irc.args
+
+This package is responsible for parsing command-line arguments and converting them into a format suitable for consumption by the rest of the application. It is used both when starting the application and for interpreting user commands to the client. The most important class here is `ArgsParser`, everything else is used to support it.
+
+#### com.jessegrabowski.irc.client
+
+This package contains all of the client-specific logic for the application, including the main method for starting the client (`com.jessegrabowski.irc.client.IRCClient`).
+
+#### com.jessegrabowski.irc.client.command
+
+This package contains the logic for interpreting user commands, including a registry of `ArgsParser` instances that can be used to parse specific command arguments.
+
+#### com.jessegrabowski.irc.client.command.model
+
+This package contains Java classes representing each individual client command.
+
+#### com.jessegrabowski.irc.client.dcc
+
+This package contains the logic for handling DCC file transfers, including event definitions and a `DCCUploader` and `DCCDownloader` class for managing the transfer.
+
+#### com.jessegrabowski.irc.client.tui
+
+This package contains the logic for the client's text-based user interface.
+
+#### com.jessegrabowski.irc.network
+
+This package contains shared networking logic, including an acceptor loop for handling incoming socket connections (`ServerSocket` wrapper) and `IRCConnection`, a bidirectional stream abstraction for sending and receiving raw IRC messages.
+
+#### com.jessegrabowski.irc.protocol
+
+This package contains the logic for parsing raw IRC messages into Java objects (`IRCMessageUnmarshaller` and `IRCMessageMarshaller`), as well as some helper classes for dealing with generic IRC messages and some enums containing protocol-relevant concepts.
+
+#### com.jessegrabowski.irc.protocol.dsl
+
+This package contains a DSL for defining IRC messages to make the unmarshaller a bit easier to read.
+
+#### com.jessegrabowski.irc.protocol.model
+
+This package contains Java classes representing each individual IRC message type.
+
+#### com.jessegrabowski.irc.server
+
+This package contains all of the server-specific logic for the application, including the main method for starting the server (`com.jessegrabowski.irc.server.IRCServer`).
+
+#### com.jessegrabowski.irc.server.dcc
+
+This package contains the logic for relaying DCC file transfers through the server, including `DCCRelayEngine` for overall management.
+
+#### com.jessegrabowski.irc.server.state
+
+This package includes the application-level state of the server, including a registry of users, channels, and DCC transfers.
+
+#### com.jessegrabowski.irc.util
+
+This package contains various utility classes used throughout the application.
+
+### Common Classes
+
+#### com.jessegrabowski.irc.network.IRCConnection
+
+This class works as a bidirectional channel for sending and receiving lines of IRC messages. It wraps a `Socket` and provides simple, non-blocking methods for interacting with it. This class wraps a pair of threads, one for sending (egress) which blocks on a queue until someone submits a message before sending it over the socket and repeating, and one for receiving (ingress) which blocks on the socket until a line is received before dispatching it to an `IRCIngressHandler` (which is implemented by `IRCClientEngine`). The `offer(String)` method is used to submit a message to the egress queue; it returns true if the message is accepted, or false if we've hit backpressure (which is less relevant for the client, but kills the connection on the server).
+
+#### com.jessegrabowski.irc.protocol.model.IRCMessage
+
+This is the base class for our Java representations of IRC messages. There are quite a few subclasses of this, but they are all very similarly structured, so I recommend looking at one or two of them to get a feel for the pattern and then ignoring the rest.
+
+#### com.jessegrabowski.irc.protocol.IRCMessageMarshaller
+
+This class is responsible for mapping an `IRCMessage` to a raw string suitable for sending over the network. Marshalling is fairly simple in this context, so this is mostly responsible for determining what order the fields of each Java type should be serialized in, with a few helper methods for edge cases like lists and optional values.
+
+#### com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller
+
+This class is responsible for parsing a raw string into an `IRCMessage` instance. This is an extremely complicated class, as we need to handle hundreds of message types, so a large amount of supporting logic exists in `com.jessegrabowski.irc.protocol.dsl` to make this easier to understand. Here's an example of how it is used:
+
+```java
+private IRCMessage004 parse004(Parameters parameters) throws Exception {
+    return parameters.inject(
+            required("client"),
+            required("servername"),
+            required("version"),
+            required("available user modes"),
+            required("available channel modes"),
+            optional("channel modes with a parameter"),
+            IRCMessage004::new);
+}
+
+private IRCMessage005 parse005(Parameters parameters) throws Exception {
+    return parameters.inject(
+            required("client"),
+            greedyRequiredMap("tokens", this::splitToEntry),
+            required("text"),
+            IRCMessage005::new);
+}
+```
+
+You'll note that any message type that has optional or non-string fields gets its own method, while the simpler method types are parsed in a large switch-expression at the top using `parseExact(~)`. The `Parameters` class wraps a simple `List<String>` of incoming fields and maps them to the correct type based on the arguments to `inject(~)`, filling fields from left to right and skipping any optional fields that are not present (i.e., each required field MUST claim one parameter, optional fields MAY claim one of there are any remaining, and greedy fields claim all remaining parameters. Optional fields are resolved on a first-come-first-served basis).
+
+### Client Walkthrough
+
+This section will walk through the client's code, focusing on the parts that are especially relevant to the assignment.
+
+#### com.jessegrabowski.irc.client.IRCClient
+
+This class is the main entrypoint for the application. The main method parses command line arguments (Using `ArgsParser`) into an `IRCClientProperties` object, sets up logging, creates and starts the various components of the client (`TerminalUI`, `IRCClientEngine`, and `ClientCommandDispatcher`), and wires everything together.
+
+#### com.jessegrabowski.irc.client.tui.TerminalUI
+
+This is the abstract base class of both of our terminal implementations and gives an idea of what capabilities are available. Of note, the `TerminalInputHandler` abstraction is used to dispatch lines of user input to `ClientCommandDispatcher`. Also, it exposes methods to set the prompt, update the status bar, and print lines to the terminal. These methods work in terms of `RichString`s instead of regular strings, as we need a bit more functionality than what is provided by the standard library.
+
+#### com.jessegrabowski.irc.client.tui.RichString
+
+This class wraps a Java string but provides additional formatting information, such as a background or foreground color or a weight. It is used extensively throughout the client to display text in different colors and styles. It also contains some static utility methods mirroring the standard String class to make it easier to work with.
+
+#### com.jessegrabowski.irc.client.command.ClientCommandDispatcher
+
+This class is responsible for converting lines of user input into `IRCCommand` objects and dispatching them to `IRCClientEngine`. It does so using a registry of `ArgsParser` instances via `ClientCommandParser`.
+
+#### com.jessegrabowski.irc.client.IRCClientEngine
+
+This is the main brain of the client. 
+
+The first method you'll want to look at is the constructor, which sets up the work queue (indirectly, as a `ScheduledExecutorService`). This also sets up our `StateGuard`, an abstraction used throughout the engine classes to ensure that state is only touched from a single thread.
+
+Next, take a look at the `start()` method, which is called by the main method on startup. The interesting bit here is the call to `accept(ClientCommand)` with an instance of `ClientCommandConnect`, which is how the client does its automatic connection attempt at startup. We'll discuss how these commands are handled in a bit, but for now, you can treat this like a direct call to the `connect()` method.
+
+The `connect()` method is responsible for establishing a connection to the server. It does so using the `IRCClientConnectionFactory` class, which is responsible for creating a `Socket` and wrapping it in our `IRCConnection` abstraction. Once we have a connection object, this method fires off a series of commands to register the client with the server and set up various capabilities using the `send(IRCMessage)` method.
+
+Looking deeper at the `send(IRCMessage)` method, we can see that it simply marshals the message into a raw string and sends it using our `IRCConnection` abstraction.
+
+```java
+private boolean send(IRCMessage message) {
+  return send(MARSHALLER.marshal(message));
+}
+
+private boolean send(String message) {
+    IRCConnection connection = connectionHolder.get();
+    if (connection == null) {
+        return false;
+    }
+    return connection.offer(message);
+}
+```
+
+Next, you'll want to take a look at `accept(ClientCommand)`, the method that handles incoming commands from the `ClientCommandDispatcher`. You'll notice that it immediately passes the command off to the `ScheduledExecutorService` for serialized execution of the `handle(ClientCommand)` method. Jumping down to there, you'll see a large switch-expression exhaustively covering all of the different command types; as this is using sealed interfaces, there is a compile-time check enforcing that every possible branch is covered. To understand how these are handled, let's take a quick look at the handler for `ClientCommandMsg`; the others are similar.
+
+```java
+private void handle(ClientCommandMsg command) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+        terminal.println(makeSystemErrorMessage("Could not send message -- connection not yet registered"));
+        return;
+    }
+
+    send(new IRCMessagePRIVMSG(command.getTargets(), command.getText()));
+
+    if (!state.getCapabilities().isActive(IRCCapability.ECHO_MESSAGE)) {
+        for (String target : command.getTargets()) {
+            terminal.println(
+                    new TerminalMessage(LocalTime.now(), f(state.getMe()), f(target), s(command.getText())));
+        }
+    }
+}
+```
+
+First, we check that our connection status is correct and show an error message if it isn't. Next, we send an IRC message to the server using `send(IRCMessage)` again, more or less directly passing the input as given by the user. Finally, we conditionally print a message to the terminal.
+
+Finally, we need to understand how this class receives incoming messages from the server. `IRCConnection` calls `receive(IRCConnection, String)` each time a new line arrives, where it is immediately shifted over to the engine's thread. From there, it is parsed (as parsing requires state from the server) and dispatched via the `handle(IRCMessage)` method. Each message type (except for the simple, informational ones) has its own handler method. For example, here's the handler for a PRIVMSG command:
+
+```java
+private void handle(IRCMessagePRIVMSG message) {
+    IRCClientState state = clientStateGuard.getState();
+    if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+        return;
+    }
+
+    LocalTime time = getMessageTime(message);
+    for (String target : message.getTargets()) {
+        terminal.println(new TerminalMessage(time, f(message.getPrefixName()), f(target), s(message.getMessage())));
+    }
+
+    state.touch(message.getPrefixName());
+}
+```
+
+Once again, we begin by making sure we're fully connected. We then simply display the message as-is to the user, and update the last-active time for the sender.
+
+Finally, file transfers involve a bit of additional logic beyond normal IRC processing. The methods of interest here are `handle(ClientCommandAccept)`, which is called when a user types `/accept <id>` and spawns a `DCCDownloader`, and `handle(IRCMessageCTCPDCCReceive)`, which is called when the receiver connects to the server's DCC relay and spawns a `DCCUploader`.
+
+As there are quite a few handlers, here is a brief listing of the most relevant ones for the assignment:
+- `handle(IRCMessageCTCPDCCSend)` - The receiver of a file transfer receives this message when the sender initiates the transfer. If they accept it, the transfer is done out of band using `DCCDownloader`.
+- `handle(IRCMessageCTCPDCCReceive)` - The sender of a file transfer receives this message once the receiver accepts the transfer. This causes the transfer to be performed out of band using `DCCUploader`.
+- `handle(IRCMessagePRIVMSG)` - This is called whenever a user receives a direct message, or when a channel the user is joined to receives a message.
+- `handle(ClientCommandAccept)` - This is called when a user types `/accept <id>` and spawns a `DCCDownloader`. If all goes well, this will eventually lead to the transfer being completed and `handle(DCCClientDownloadCompletedEvent)` being called.
+- `handle(ClientCommandConnect)` - This is called automatically at application startup, or when the user types the `/connect` command. This sets up a connection between the client and the server. If all goes well, this should eventually lead to `handle(IRCMessage001)` being called.
+- `handle(ClientCommandExit)` - This is called when the user types `/exit` to gracefully shut down the client. If all goes well, this should result in `handle(IRCMessageERROR)` being called, as well as the termination of `IRCConnection`.
+- `handle(ClientCommandJoin)` - This is called when the user types `/join <channel>` to join a channel. If all goes well, this should eventually lead to `handle(IRCMessageJOIN)` being called.
+- `handle(ClientCommandMsg)` - This is called when the user types `/msg <nickname> <message>` to send a direct message to another user. If all goes well, this should eventually lead to `handle(IRCMessagePRIVMSG)` being called (if `echo-message` is negotiated, otherwise this will just print to the terminal itself).
+- `handle(ClientCommandPart)` - This is called when the user types `/part <channel>` to leave a channel. If all goes well, this should eventually lead to `handle(IRCMessagePART)` being called.
+- `handle(ClientCommandSend)` - This is called when the user types `/send <nickname> <path>` to initiate a file transfer. If all goes well, this should eventually lead to `handle(IRCMessageCTCPDCCReceive)` being called.
+
+#### com.jessegrabowski.irc.client.dcc.DCCDownloader
+
+This class is responsible for handling the receiving end of a file transfer. It's a relatively simple wrapper around a `Socket` that simply connects, reads as much as it needs to, then disconnects when the transfer is complete.
+
+#### com.jessegrabowski.irc.client.dcc.DCCUploader
+
+This class is responsible for handling the sending end of a file transfer. It's a relatively simple wrapper around a `Socket` that simply connects, writes the file as raw bytes, waits for an acknowledgement from the receiver, then disconnects.

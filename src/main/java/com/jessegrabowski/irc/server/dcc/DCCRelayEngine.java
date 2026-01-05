@@ -171,6 +171,7 @@ public class DCCRelayEngine implements Closeable {
     private boolean doPipe(
             Socket socket, UUID token, DCCPipeHolder holder, Function<UUID, DCCServerEvent> connectedEventFactory) {
         try (socket) {
+            socket.setSoTimeout(600000);
             holder.getSockets().add(socket);
             DCCRelayPipe pipe = holder.getPipe();
             executor.execute(() -> sendEvent(connectedEventFactory.apply(token)));

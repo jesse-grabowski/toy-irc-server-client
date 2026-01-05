@@ -73,9 +73,9 @@ public final class IRCConnection implements Closeable {
     private static final ThreadFactory FINALIZER_THREAD_FACTORY =
             Thread.ofVirtual().name("IRCConnection-Finalizer-", 0).factory();
 
-    // arbitrary cap of 50; in practice this should almost always be empty unless there's
+    // arbitrary cap; in practice this should almost always be empty unless there's
     // an issue with the connection or we're under very high load
-    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(50);
+    private final BlockingQueue<String> egressQueue = new ArrayBlockingQueue<>(200);
 
     private final List<IRCIngressHandler> ingressHandlers = new CopyOnWriteArrayList<>();
     private final List<IRCDisconnectHandler> shutdownHandlers = new CopyOnWriteArrayList<>();

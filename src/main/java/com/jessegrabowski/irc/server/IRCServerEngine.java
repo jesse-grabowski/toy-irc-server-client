@@ -177,6 +177,15 @@ public class IRCServerEngine
             return false;
         }
 
+        try {
+            socket.setSoTimeout(600000);
+            socket.setTcpNoDelay(true);
+            socket.setKeepAlive(true);
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Error setting socket options", e);
+            return true;
+        }
+
         executor.execute(spy(() -> {
             IRCConnection connection = new IRCConnection(socket);
             connection.addIngressHandler(this);
