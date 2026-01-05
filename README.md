@@ -8,6 +8,46 @@ RitsIRC is a mostly specification-compliant [Modern IRC](https://modern.ircdocs.
 
 - Jesse Grabowski (2600230465-0)
 
+## TLDR
+
+### Running the Application
+
+1. Build the application using `mvn clean package -DskipTests`
+2. Run the server using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.server.IRCServer -H <your IP> -L FINE` (`-H` must be correct for file transfers to work, but is optional for chatting)
+3. Run the client using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient <your IP>` (include `-n <nickname>` if you wish to use a custom nickname instead of a randomly generated one)
+
+### Exercising the Application
+
+1. Launch the server and at least two clients as shown above. Enter the following commands on at least one client.
+2. `/connect` if not automatically connected
+3. `/msg <nickname> <message>` to send a direct message to another user
+4. `/send <nickname> <path>` to send a file to another user
+5. `/accept <id>` to accept a file transfer from another user
+6. `/join #test` to join a channel named `#test`
+7. `/msg #test <message>` or enter text with no command if the channel is focused (prompt will be `[<nick>@<ip>/<focused channel>]`) to send a message to a channel
+
+### Evaluating the Networking Code
+
+1. Begin at `com.jessegrabowski.irc.network.IRCConnection` for the main IRC `Socket` code, shared by the server and client.
+2. Next look at `com.jessegrabowski.irc.network.Acceptor` for the server-side `ServerSocket` listener code, including the acceptor loop.
+3. Check out `com.jessegrabowski.irc.client.dcc.DCCDownloader` and `com.jessegrabowski.irc.client.dcc.DCCUploader` for the client-side file transfer code, and `com.jessegrabowski.irc.server.dcc.DCCRelayEngine` and `com.jessegrabowski.irc.server.dcc.DCCRelayPipe` for the server-side file transfer code.
+
+### Evaluating the Protocol Code
+
+1. Begin with `com.jessegrabowski.irc.protocol.model.IRCMessage` and a few of its subclasses for the message model.
+2. Next look at `com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller` for the main message parsing logic.
+3. Finally look at `com.jessegrabowski.irc.protocol.IRCMessageMarshaller` for the main message serialization logic.
+
+### Evaluating the Client
+
+1. Begin at the entrypoint: `com.jessegrabowski.irc.client.IRCClient`
+2. Check `com.jessegrabowski.irc.client.IRCClientEngine` for connection management and protocol handlers
+
+### Evaluating the Server
+
+1. Begin at the entrypoint: `com.jessegrabowski.irc.server.IRCServer`
+2. Check `com.jessegrabowski.irc.server.IRCServerEngine` for connection management and protocol handlers
+
 ## Project Structure
 
 RitsIRC is built using [Apache Maven](https://maven.apache.org/) and generally follows Maven’s standard project layout, with a few additional directories:
@@ -210,11 +250,11 @@ Upon completion, the sender will be shown a success message. The receiver will b
 
 ### Channels
 
-Upon joining the server, a user will not be in any channels. If they wish to join or create one, they may do so using the `/join <channel>` command. Generally, IRC channels generally must begin with the prefix `#` or `&`, although this is server-dependent.
+Upon joining the server, a user will not be in any channels. If they wish to join or create one, they may do so using the `/join <channel>` command. Generally, IRC channels must begin with the prefix `#` or `&`, although this is server-dependent.
 
 ![join.png](doc/join.png)
 
-Doing so will cause the channel to be focused (shown in the prompt). Any text typed that isn't a valid command will be send to the focused channel as if the user had typed `/msg <channel> <text>`.
+Doing so will cause the channel to be focused (shown in the prompt). Any text typed that isn't a valid command will be sent to the focused channel as if the user had typed `/msg <channel> <text>`.
 
 ![join-focus.png](doc/join-focus.png)
 
@@ -318,7 +358,7 @@ This class is responsible for mapping an `IRCMessage` to a raw string suitable f
 
 #### com.jessegrabowski.irc.protocol.IRCMessageUnmarshaller
 
-This class is responsible for parsing a raw string into an `IRCMessage` instance. This is an extremely complicated class, as we need to handle hundreds of message types, so a large amount of supporting logic exists in `com.jessegrabowski.irc.protocol.dsl` to make this easier to understand. Here's an example of how it is used:
+This class is responsible for parsing a raw string into an `IRCMessage` instance. This class covers nearly 200 message types so it is quite long, but it utilizes a DSL from `com.jessegrabowski.irc.protocol.dsl` to allow the mappings to be written declaratively. Parsing a message looks something like:
 
 ```java
 private IRCMessage004 parse004(Parameters parameters) throws Exception {
