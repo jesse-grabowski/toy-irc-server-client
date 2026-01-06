@@ -36,16 +36,30 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class IRCClientConnectionFactory {
 
+    private static final Logger LOG = Logger.getLogger(IRCClientConnectionFactory.class.getName());
+
     public static IRCConnection create(InetAddress host, int port, Charset charset, int connectTimeout, int readTimeout)
             throws IOException {
-        assert host != null;
-        assert port > 0 && port < 65536;
-        assert charset != null;
-        assert connectTimeout > 0;
-        assert readTimeout > 0;
+        if (host == null) {
+            throw new IllegalArgumentException("host cannot be null");
+        }
+        if (port <= 0 || port >= 65536) {
+            throw new IllegalArgumentException("port must be between 0 and 65535");
+        }
+        if (charset == null) {
+            throw new IllegalArgumentException("charset cannot be null");
+        }
+        if (connectTimeout <= 0) {
+            throw new IllegalArgumentException("connectTimeout must be greater than 0");
+        }
+        if (readTimeout <= 0) {
+            throw new IllegalArgumentException("readTimeout must be greater than 0");
+        }
 
         Socket socket = new Socket();
         socket.setTcpNoDelay(true);
@@ -65,8 +79,8 @@ public class IRCClientConnectionFactory {
             } else {
                 try {
                     socket.close();
-                } catch (IOException ignored) {
-                    // do nothing
+                } catch (IOException ex) {
+                    LOG.log(Level.WARNING, "Error closing IRCConnection socket", ex);
                 }
             }
             throw e;

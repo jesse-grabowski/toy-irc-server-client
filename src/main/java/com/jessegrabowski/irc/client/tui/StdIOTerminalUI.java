@@ -62,6 +62,10 @@ public class StdIOTerminalUI extends TerminalUI {
                 return;
             }
             dispatchInput(line).get();
+            // show a little spinner and block I/O for a bit while the server handles the request
+            // to prevent the user from typing something and getting interrupted halfway through
+            // This isn't perfect, but should trick the user into having a better experience most
+            // of the time
             if (System.console() != null) {
                 for (char c : "|/-\\".repeat(2).toCharArray()) {
                     System.out.print("\r\033[2K");

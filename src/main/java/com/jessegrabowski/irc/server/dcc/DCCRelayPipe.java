@@ -77,6 +77,8 @@ public class DCCRelayPipe {
         is.transferTo(os);
         os.flush();
 
+        // these are best effort, if they fail they'll get cleaned up
+        // properly when the socket is closed
         try {
             src.shutdownInput();
         } catch (IOException _) {

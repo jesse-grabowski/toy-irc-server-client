@@ -546,7 +546,7 @@ public class IRCClientState {
 
     public void startDownload(DCCDownload download, DCCDownloader downloader) {
         if (download.isStarted()) {
-            throw new IllegalStateException("Upload already started");
+            throw new IllegalStateException("Download already started");
         }
         download.setDownloader(downloader);
         downloader.start();

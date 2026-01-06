@@ -873,6 +873,7 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
                     " tried to request a file (",
                     message.getFilename(),
                     ") but you are already uploading it")));
+            return;
         }
 
         DCCUploader uploader = new DCCUploader(

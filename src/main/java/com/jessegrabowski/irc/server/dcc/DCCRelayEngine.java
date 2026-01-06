@@ -247,6 +247,7 @@ public class DCCRelayEngine implements Closeable {
         // Annoyingly, this has to be System.err instead of using JUL to avoid a shutdown race condition
         System.err.println("Shutting down DCCRelayEngine...");
 
+        // Make a best effort to cancel any in-flight requests
         try {
             executor.submit(() -> {
                         Map<UUID, DCCPipeHolder> pipes = pipesGuard.getState();
@@ -264,6 +265,8 @@ public class DCCRelayEngine implements Closeable {
             e.printStackTrace(System.err);
         }
 
+        // shut down the executor gracefully, then hard kill it if all the jobs
+        // don't finish quickly for some reason
         executor.shutdown();
         try {
             if (!executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {

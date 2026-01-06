@@ -187,7 +187,8 @@ public class DCCDownloader {
         }
         try {
             Files.deleteIfExists(path);
-        } catch (IOException _) {
+        } catch (IOException e) {
+            LOG.log(Level.FINE, "Failed to delete partially downloaded file", e);
         }
     }
 }
