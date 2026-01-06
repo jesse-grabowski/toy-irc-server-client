@@ -80,7 +80,13 @@ public class DCCRelayEngine implements Closeable {
                 Thread.ofPlatform()
                         .name("DCCRelay-Engine") // name the thread so it shows up nicely in our logs
                         .daemon(false) // we don't want the JVM to terminate until this thread dies
-                        .uncaughtExceptionHandler((t, e) -> LOG.log(Level.SEVERE, "Error executing task", e))
+                        .uncaughtExceptionHandler((_, e) -> {
+                            try {
+                                LOG.log(Level.SEVERE, "Error executing task", e);
+                            } catch (Exception _) {
+                                // logging can fail if this is hit during shutdown
+                            }
+                        })
                         .factory(),
                 // the more important bit is that we're overriding the default exception behavior, the
                 // logging just makes it a bit easier for us to spot stray messages during shutdown (which are
@@ -238,6 +244,7 @@ public class DCCRelayEngine implements Closeable {
             return;
         }
 
+        // Annoyingly, this has to be System.err instead of using JUL to avoid a shutdown race condition
         System.err.println("Shutting down DCCRelayEngine...");
 
         try {

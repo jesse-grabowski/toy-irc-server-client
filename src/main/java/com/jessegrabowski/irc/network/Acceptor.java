@@ -206,6 +206,7 @@ public class Acceptor implements Closeable {
         state = State.CLOSED;
 
         InetSocketAddress address = (InetSocketAddress) serverSocket.getLocalSocketAddress();
+        // Annoyingly, this has to be System.err instead of using JUL to avoid a shutdown race condition
         System.err.println("No longer listening on " + address);
 
         // interrupt serverSocket.accept()
