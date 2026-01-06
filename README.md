@@ -2,7 +2,7 @@
 
 This repository contains my solution to the final assignment for Ritsumeikan University’s 2025–2026 **53346 Network Systems** course.
 
-RitsIRC is a mostly specification-compliant [Modern IRC](https://modern.ircdocs.horse/) client and server written in pure Java. **This is a toy project and is not intended for production use**. While it is reasonably complete from a functional perspective, it lacks many security features and is not optimized for performance.
+RitsIRC is a mostly specification-compliant [Modern IRC](https://modern.ircdocs.horse/) client and server written in pure Java. **This is a toy project and is not intended for production use**.
 
 ## Team Members
 
@@ -12,9 +12,9 @@ RitsIRC is a mostly specification-compliant [Modern IRC](https://modern.ircdocs.
 
 ### Running the Application
 
-1. Build the application using `mvn clean package -DskipTests`
-2. Run the server using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.server.IRCServer -H <your IP> -L FINE` (`-H` must be correct for file transfers to work, but is optional for chatting)
-3. Run the client using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient <your IP>` (include `-n <nickname>` if you wish to use a custom nickname instead of a randomly generated one)
+1. Build the application using `mvn clean package -DskipTests` (or `./mvnw clean package -DskipTests` if you don't have Maven installed)
+2. Run the server using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.server.IRCServer -H <server IP> -L FINE` (`-H` must be correct for file transfers to work, but is optional for chatting)
+3. Run the client using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient <server IP>` (include `-n <nickname>` if you wish to use a custom nickname instead of a randomly generated one, include `-s` to enable the simple UI if the standard client does not work correctly on your system)
 
 ### Exercising the Application
 
@@ -103,6 +103,8 @@ This will generate a `target/` directory containing a single JAR file named:
 ```
 irc-<version>-SNAPSHOT.jar
 ```
+
+Note that `-DskipTests` is used to skip running unit tests, as they slow down the build process and are not required for this assignment. If you're curious about how the tests work, you can omit this flag to run them, but I'd rather they be off for evaluation in case a network test decides to be flaky.
 
 ## Running
 
@@ -385,6 +387,10 @@ private IRCMessage005 parse005(Parameters parameters) throws Exception {
 
 You'll note that any message type that has optional or non-string fields gets its own method, while the simpler method types are parsed in a large switch-expression at the top using `parseExact(~)`. The `Parameters` class wraps a simple `List<String>` of incoming fields and maps them to the correct type based on the arguments to `inject(~)`, filling fields from left to right and skipping any optional fields that are not present (i.e., each required field MUST claim one parameter, optional fields MAY claim one of there are any remaining, and greedy fields claim all remaining parameters. Optional fields are resolved on a first-come-first-served basis).
 
+#### com.jessegrabowski.irc.args.ArgsParser
+
+This class is responsible for parsing command-line arguments into type-safe properties objects. It is used by both the client and server for startup, as well as by the client for parsing runtime user commands.
+
 ### Client Walkthrough
 
 This section will walk through the client's code, focusing on the parts that are especially relevant to the assignment.
@@ -495,3 +501,40 @@ This class is responsible for handling the receiving end of a file transfer. It'
 #### com.jessegrabowski.irc.client.dcc.DCCUploader
 
 This class is responsible for handling the sending end of a file transfer. It's a relatively simple wrapper around a `Socket` that simply connects, writes the file as raw bytes, waits for an acknowledgement from the receiver, then disconnects.
+
+### Server Walkthrough
+
+This section will walk through the server's code, focusing on the parts that are especially relevant to the assignment.
+
+#### com.jessegrabowski.irc.server.IRCServer
+
+This class is the main entrypoint for the application. The main method parses command line arguments (Using `ArgsParser`) into an `IRCServerProperties` object, sets up logging, creates and starts the various components of the server (`IRCServerEngine`, `DCCRelayEngine`, and an `Acceptor`), and wires everything together.
+
+#### com.jessegrabowski.irc.network.Acceptor
+
+This class wraps a ServerSocket and handles incoming connections using an `accept()` loop. When `Acceptor` receives a connection, it simply passes the `Socket` off to a `Dispatcher` instance, blocking the thread until the `Dispatcher` returns. `IRCServerEngine` is one such implementation (for IRC connections), and `DCCRelayEngine` has an internal lambda that also implements this interface (for file transfers).
+
+#### com.jessegrabowski.irc.server.IRCServerEngine
+
+This is the main brain of the client.
+
+The first method you'll want to look at is the constructor, which sets up the work queue (indirectly, as a `ScheduledExecutorService`). This also sets up our `StateGuard`, an abstraction used throughout the engine classes to ensure that state is only touched from a single thread.
+
+Next, look at `dispatch(Socket)`, which is called by the `Acceptor` when a new connection is received. This is responsible for creating a new `IRCConnection` instance and registering it with the server state. It also binds `onDisconnect(IRCConnection)` and `receive(IRCConnection, String)` to the connection so that they can be used later.
+
+`onDisconnect(IRCConnection)` is called when the connection is closed, either erroneously or intentionally, and is responsible for removing the connection and its associated user from the server state.
+
+`receive(IRCConnection, String)` is called whenever a line of text is received from the connection, and is responsible for parsing the raw string into an `IRCMessage` and dispatching it to the appropriate handler.
+
+`handle(IRCConnection, IRCMessage)` is the main handler for incoming messages from the client. This does not make use of exhaustive pattern matching, as the server has no reasonable way to respond to most message types beyond logging them (see the `default` branch). This is otherwise very similar to the client's implementation. The following handlers are particularly relevant to the assignment:
+- `handle(IRCConnection, IRCMessageCTCPDCCSend)` - This handler checks incoming DCC sends (file transfers) to determine if they're active (non-zero port) or passive (zero port). It rewrites passive sends to active sends originating from the server (to the receiver) and receives originating from the receiver (to the sender). It also notifies `DCCRelayEngine` of the new transfer (see `onEvent(DCCServerEvent)` for further interactions)
+- `handle(IRCConnection, IRCMessageJOINNormal)` - This handler attempts to add a client to a channel, if they are permitted to join.
+- `handle(IRCConnection, IRCMessageLIST)` - This handler responds to the `/list` command by sending a list of all channels to the client.
+- `handle(IRCConnection, IRCMessagePART)` - This handler attempts to remove a client from a channel.
+- `handlePrivmsg(IRCConnection, ~)` - This is a general-purpose handler for `PRIVMSG` (`/msg` command), `NOTICE`, and `TAGMSG`. It takes an incoming message, determine if it is allowed to be routed to its targets, and then forwards it on to each relevant party, applying filtering or capability checks as necessary.
+
+Finally, we have the `onEvent(DCCServerEvent)` method, which is responsible for mapping DCC events to changes to IRC state (and IRC messages when necessary). This method, and the handlers it delegates to, handle the bulk of the orchestration logic for file transfers on the server.
+
+#### com.jessegrabowski.irc.server.dcc.DCCRelayEngine
+
+This class is responsible for joining two clients together when they initiate a file transfer. Because DCC SEND does not include any sort of unique identifier or token, we instead need to open a new server port for each sender or receiver to connect to. This class is responsible for managing those ports (by managing `Acceptor` instances) and ensuring that they are properly cleaned up when the transfer is complete. It also provides a dynamic `Dispatcher` implementation that blocks until both clients connect, then joins them into a full-duplex channel.

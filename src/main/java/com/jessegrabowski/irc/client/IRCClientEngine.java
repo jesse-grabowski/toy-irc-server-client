@@ -261,14 +261,6 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
         });
     }
 
-    public CompletableFuture<Void> accept(ClientCommand command) {
-        if (engineState.get() != IRCClientEngineState.CLOSED) {
-            return CompletableFuture.runAsync(spy(() -> handle(command)), executor);
-        } else {
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
     private boolean send(String message) {
         IRCConnection connection = connectionHolder.get();
         if (connection == null) {
@@ -1383,6 +1375,14 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
                 f(Color.RED, s("Could not complete command, you must first join ", f(message.getChannel()), "!"))));
     }
 
+    public CompletableFuture<Void> accept(ClientCommand command) {
+        if (engineState.get() != IRCClientEngineState.CLOSED) {
+            return CompletableFuture.runAsync(spy(() -> handle(command)), executor);
+        } else {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     private void handle(ClientCommand command) {
         switch (command) {
             case ClientCommandAccept c -> handle(c);
@@ -1417,7 +1417,8 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
 
     private void handle(ClientCommandAccept command) {
         IRCClientState state = clientStateGuard.getState();
-        if (state == null) {
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not accept file transfer -- connection not yet registered"));
             return;
         }
 
@@ -1446,7 +1447,8 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
 
     private void handle(ClientCommandAction command) {
         IRCClientState state = clientStateGuard.getState();
-        if (state == null) {
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not perform CTCP action -- connection not yet registered"));
             return;
         }
 
@@ -1461,7 +1463,8 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
 
     private void handle(ClientCommandAfk command) {
         IRCClientState state = clientStateGuard.getState();
-        if (state == null) {
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not update away status -- connection not yet registered"));
             return;
         }
 
@@ -1471,6 +1474,12 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
     }
 
     private void handle(ClientCommandBack command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not update away status -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessageAWAY(null));
     }
 
@@ -1506,10 +1515,22 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
     }
 
     private void handle(ClientCommandJoin command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not join channel -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessageJOINNormal(command.getChannels(), command.getKeys()));
     }
 
     private void handle(ClientCommandKick command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not kick user -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessageKICK(command.getChannel(), command.getNick(), command.getReason()));
     }
 
@@ -1529,10 +1550,22 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
     }
 
     private void handle(ClientCommandList command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not list channels -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessageLIST(command.getChannels()));
     }
 
     private void handle(ClientCommandMode command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not set modes -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessageMODE(command.getTarget(), command.getModeString(), command.getModeArguments()));
     }
 
@@ -1575,10 +1608,22 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
     }
 
     private void handle(ClientCommandNick command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            terminal.println(makeSystemErrorMessage("Could not change nickname -- you aren't connected to anything"));
+            return;
+        }
+
         send(new IRCMessageNICK(command.getNick()));
     }
 
     private void handle(ClientCommandOper command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null || engineState.get() != IRCClientEngineState.REGISTERED) {
+            terminal.println(makeSystemErrorMessage("Could not become operator -- connection not yet registered"));
+            return;
+        }
+
         send(new IRCMessageOPER(command.getName(), command.getPassword()));
     }
 
@@ -1603,6 +1648,12 @@ public class IRCClientEngine implements DCCClientEventListener, IRCDisconnectHan
     }
 
     private void handle(ClientCommandQuit command) {
+        IRCClientState state = clientStateGuard.getState();
+        if (state == null) {
+            terminal.println(makeSystemErrorMessage("Could not quit -- you aren't connected to anything"));
+            return;
+        }
+
         send(new IRCMessageQUIT(command.getReason()));
     }
 

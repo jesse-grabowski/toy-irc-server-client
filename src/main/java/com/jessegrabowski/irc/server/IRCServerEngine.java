@@ -221,260 +221,6 @@ public class IRCServerEngine
         executor.execute(() -> handleDisconnect(connection));
     }
 
-    @Override
-    public void receive(IRCConnection connection, String line) {
-        parseAndHandleAsync(connection, line);
-    }
-
-    private void send(IRCConnection receiver, IRCMessage message) {
-        String rawValue = MARSHALLER.marshal(message);
-        if (!receiver.offer(rawValue) && !receiver.isClosed()) {
-            LOG.log(Level.WARNING, "Failed to send message to client {0}: {1}", new Object[] {
-                receiver.getHostAddress(), rawValue
-            });
-            LOG.log(Level.WARNING, "Terminating client connection {0}", receiver.getHostAddress());
-            receiver.closeDeferred();
-        }
-    }
-
-    private <T extends IRCMessage> void send(
-            IRCConnection receiver, MessageSource sender, IRCMessage initiator, IRCMessageFactory0<T> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender));
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            IRCMessageFactory1<T, A> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            IRCMessageFactory2<T, A, B> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B> void echo(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            IRCMessageFactory2<T, A, B> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, true, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B, C> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            C arg2,
-            IRCMessageFactory3<T, A, B, C> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1,
-                arg2);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B, C, D> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            C arg2,
-            D arg3,
-            IRCMessageFactory4<T, A, B, C, D> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1,
-                arg2,
-                arg3);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B, C, D, E> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            C arg2,
-            D arg3,
-            E arg4,
-            IRCMessageFactory5<T, A, B, C, D, E> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1,
-                arg2,
-                arg3,
-                arg4);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B, C, D, E, F> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            C arg2,
-            D arg3,
-            E arg4,
-            F arg5,
-            IRCMessageFactory6<T, A, B, C, D, E, F> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1,
-                arg2,
-                arg3,
-                arg4,
-                arg5);
-        send(receiver, message);
-    }
-
-    private <T extends IRCMessage, A, B, C, D, E, F, G, H, I> void send(
-            IRCConnection receiver,
-            MessageSource sender,
-            IRCMessage initiator,
-            A arg0,
-            B arg1,
-            C arg2,
-            D arg3,
-            E arg4,
-            F arg5,
-            G arg6,
-            H arg7,
-            I arg8,
-            IRCMessageFactory9<T, A, B, C, D, E, F, G, H, I> factory) {
-        T message = factory.create(
-                null,
-                makeTags(receiver, false, initiator),
-                makePrefixName(sender),
-                makePrefixUser(sender),
-                makePrefixHost(receiver, sender),
-                arg0,
-                arg1,
-                arg2,
-                arg3,
-                arg4,
-                arg5,
-                arg6,
-                arg7,
-                arg8);
-        send(receiver, message);
-    }
-
-    private SequencedMap<String, String> makeTags(IRCConnection connection, boolean isEcho, IRCMessage initiator) {
-        ServerState state = serverStateGuard.getState();
-        if (!state.hasCapability(connection, IRCCapability.MESSAGE_TAGS)
-                && !state.hasCapability(connection, IRCCapability.SERVER_TIME)) {
-            return new LinkedHashMap<>();
-        }
-
-        SequencedMap<String, String> tags = new LinkedHashMap<>();
-
-        if (initiator != null) {
-            for (Map.Entry<String, String> entry : initiator.getTags().entrySet()) {
-                if (isEcho || entry.getKey().startsWith("+")) {
-                    tags.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
-
-        if (state.hasCapability(connection, IRCCapability.SERVER_TIME)) {
-            tags.put("time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()));
-        }
-
-        return tags;
-    }
-
-    private String makePrefixName(MessageSource sender) {
-        return sender.getNickname();
-    }
-
-    private String makePrefixUser(MessageSource sender) {
-        return sender.getUsername();
-    }
-
-    private String makePrefixHost(IRCConnection connection, MessageSource sender) {
-        String host = sender.getHostAddress();
-        if (host == null) {
-            return null;
-        }
-
-        ServerState state = serverStateGuard.getState();
-        ServerUser user = state.getUserForConnection(connection);
-        if (Objects.equals(user.getNickname(), sender.getNickname())) {
-            return sender.getHostAddress();
-        } else {
-            return properties.getServer();
-        }
-    }
-
-    private MessageSource server() {
-        return new MessageSource.ServerMessageSource(properties.getHost());
-    }
-
     private void handleDisconnect(IRCConnection connection) {
         ServerState state = serverStateGuard.getState();
         ServerUser me = state.getUserForConnection(connection);
@@ -511,7 +257,8 @@ public class IRCServerEngine
         }
     }
 
-    private void parseAndHandleAsync(IRCConnection client, String line) {
+    @Override
+    public void receive(IRCConnection connection, String line) {
         if (engineState.get() != IRCServerEngineState.ACTIVE) {
             LOG.log(Level.WARNING, "Received message while shutting down engine");
             return;
@@ -521,7 +268,7 @@ public class IRCServerEngine
         // thread to mitigate DoS if someone finds a particularly slow request format
 
         IRCMessage message = UNMARSHALLER.unmarshal(parameters, StandardCharsets.UTF_8, line);
-        executor.execute(() -> handle(client, message));
+        executor.execute(() -> handle(connection, message));
     }
 
     private void handle(IRCConnection connection, IRCMessage message) {
@@ -2116,43 +1863,6 @@ public class IRCServerEngine
     }
 
     @Override
-    public void close() {
-        IRCServerEngineState oldState = engineState.getAndSet(IRCServerEngineState.CLOSED);
-        if (oldState == IRCServerEngineState.CLOSED) {
-            return;
-        }
-
-        // Annoyingly, this has to be System.err instead of using JUL to avoid a shutdown race condition
-        System.err.println("IRCServerEngine shutting down...");
-
-        executor.execute(() -> {
-            ServerState state = serverStateGuard.getState();
-            state.getConnections().forEach(IRCConnection::closeDeferred);
-        });
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        System.err.println("IRCServerEngine shutdown complete");
-    }
-
-    private Runnable spy(Runnable runnable) {
-        return () -> {
-            try {
-                runnable.run();
-            } catch (Exception e) {
-                LOG.log(Level.WARNING, "Error executing task", e);
-                throw e;
-            }
-        };
-    }
-
-    @Override
     public void onEvent(DCCServerEvent event) {
         if (engineState.get() == IRCServerEngineState.CLOSED) {
             LOG.warning("Ignoring DCC event after engine shutdown");
@@ -2278,6 +1988,292 @@ public class IRCServerEngine
         if (session != null && Objects.equals(session.getToken(), event.getToken())) {
             state.setDccSession(sender, null);
         }
+    }
+
+    private void send(IRCConnection receiver, IRCMessage message) {
+        String rawValue = MARSHALLER.marshal(message);
+        if (!receiver.offer(rawValue) && !receiver.isClosed()) {
+            LOG.log(Level.WARNING, "Failed to send message to client {0}: {1}", new Object[] {
+                receiver.getHostAddress(), rawValue
+            });
+            LOG.log(Level.WARNING, "Terminating client connection {0}", receiver.getHostAddress());
+            receiver.closeDeferred();
+        }
+    }
+
+    private <T extends IRCMessage> void send(
+            IRCConnection receiver, MessageSource sender, IRCMessage initiator, IRCMessageFactory0<T> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender));
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            IRCMessageFactory1<T, A> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            IRCMessageFactory2<T, A, B> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B> void echo(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            IRCMessageFactory2<T, A, B> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, true, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B, C> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            IRCMessageFactory3<T, A, B, C> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1,
+                arg2);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B, C, D> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            IRCMessageFactory4<T, A, B, C, D> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1,
+                arg2,
+                arg3);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B, C, D, E> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            E arg4,
+            IRCMessageFactory5<T, A, B, C, D, E> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1,
+                arg2,
+                arg3,
+                arg4);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B, C, D, E, F> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            E arg4,
+            F arg5,
+            IRCMessageFactory6<T, A, B, C, D, E, F> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1,
+                arg2,
+                arg3,
+                arg4,
+                arg5);
+        send(receiver, message);
+    }
+
+    private <T extends IRCMessage, A, B, C, D, E, F, G, H, I> void send(
+            IRCConnection receiver,
+            MessageSource sender,
+            IRCMessage initiator,
+            A arg0,
+            B arg1,
+            C arg2,
+            D arg3,
+            E arg4,
+            F arg5,
+            G arg6,
+            H arg7,
+            I arg8,
+            IRCMessageFactory9<T, A, B, C, D, E, F, G, H, I> factory) {
+        T message = factory.create(
+                null,
+                makeTags(receiver, false, initiator),
+                makePrefixName(sender),
+                makePrefixUser(sender),
+                makePrefixHost(receiver, sender),
+                arg0,
+                arg1,
+                arg2,
+                arg3,
+                arg4,
+                arg5,
+                arg6,
+                arg7,
+                arg8);
+        send(receiver, message);
+    }
+
+    private SequencedMap<String, String> makeTags(IRCConnection connection, boolean isEcho, IRCMessage initiator) {
+        ServerState state = serverStateGuard.getState();
+        if (!state.hasCapability(connection, IRCCapability.MESSAGE_TAGS)
+                && !state.hasCapability(connection, IRCCapability.SERVER_TIME)) {
+            return new LinkedHashMap<>();
+        }
+
+        SequencedMap<String, String> tags = new LinkedHashMap<>();
+
+        if (initiator != null) {
+            for (Map.Entry<String, String> entry : initiator.getTags().entrySet()) {
+                if (isEcho || entry.getKey().startsWith("+")) {
+                    tags.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        if (state.hasCapability(connection, IRCCapability.SERVER_TIME)) {
+            tags.put("time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()));
+        }
+
+        return tags;
+    }
+
+    private String makePrefixName(MessageSource sender) {
+        return sender.getNickname();
+    }
+
+    private String makePrefixUser(MessageSource sender) {
+        return sender.getUsername();
+    }
+
+    private String makePrefixHost(IRCConnection connection, MessageSource sender) {
+        String host = sender.getHostAddress();
+        if (host == null) {
+            return null;
+        }
+
+        ServerState state = serverStateGuard.getState();
+        ServerUser user = state.getUserForConnection(connection);
+        if (Objects.equals(user.getNickname(), sender.getNickname())) {
+            return sender.getHostAddress();
+        } else {
+            return properties.getServer();
+        }
+    }
+
+    private MessageSource server() {
+        return new MessageSource.ServerMessageSource(properties.getHost());
+    }
+
+    private Runnable spy(Runnable runnable) {
+        return () -> {
+            try {
+                runnable.run();
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "Error executing task", e);
+                throw e;
+            }
+        };
+    }
+
+    @Override
+    public void close() {
+        IRCServerEngineState oldState = engineState.getAndSet(IRCServerEngineState.CLOSED);
+        if (oldState == IRCServerEngineState.CLOSED) {
+            return;
+        }
+
+        // Annoyingly, this has to be System.err instead of using JUL to avoid a shutdown race condition
+        System.err.println("IRCServerEngine shutting down...");
+
+        executor.execute(() -> {
+            ServerState state = serverStateGuard.getState();
+            state.getConnections().forEach(IRCConnection::closeDeferred);
+        });
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.err.println("IRCServerEngine shutdown complete");
     }
 
     private enum IRCServerEngineState {

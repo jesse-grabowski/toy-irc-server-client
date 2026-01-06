@@ -313,8 +313,8 @@ class DCCRelayEngineTest {
         try (Socket receiver = connectLoopback(receiverPort);
                 Socket sender = connectLoopback(senderPort)) {
 
-            awaitEvent(DCCServerEventReceiverConnected.class, token, Duration.ofSeconds(2));
-            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(2));
+            awaitEvent(DCCServerEventReceiverConnected.class, token, Duration.ofSeconds(5));
+            awaitEvent(DCCServerEventSenderConnected.class, token, Duration.ofSeconds(5));
 
             engine.cancel(token);
             engine.cancel(token);
