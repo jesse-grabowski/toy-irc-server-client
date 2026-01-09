@@ -1000,8 +1000,8 @@ public class IRCServerEngine
                     IRCMessage501::new);
         }
 
-        ServerChannel channel = state.getExistingChannel(connection, message.getTarget());
         for (IRCChannelList list : viewedLists) {
+            ServerChannel channel = state.getExistingChannel(connection, message.getTarget());
             switch (list) {
                 case BAN -> {
                     for (Glob glob : channel.getList(list)) {
