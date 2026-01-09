@@ -1269,6 +1269,8 @@ public class IRCServerEngine
             return;
         }
         for (MessageTarget target : targets) {
+            // we only want to send away status if they target a specific nickname;
+            // channels and globs won't match a user in getAway and will just return null
             String away = state.getAway(target.getMask());
             if (away != null && !away.isEmpty()) {
                 send(connection, server(), message, me.getNickname(), target.getMask(), away, IRCMessage301::new);
@@ -1993,6 +1995,9 @@ public class IRCServerEngine
     private void send(IRCConnection receiver, IRCMessage message) {
         String rawValue = MARSHALLER.marshal(message);
         if (!receiver.offer(rawValue) && !receiver.isClosed()) {
+            // There are a couple of ways this could be handled, but given that this should be very
+            // rare under normal operating conditions, blowing up the connection is a reasonable solution
+            // to backpressure.
             LOG.log(Level.WARNING, "Failed to send message to client {0}: {1}", new Object[] {
                 receiver.getHostAddress(), rawValue
             });

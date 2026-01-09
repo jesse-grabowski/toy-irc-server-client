@@ -136,7 +136,8 @@ public final class IRCConnection implements Closeable {
     /**
      * Make a best-effort attempt to enqueue a line for egress. This method does not guarantee that
      * the message will be sent (e.g. if the connection closes while it is enqueued the message will
-     * be lost).
+     * be lost). This will also refuse a message if the egress queue is full, as we want to limit the
+     * memory a single connection can use.
      *
      * @param line a well-formed IRC message line
      * @return true if the message was successfully enqueued, false otherwise.
@@ -146,6 +147,10 @@ public final class IRCConnection implements Closeable {
             return false;
         }
 
+        // This should really never fill up under normal circumstances, at least in the scope
+        // of this course. Under extreme load or with a slow client/server this could hit backpressure,
+        // but there's really not a good non-blocking way to deal with that beyond signaling up to the
+        // caller and letting them sort it out
         return egressQueue.offer(Objects.requireNonNull(line));
     }
 
