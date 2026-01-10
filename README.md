@@ -12,9 +12,10 @@ RitsIRC is a mostly specification-compliant [Modern IRC](https://modern.ircdocs.
 
 ### Running the Application
 
-1. Build the application using `mvn clean package -DskipTests` (or `./mvnw clean package -DskipTests` if you don't have Maven installed)
-2. Run the server using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.server.IRCServer -H <server IP> -L FINE` (`-H` must be correct for file transfers to work, but is optional for chatting)
-3. Run the client using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient <server IP>` (include `-n <nickname>` if you wish to use a custom nickname instead of a randomly generated one, include `-s` to enable the simple UI if the standard client does not work correctly on your system)
+1. Install Java 25 or later and, optionally, Apache Maven (or use the Maven wrapper script included in this project)
+2. Build the application using `mvn clean package -DskipTests` (or `./mvnw clean package -DskipTests` if you don't have Maven installed)
+3. Run the server using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.server.IRCServer -H <server IP> -L FINE` (`-H` must be correct for file transfers to work, but is optional for chatting)
+4. Run the client using `java -cp target/irc-1.0.0-SNAPSHOT.jar com.jessegrabowski.irc.client.IRCClient <server IP>` (include `-n <nickname>` if you wish to use a custom nickname instead of a randomly generated one, include `-s` to enable the simple UI if the standard client does not work correctly on your system)
 
 ### Exercising the Application
 
@@ -28,8 +29,8 @@ RitsIRC is a mostly specification-compliant [Modern IRC](https://modern.ircdocs.
 
 ### Evaluating the Networking Code
 
-1. Begin at `com.jessegrabowski.irc.network.IRCConnection` for the main IRC `Socket` code, shared by the server and client.
-2. Next look at `com.jessegrabowski.irc.network.Acceptor` for the server-side `ServerSocket` listener code, including the acceptor loop.
+1. Begin at `com.jessegrabowski.irc.network.IRCConnection` for the main IRC `Socket` wrapper, shared by the server and client.
+2. Next look at `com.jessegrabowski.irc.network.Acceptor` for the server-side `ServerSocket` listener code, including the accept loop.
 3. Check out `com.jessegrabowski.irc.client.dcc.DCCDownloader` and `com.jessegrabowski.irc.client.dcc.DCCUploader` for the client-side file transfer code, and `com.jessegrabowski.irc.server.dcc.DCCRelayEngine` and `com.jessegrabowski.irc.server.dcc.DCCRelayPipe` for the server-side file transfer code.
 
 ### Evaluating the Protocol Code
@@ -104,7 +105,7 @@ This will generate a `target/` directory containing a single JAR file named:
 irc-<version>-SNAPSHOT.jar
 ```
 
-Note that `-DskipTests` is used to skip running unit tests, as they slow down the build process and are not required for this assignment. If you're curious about how the tests work, you can omit this flag to run them, but I'd rather they be off for evaluation in case a network test decides to be flaky.
+Note that `-DskipTests` is used to skip running unit tests, as they slow down the build process and are not required for this assignment. If you're curious about how the tests work, you can omit this flag to run them, but I'd rather they be off for evaluation in case a network-related test decides to be flaky.
 
 ## Running
 
