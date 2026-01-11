@@ -74,6 +74,9 @@ public class DCCRelayPipe {
     private void transmit(Socket src, Socket dest) throws IOException {
         InputStream is = src.getInputStream();
         OutputStream os = dest.getOutputStream();
+
+        // real system would probably rate-limit/throttle this somehow
+        // but we'll just go full speed here
         is.transferTo(os);
         os.flush();
 

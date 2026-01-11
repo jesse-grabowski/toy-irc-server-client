@@ -189,6 +189,11 @@ public class IRCServerEngine
             socket.setKeepAlive(true);
         } catch (IOException e) {
             LOG.log(Level.WARNING, "Error setting socket options", e);
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                LOG.log(Level.FINE, "Error closing client socket", ex);
+            }
             return true;
         }
 
