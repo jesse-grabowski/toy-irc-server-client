@@ -1087,7 +1087,7 @@ public final class ServerState {
 
     public List<ServerUserWas> getNicknameHistory(String nickname, int limit) {
         return nicknameHistory.stream()
-                .filter(u -> u.getNickname().equals(normalizeNickname(nickname)))
+                .filter(u -> Objects.equals(u.getNickname(), normalizeNickname(nickname)))
                 .limit(limit)
                 .collect(Collectors.toList());
     }
