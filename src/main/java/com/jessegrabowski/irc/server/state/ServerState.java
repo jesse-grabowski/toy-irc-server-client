@@ -788,7 +788,7 @@ public final class ServerState {
 
         // Nickname
         return new MessageTarget(mask, false, glob.isLiteral(), Set.copyOf(users.values()), Set.of())
-                .filterUsers(u -> glob.matches(normalizeNickname(u.getNickname())));
+                .filterUsers(u -> u.getNickname() != null && glob.matches(normalizeNickname(u.getNickname())));
     }
 
     public MessageTarget getWatchers(ServerChannel channel) {
